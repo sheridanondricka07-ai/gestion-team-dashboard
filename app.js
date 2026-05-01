@@ -73,11 +73,18 @@ class TeamApp {
         this.updateDashboard();
     }
 
-    updateRPIps(rpId, ips) {
-        const rp = this.state.rps.find(r => r.id === rpId);
-        if (rp) {
-            rp.assignedIps = ips;
-        }
+    deleteServer(serverId) {
+        // Move any RPs in this server back to stock
+        this.state.rps.forEach(rp => {
+            if (rp.serverId === serverId) {
+                rp.serverId = null;
+                rp.mailerId = null;
+                rp.assignedIps = [];
+            }
+        });
+        
+        // Remove the server
+        this.state.servers = this.state.servers.filter(s => s.id !== serverId);
         this.saveState();
         this.updateDashboard();
     }

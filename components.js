@@ -237,7 +237,8 @@ function renderManagement(app, container) {
                     <div class="drop-zone" data-type="stock-srv" style="min-height: 50px;">
                         ${stockSrvs.map(srv => `
                             <div class="draggable-item" draggable="true" ondragstart="handleDragStart(event, 'srv', '${srv.id}')">
-                                <span>${srv.name}</span>
+                                <span style="flex: 1;">${srv.name}</span>
+                                <i data-lucide="trash-2" style="width: 12px; cursor: pointer; color: var(--error); margin-right: 8px;" onclick="confirmDeleteServer('${srv.id}')"></i>
                                 <span class="badge badge-srv">SRV</span>
                             </div>
                         `).join('')}
@@ -263,8 +264,11 @@ function renderManagement(app, container) {
                                     return `
                                         <div class="server-container draggable-item" draggable="true" ondragstart="handleDragStart(event, 'srv', '${srv.id}')">
                                             <div class="server-header">
-                                                <span>${srv.name} (${srv.ip})</span>
-                                                <i data-lucide="server" style="width: 12px;"></i>
+                                                <span style="flex: 1;">${srv.name} (${srv.ip})</span>
+                                                <div style="display: flex; gap: 8px; align-items: center;">
+                                                    <i data-lucide="archive" style="width: 12px; cursor: pointer; color: var(--text-secondary);" title="Return to Stock" onclick="app.assignResource('srv', '${srv.id}', null)"></i>
+                                                    <i data-lucide="trash-2" style="width: 12px; cursor: pointer; color: var(--error);" title="Delete Server" onclick="confirmDeleteServer('${srv.id}')"></i>
+                                                </div>
                                             </div>
                                             <div class="rp-list drop-zone" data-type="server" data-id="${srv.id}" style="min-height: 30px;">
                                                 ${srvRps.map(rp => `
@@ -494,6 +498,12 @@ window.saveRPIps = (rpId, btn) => {
     const selectedIps = Array.from(btn.closest('.modal').querySelectorAll('.ip-pill.selected')).map(el => el.dataset.ip);
     window.app.updateRPIps(rpId, selectedIps);
     btn.closest('.modal-overlay').remove();
+};
+
+window.confirmDeleteServer = (serverId) => {
+    if (confirm("Are you sure you want to delete this server? All linked RPs will be moved back to the stock pool.")) {
+        window.app.deleteServer(serverId);
+    }
 };
 
 // Drag & Drop Logic
