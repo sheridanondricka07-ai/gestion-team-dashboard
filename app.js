@@ -1,0 +1,126 @@
+import { renderLogin, renderSidebar, renderTopBar, renderView } from './components.js';
+
+class TeamApp {
+    constructor() {
+        this.state = {
+            currentUser: null,
+            currentView: 'overview',
+            mailers: [
+                { id: '1', name: 'Jaefar LAAKEL HEMDANOU', role: 'mailer', email: 'jaefar@team.com', password: 'pass' },
+                { id: '2', name: 'Ayoub SABER', role: 'mailer', email: 'ayoub.s@team.com', password: 'pass' },
+                { id: '3', name: 'Inssaf EL HAOUASS', role: 'mailer', email: 'inssaf@team.com', password: 'pass' },
+                { id: '4', name: 'Ayoub GHAILAN', role: 'mailer', email: 'ayoub.g@team.com', password: 'pass' },
+                { id: '5', name: 'Salma EL KARTIT', role: 'mailer', email: 'salma@team.com', password: 'pass' },
+                { id: 'admin', name: 'Team Leader', role: 'admin', email: 'admin@team.com', password: 'admin' }
+            ],
+            rps: [
+                { id: 'rp1', domain: 'marketing-pro.com', mailerId: '1', status: 'active' },
+                { id: 'rp2', domain: 'service-outreach.net', mailerId: '1', status: 'active' },
+                { id: 'rp3', domain: 'business-leads.io', mailerId: '2', status: 'warming' },
+                { id: 'rp4', domain: 'global-connect.com', mailerId: null, status: 'stock' },
+                { id: 'rp5', domain: 'prime-sender.org', mailerId: null, status: 'stock' },
+                { id: 'rp6', domain: 'elite-mail.com', mailerId: '3', status: 'active' },
+            ],
+            servers: [
+                { id: 'srv1', name: 'SRV-NYC-01', ip: '192.168.1.10', ips: ['1.1.1.1', '1.1.1.2', '1.1.1.3'], mailerId: '1' },
+                { id: 'srv2', name: 'SRV-LDN-05', ip: '10.0.0.45', ips: ['2.2.2.1', '2.2.2.2'], mailerId: '2' },
+                { id: 'srv3', name: 'SRV-FRA-02', ip: '172.16.0.12', ips: ['3.3.3.1'], mailerId: null },
+            ]
+        };
+
+        this.init();
+    }
+
+    init() {
+        this.loadState();
+        this.checkAuth();
+        this.attachGlobalEvents();
+    }
+
+    loadState() {
+        const savedState = localStorage.getItem('team_management_state');
+        if (savedState) {
+            const parsed = JSON.parse(savedState);
+            this.state = { ...this.state, ...parsed };
+        }
+    }
+
+    saveState() {
+        localStorage.setItem('team_management_state', JSON.stringify(this.state));
+    }
+
+    checkAuth() {
+        if (!this.state.currentUser) {
+            this.showScreen('login');
+            renderLogin(this);
+        } else {
+            this.showScreen('dashboard');
+            this.updateDashboard();
+        }
+    }
+
+    login(email, password) {
+        const user = this.state.mailers.find(u => u.email === email && u.password === password);
+        if (user) {
+            this.state.currentUser = user;
+            this.saveState();
+            this.checkAuth();
+            return true;
+        }
+        return false;
+    }
+
+    logout() {
+        this.state.currentUser = null;
+        this.state.currentView = 'overview';
+        this.saveState();
+        this.checkAuth();
+    }
+
+    showScreen(screenName) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+        document.getElementById(`${screenName}-screen`).classList.remove('hidden');
+    }
+
+    updateDashboard() {
+        renderSidebar(this);
+        renderTopBar(this);
+        renderView(this);
+        // Initialize Lucide icons after rendering
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
+    }
+
+    setView(viewName) {
+        this.state.currentView = viewName;
+        this.updateDashboard();
+    }
+
+    // Data Actions
+    assignResource(type, resourceId, mailerId) {
+        if (this.state.currentUser.role !== 'admin') return;
+
+        if (type === 'rp') {
+            const rp = this.state.rps.find(r => r.id === resourceId);
+            if (rp) {
+                rp.mailerId = mailerId;
+                rp.status = mailerId ? 'active' : 'stock';
+            }
+        } else if (type === 'srv') {
+            const srv = this.state.servers.find(s => s.id === resourceId);
+            if (srv) {
+                srv.mailerId = mailerId;
+            }
+        }
+        this.saveState();
+        this.updateDashboard();
+    }
+
+    attachGlobalEvents() {
+        // Handle drag and drop global events if needed
+    }
+}
+
+// Initialize the app
+window.app = new TeamApp();

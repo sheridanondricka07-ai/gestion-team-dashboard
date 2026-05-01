@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Management | Emailing Pro</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+    <div id="app">
+        <!-- App content will be injected here -->
+        <div id="login-screen" class="screen"></div>
+        <div id="dashboard-screen" class="screen hidden">
+            <aside id="sidebar"></aside>
+            <main id="main-content">
+                <header id="top-bar"></header>
+                <div id="view-container"></div>
+            </main>
+        </div>
+    </div>
+    <script type="module" src="app.js"></script>
+</body>
+</html>
