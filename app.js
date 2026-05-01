@@ -33,12 +33,13 @@ class TeamApp {
 
     // ... (rest of methods)
 
-    addServer(name, ip, ips) {
+    addServer(name, ips) {
+        const ipList = ips.split('\n').map(i => i.trim()).filter(i => i !== '');
         const newServer = {
             id: 'srv' + Date.now(),
             name,
-            ip,
-            ips: ips.split(',').map(i => i.trim()),
+            ip: ipList[0] || 'No IP', // Use first IP as display IP
+            ips: ipList,
             mailerId: null
         };
         this.state.servers.push(newServer);

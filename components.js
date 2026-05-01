@@ -410,12 +410,8 @@ window.showAddServerModal = () => {
                 <input type="text" id="srv-name" placeholder="SRV-NYC-01">
             </div>
             <div class="form-group">
-                <label>Main IP</label>
-                <input type="text" id="srv-ip" placeholder="192.168.1.1">
-            </div>
-            <div class="form-group">
-                <label>Additional IPs (comma separated)</label>
-                <input type="text" id="srv-ips" placeholder="1.1.1.1, 1.1.1.2">
+                <label>IP Addresses (one per line)</label>
+                <textarea id="srv-ips" rows="6" style="width: 100%; padding: 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-family: monospace;" placeholder="1.1.1.1&#10;2.2.2.2&#10;3.3.3.3"></textarea>
             </div>
             <div style="display: flex; gap: 12px;">
                 <button onclick="this.closest('.modal-overlay').remove()" style="background: var(--bg-tertiary);">Cancel</button>
@@ -428,10 +424,9 @@ window.showAddServerModal = () => {
 
 window.submitServer = (btn) => {
     const name = document.getElementById('srv-name').value;
-    const ip = document.getElementById('srv-ip').value;
     const ips = document.getElementById('srv-ips').value;
-    if (name && ip) {
-        window.app.addServer(name, ip, ips);
+    if (name && ips) {
+        window.app.addServer(name, ips);
         btn.closest('.modal-overlay').remove();
     }
 };
