@@ -14,12 +14,12 @@ class TeamApp {
                 { id: 'admin', name: 'Team Leader', role: 'admin', email: 'admin@team.com', password: 'admin' }
             ],
             rps: [
-                { id: 'rp1', domain: 'marketing-pro.com', mailerId: '1', status: 'active' },
-                { id: 'rp2', domain: 'service-outreach.net', mailerId: '1', status: 'active' },
-                { id: 'rp3', domain: 'business-leads.io', mailerId: '2', status: 'warming' },
-                { id: 'rp4', domain: 'global-connect.com', mailerId: null, status: 'stock' },
-                { id: 'rp5', domain: 'prime-sender.org', mailerId: null, status: 'stock' },
-                { id: 'rp6', domain: 'elite-mail.com', mailerId: '3', status: 'active' },
+                { id: 'rp1', domain: 'marketing-pro.com', mailerId: '1', serverId: 'srv1', assignedIps: ['1.1.1.1'], status: 'active' },
+                { id: 'rp2', domain: 'service-outreach.net', mailerId: '1', serverId: 'srv1', assignedIps: ['1.1.1.2'], status: 'active' },
+                { id: 'rp3', domain: 'business-leads.io', mailerId: '2', serverId: 'srv2', assignedIps: ['2.2.2.1'], status: 'warming' },
+                { id: 'rp4', domain: 'global-connect.com', mailerId: null, serverId: null, assignedIps: [], status: 'stock' },
+                { id: 'rp5', domain: 'prime-sender.org', mailerId: null, serverId: null, assignedIps: [], status: 'stock' },
+                { id: 'rp6', domain: 'elite-mail.com', mailerId: '3', serverId: null, assignedIps: [], status: 'active' },
             ],
             servers: [
                 { id: 'srv1', name: 'SRV-NYC-01', ip: '192.168.1.10', ips: ['1.1.1.1', '1.1.1.2', '1.1.1.3'], mailerId: '1' },
@@ -29,6 +29,56 @@ class TeamApp {
         };
 
         this.init();
+    }
+
+    // ... (rest of methods)
+
+    addServer(name, ip, ips) {
+        const newServer = {
+            id: 'srv' + Date.now(),
+            name,
+            ip,
+            ips: ips.split(',').map(i => i.trim()),
+            mailerId: null
+        };
+        this.state.servers.push(newServer);
+        this.saveState();
+        this.updateDashboard();
+    }
+
+    addRP(domain) {
+        const newRP = {
+            id: 'rp' + Date.now(),
+            domain,
+            mailerId: null,
+            serverId: null,
+            assignedIps: [],
+            status: 'stock'
+        };
+        this.state.rps.push(newRP);
+        this.saveState();
+        this.updateDashboard();
+    }
+
+    assignRPtoServer(rpId, serverId) {
+        const rp = this.state.rps.find(r => r.id === rpId);
+        const srv = this.state.servers.find(s => s.id === serverId);
+        if (rp) {
+            rp.serverId = serverId;
+            rp.mailerId = srv ? srv.mailerId : null;
+            if (!srv) rp.assignedIps = [];
+        }
+        this.saveState();
+        this.updateDashboard();
+    }
+
+    updateRPIps(rpId, ips) {
+        const rp = this.state.rps.find(r => r.id === rpId);
+        if (rp) {
+            rp.assignedIps = ips;
+        }
+        this.saveState();
+        this.updateDashboard();
     }
 
     init() {

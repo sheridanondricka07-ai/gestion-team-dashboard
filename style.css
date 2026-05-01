@@ -387,16 +387,73 @@ button:active {
 .badge-rp { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
 .badge-srv { background: rgba(168, 85, 247, 0.2); color: #c084fc; }
 
-/* Responsive */
-@media (max-width: 1024px) {
-    #sidebar {
-        width: 80px;
-        padding: var(--spacing-md);
-    }
-    .nav-label, .nav-item span, .sidebar-logo span {
-        display: none;
-    }
-    .resource-manager {
-        grid-template-columns: 1fr;
-    }
+/* Modals */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.modal {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    padding: var(--spacing-xl);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 500px;
+}
+
+/* Nested Items */
+.server-container {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: var(--spacing-md);
+    overflow: hidden;
+}
+
+.server-header {
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: rgba(255,255,255,0.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.rp-list {
+    padding: var(--spacing-sm);
+}
+
+.rp-item {
+    background: var(--bg-secondary);
+    padding: var(--spacing-sm);
+    border-radius: 6px;
+    margin-bottom: var(--spacing-xs);
+    font-size: 0.8rem;
+    display: flex;
+    justify-content: space-between;
+}
+
+/* IP Selection */
+.ip-pill {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--bg-tertiary);
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+
+.ip-pill.selected {
+    background: var(--accent-primary);
+    color: white;
 }
