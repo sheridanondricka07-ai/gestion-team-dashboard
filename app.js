@@ -4,7 +4,7 @@ class TeamApp {
     constructor() {
         this.state = {
             currentUser: null,
-            currentView: 'overview', // 'overview', 'management'
+            currentView: 'overview', // 'overview', 'management', 'team'
             mailers: [
                 { id: 'admin', name: 'Team Leader', email: 'admin@admin.com', password: 'admin', role: 'admin' },
                 { id: '1', name: 'Moussa ADEMOU', email: 'moussa@test.com', password: 'password', role: 'mailer' },
@@ -56,6 +56,43 @@ class TeamApp {
         });
         this.saveState();
         this.updateDashboard();
+    }
+
+    addMailer(mailerData) {
+        const newMailer = {
+            id: 'm' + Date.now(),
+            name: mailerData.name,
+            email: mailerData.email,
+            password: mailerData.password,
+            role: 'mailer'
+        };
+        this.state.mailers.push(newMailer);
+        this.saveState();
+        this.updateDashboard();
+    }
+
+    deleteMailer(mailerId) {
+        if (mailerId === 'admin') return; // Cannot delete admin
+        
+        this.showConfirm("Are you sure you want to remove this mailer? All their assigned servers and RPs will be moved back to stock.", () => {
+            // Unassign all servers from this mailer
+            this.state.servers.forEach(s => {
+                if (s.mailerId === mailerId) s.mailerId = null;
+            });
+            // Unassign all RPs from this mailer
+            this.state.rps.forEach(rp => {
+                if (rp.mailerId === mailerId) {
+                    rp.mailerId = null;
+                    rp.serverId = null;
+                    rp.assignedIps = [];
+                    rp.status = 'stock';
+                }
+            });
+            
+            this.state.mailers = this.state.mailers.filter(m => m.id !== mailerId);
+            this.saveState();
+            this.updateDashboard();
+        });
     }
 
     updateRPIps(rpId, ips) {
@@ -154,7 +191,7 @@ class TeamApp {
                 </div>
                 <p style="margin-bottom: 32px; color: var(--text-secondary); line-height: 1.6;">${message}</p>
                 <div style="display: flex; gap: 12px;">
-                    <button id="confirm-yes" style="flex: 1; background: var(--error);">Yes, Delete</button>
+                    <button id="confirm-yes" style="flex: 1; background: var(--error);">Yes, Continue</button>
                     <button id="confirm-no" style="flex: 1; background: var(--bg-tertiary);">Cancel</button>
                 </div>
             </div>
@@ -248,6 +285,7 @@ window.app = new TeamApp();
 // Global Helpers
 window.deleteRP = (id) => window.app.deleteRP(id);
 window.deleteServer = (id) => window.app.deleteServer(id);
+window.deleteMailer = (id) => window.app.deleteMailer(id);
 window.unassignRP = (id) => window.app.unassignRP(id);
 window.unassignServer = (id) => window.app.unassignServer(id);
 

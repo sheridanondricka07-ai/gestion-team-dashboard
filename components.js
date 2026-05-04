@@ -51,6 +51,10 @@ export function renderSidebar(app) {
                     <i data-lucide="settings"></i>
                     <span>Management</span>
                 </div>
+                <div class="nav-item ${view === 'team' ? 'active' : ''}" onclick="app.setView('team')">
+                    <i data-lucide="users"></i>
+                    <span>Team</span>
+                </div>
             ` : ''}
         </div>
         <div style="margin-top: auto;">
@@ -74,6 +78,9 @@ export function renderTopBar(app) {
                 <button onclick="showAddServerModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color);">+ Server</button>
                 <button onclick="showAddRPModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto;">+ RP</button>
             ` : ''}
+            ${app.state.currentUser.role === 'admin' && app.state.currentView === 'team' ? `
+                <button onclick="showAddMailerModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto;">+ Mailer</button>
+            ` : ''}
             <div style="text-align: right;">
                 <div style="font-size: 0.85rem; font-weight: 600;">${app.state.currentUser.name}</div>
                 <div style="font-size: 0.7rem; color: var(--text-secondary);">${app.state.currentUser.role.toUpperCase()}</div>
@@ -91,6 +98,8 @@ export function renderView(app) {
         renderOverview(app, container);
     } else if (view === 'management') {
         renderManagement(app, container);
+    } else if (view === 'team') {
+        renderTeamManagement(app, container);
     }
 }
 
@@ -146,8 +155,14 @@ function renderOverview(app, container) {
                             <div class="rp-list" style="padding: 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px;">
                                 ${srvRps.map(rp => `
                                     <div class="rp-item" style="background: var(--bg-tertiary); margin-bottom: 0;">
-                                        <span>${rp.domain}</span>
-                                        <span style="font-size: 0.7rem; color: var(--text-secondary);">${rp.assignedIps.length} IPs</span>
+                                        <div style="flex: 1;">
+                                            <div style="font-weight: 500;">${rp.domain}</div>
+                                            <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;">
+                                                ${rp.assignedIps.map(ip => `
+                                                    <span style="font-size: 0.6rem; background: var(--bg-primary); padding: 1px 4px; border-radius: 4px; color: var(--accent-primary); border: 1px solid var(--accent-primary);">${ip}</span>
+                                                `).join('')}
+                                            </div>
+                                        </div>
                                     </div>
                                 `).join('')}
                                 ${srvRps.length === 0 ? '<span style="color: var(--text-secondary); font-size: 0.8rem;">No RPs assigned</span>' : ''}
@@ -279,6 +294,94 @@ function renderManagement(app, container) {
     setupDragAndDrop(app);
     if (window.lucide) window.lucide.createIcons();
 }
+
+function renderTeamManagement(app, container) {
+    const { mailers, servers, rps } = app.state;
+    const teamMembers = mailers.filter(m => m.role === 'mailer');
+
+    container.innerHTML = `
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h3 style="font-size: 1.25rem;">Team Management</h3>
+                <span style="color: var(--text-secondary); font-size: 0.85rem;">${teamMembers.length} Mailers Active</span>
+            </div>
+            
+            <div class="team-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
+                ${teamMembers.map(member => {
+                    const memberSrvs = servers.filter(s => s.mailerId === member.id);
+                    const memberRps = rps.filter(r => r.mailerId === member.id);
+                    return `
+                        <div class="card" style="background: var(--bg-tertiary); border: 1px solid var(--border-color); position: relative;">
+                            <div style="position: absolute; top: 12px; right: 12px;">
+                                <span class="action-icon delete" onclick="deleteMailer('${member.id}')" title="Remove Mailer">
+                                    <i data-lucide="user-x" style="width: 16px; color: var(--error);"></i>
+                                </span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
+                                <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--accent-primary); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.2rem;">
+                                    ${member.name.charAt(0)}
+                                </div>
+                                <div>
+                                    <div style="font-weight: 600;">${member.name}</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-secondary);">${member.email}</div>
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                                <div style="background: var(--bg-secondary); padding: 8px; border-radius: 8px; text-align: center;">
+                                    <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase;">Servers</div>
+                                    <div style="font-weight: 700; font-size: 1.1rem;">${memberSrvs.length}</div>
+                                </div>
+                                <div style="background: var(--bg-secondary); padding: 8px; border-radius: 8px; text-align: center;">
+                                    <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase;">RPs</div>
+                                    <div style="font-weight: 700; font-size: 1.1rem;">${memberRps.length}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+                ${teamMembers.length === 0 ? '<div style="grid-column: 1/-1; text-align: center; color: var(--text-secondary); padding: 40px;">No team members found.</div>' : ''}
+            </div>
+        </div>
+    `;
+    if (window.lucide) window.lucide.createIcons();
+}
+
+window.showAddMailerModal = () => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+        <div class="modal">
+            <h2 style="margin-bottom: 16px;">Add New Mailer</h2>
+            <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" id="m-name" placeholder="John Doe">
+            </div>
+            <div class="form-group">
+                <label>Email Address</label>
+                <input type="email" id="m-email" placeholder="john@example.com">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="m-pass" placeholder="••••••••">
+            </div>
+            <div style="display: flex; gap: 12px;">
+                <button onclick="saveMailer(this)" style="flex: 1;">Create Account</button>
+                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary);">Cancel</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+};
+
+window.saveMailer = (btn) => {
+    const name = document.getElementById('m-name').value;
+    const email = document.getElementById('m-email').value;
+    const password = document.getElementById('m-pass').value;
+    if (name && email && password) {
+        window.app.addMailer({ name, email, password });
+        btn.closest('.modal-overlay').remove();
+    }
+};
 
 window.showAddServerModal = () => {
     const overlay = document.createElement('div');
