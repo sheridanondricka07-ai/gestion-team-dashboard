@@ -228,7 +228,7 @@ function renderManagement(app, container) {
                         ${stockRps.map(rp => `
                             <div class="draggable-item" draggable="true" ondragstart="handleDragStart(event, 'rp', '${rp.id}')">
                                 <span style="flex: 1;">${rp.domain}</span>
-                                <span onclick="event.stopPropagation(); confirmDeleteRP('${rp.id}')" style="cursor: pointer; margin-right: 8px;">
+                                <span onclick="event.stopPropagation(); app.deleteRP('${rp.id}')" style="cursor: pointer; margin-right: 8px;">
                                     <i data-lucide="trash-2" style="width: 12px; color: var(--error);"></i>
                                 </span>
                                 <span class="badge badge-rp">RP</span>
@@ -241,7 +241,7 @@ function renderManagement(app, container) {
                         ${stockSrvs.map(srv => `
                             <div class="draggable-item" draggable="true" ondragstart="handleDragStart(event, 'srv', '${srv.id}')">
                                 <span style="flex: 1;">${srv.name}</span>
-                                <span onclick="event.stopPropagation(); confirmDeleteServer('${srv.id}')" style="cursor: pointer; margin-right: 8px;">
+                                <span onclick="event.stopPropagation(); app.deleteServer('${srv.id}')" style="cursor: pointer; margin-right: 8px;">
                                     <i data-lucide="trash-2" style="width: 12px; color: var(--error);"></i>
                                 </span>
                                 <span class="badge badge-srv">SRV</span>
@@ -274,7 +274,7 @@ function renderManagement(app, container) {
                                                     <span onclick="event.stopPropagation(); app.unassignServer('${srv.id}')" style="cursor: pointer;" title="Return to Stock">
                                                         <i data-lucide="archive" style="width: 12px; color: var(--text-secondary);"></i>
                                                     </span>
-                                                    <span onclick="event.stopPropagation(); confirmDeleteServer('${srv.id}')" style="cursor: pointer;" title="Delete Server">
+                                                    <span onclick="event.stopPropagation(); app.deleteServer('${srv.id}')" style="cursor: pointer;" title="Delete Server">
                                                         <i data-lucide="trash-2" style="width: 12px; color: var(--error);"></i>
                                                     </span>
                                                 </div>
@@ -291,7 +291,7 @@ function renderManagement(app, container) {
                                                             <span onclick="event.stopPropagation(); app.unassignRP('${rp.id}')" style="cursor: pointer;" title="Return to Stock">
                                                                 <i data-lucide="archive" style="width: 10px; color: var(--text-secondary);"></i>
                                                             </span>
-                                                            <span onclick="event.stopPropagation(); confirmDeleteRP('${rp.id}')" style="cursor: pointer;" title="Delete RP">
+                                                            <span onclick="event.stopPropagation(); app.deleteRP('${rp.id}')" style="cursor: pointer;" title="Delete RP">
                                                                 <i data-lucide="trash-2" style="width: 10px; color: var(--error);"></i>
                                                             </span>
                                                         </div>
@@ -311,7 +311,7 @@ function renderManagement(app, container) {
                                             <span onclick="event.stopPropagation(); app.unassignRP('${rp.id}')" style="cursor: pointer;" title="Return to Stock">
                                                 <i data-lucide="archive" style="width: 12px; color: var(--text-secondary);"></i>
                                             </span>
-                                            <span onclick="event.stopPropagation(); confirmDeleteRP('${rp.id}')" style="cursor: pointer; margin-right: 8px;" title="Delete RP">
+                                            <span onclick="event.stopPropagation(); app.deleteRP('${rp.id}')" style="cursor: pointer; margin-right: 8px;" title="Delete RP">
                                                 <i data-lucide="trash-2" style="width: 12px; color: var(--error);"></i>
                                             </span>
                                             <span class="badge badge-rp">Unlinked</span>
@@ -521,18 +521,6 @@ window.saveRPIps = (rpId, btn) => {
     const selectedIps = Array.from(btn.closest('.modal').querySelectorAll('.ip-pill.selected')).map(el => el.dataset.ip);
     window.app.updateRPIps(rpId, selectedIps);
     btn.closest('.modal-overlay').remove();
-};
-
-window.confirmDeleteServer = (serverId) => {
-    if (confirm("Are you sure you want to delete this server? All linked RPs will be moved back to the stock pool.")) {
-        window.app.deleteServer(serverId);
-    }
-};
-
-window.confirmDeleteRP = (rpId) => {
-    if (confirm("Are you sure you want to permanently delete this RP?")) {
-        window.app.deleteRP(rpId);
-    }
 };
 
 // Drag & Drop Logic

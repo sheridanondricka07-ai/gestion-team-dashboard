@@ -81,13 +81,19 @@ class TeamApp {
     }
 
     deleteServer(serverId) {
+        if (!confirm("Are you sure you want to delete this server? All linked RPs will be moved back to the stock pool.")) return;
+        
+        // Move any RPs in this server back to stock
         this.state.rps.forEach(rp => {
             if (rp.serverId === serverId) {
                 rp.serverId = null;
                 rp.mailerId = null;
                 rp.assignedIps = [];
+                rp.status = 'stock';
             }
         });
+        
+        // Remove the server
         this.state.servers = this.state.servers.filter(s => s.id !== serverId);
         this.saveState();
         this.updateDashboard();
@@ -191,6 +197,8 @@ class TeamApp {
     }
 
     deleteRP(rpId) {
+        if (!confirm("Are you sure you want to permanently delete this RP?")) return;
+        
         this.state.rps = this.state.rps.filter(r => r.id !== rpId);
         this.saveState();
         this.updateDashboard();
