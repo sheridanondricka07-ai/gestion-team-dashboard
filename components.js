@@ -228,7 +228,9 @@ function renderManagement(app, container) {
                         ${stockRps.map(rp => `
                             <div class="draggable-item" draggable="true" ondragstart="handleDragStart(event, 'rp', '${rp.id}')">
                                 <span style="flex: 1;">${rp.domain}</span>
-                                <i data-lucide="trash-2" style="width: 12px; cursor: pointer; color: var(--error); margin-right: 8px;" onclick="event.stopPropagation(); confirmDeleteRP('${rp.id}')"></i>
+                                <span onclick="event.stopPropagation(); confirmDeleteRP('${rp.id}')" style="cursor: pointer; margin-right: 8px;">
+                                    <i data-lucide="trash-2" style="width: 12px; color: var(--error);"></i>
+                                </span>
                                 <span class="badge badge-rp">RP</span>
                             </div>
                         `).join('')}
@@ -239,7 +241,9 @@ function renderManagement(app, container) {
                         ${stockSrvs.map(srv => `
                             <div class="draggable-item" draggable="true" ondragstart="handleDragStart(event, 'srv', '${srv.id}')">
                                 <span style="flex: 1;">${srv.name}</span>
-                                <i data-lucide="trash-2" style="width: 12px; cursor: pointer; color: var(--error); margin-right: 8px;" onclick="confirmDeleteServer('${srv.id}')"></i>
+                                <span onclick="event.stopPropagation(); confirmDeleteServer('${srv.id}')" style="cursor: pointer; margin-right: 8px;">
+                                    <i data-lucide="trash-2" style="width: 12px; color: var(--error);"></i>
+                                </span>
                                 <span class="badge badge-srv">SRV</span>
                             </div>
                         `).join('')}
@@ -267,8 +271,12 @@ function renderManagement(app, container) {
                                             <div class="server-header">
                                                 <span style="flex: 1;">${srv.name} (${srv.ip})</span>
                                                 <div style="display: flex; gap: 8px; align-items: center;">
-                                                    <i data-lucide="archive" style="width: 12px; cursor: pointer; color: var(--text-secondary);" title="Return to Stock" onclick="event.stopPropagation(); app.unassignServer('${srv.id}')"></i>
-                                                    <i data-lucide="trash-2" style="width: 12px; cursor: pointer; color: var(--error);" title="Delete Server" onclick="event.stopPropagation(); confirmDeleteServer('${srv.id}')"></i>
+                                                    <span onclick="event.stopPropagation(); app.unassignServer('${srv.id}')" style="cursor: pointer;" title="Return to Stock">
+                                                        <i data-lucide="archive" style="width: 12px; color: var(--text-secondary);"></i>
+                                                    </span>
+                                                    <span onclick="event.stopPropagation(); confirmDeleteServer('${srv.id}')" style="cursor: pointer;" title="Delete Server">
+                                                        <i data-lucide="trash-2" style="width: 12px; color: var(--error);"></i>
+                                                    </span>
                                                 </div>
                                             </div>
                                             <div class="rp-list drop-zone" data-type="server" data-id="${srv.id}" style="min-height: 30px;">
@@ -277,9 +285,15 @@ function renderManagement(app, container) {
                                                         <span style="flex: 1;">${rp.domain}</span>
                                                         <div style="display: flex; gap: 4px; align-items: center;">
                                                             <span style="font-size: 0.6rem; opacity: 0.7;">${rp.assignedIps.length} IPs</span>
-                                                            <i data-lucide="edit-3" style="width: 10px; cursor: pointer;" onclick="event.stopPropagation(); showIPSelectionModal('${rp.id}')"></i>
-                                                            <i data-lucide="archive" style="width: 10px; cursor: pointer; color: var(--text-secondary);" title="Return to Stock" onclick="event.stopPropagation(); app.unassignRP('${rp.id}')"></i>
-                                                            <i data-lucide="trash-2" style="width: 10px; cursor: pointer; color: var(--error);" title="Delete RP" onclick="event.stopPropagation(); confirmDeleteRP('${rp.id}')"></i>
+                                                            <span onclick="event.stopPropagation(); showIPSelectionModal('${rp.id}')" style="cursor: pointer;">
+                                                                <i data-lucide="edit-3" style="width: 10px;"></i>
+                                                            </span>
+                                                            <span onclick="event.stopPropagation(); app.unassignRP('${rp.id}')" style="cursor: pointer;" title="Return to Stock">
+                                                                <i data-lucide="archive" style="width: 10px; color: var(--text-secondary);"></i>
+                                                            </span>
+                                                            <span onclick="event.stopPropagation(); confirmDeleteRP('${rp.id}')" style="cursor: pointer;" title="Delete RP">
+                                                                <i data-lucide="trash-2" style="width: 10px; color: var(--error);"></i>
+                                                            </span>
                                                         </div>
                                                     </div>
                                                 `).join('')}
@@ -294,8 +308,12 @@ function renderManagement(app, container) {
                                     ${mStandaloneRps.map(rp => `
                                         <div class="draggable-item" draggable="true" ondragstart="handleDragStart(event, 'rp', '${rp.id}')">
                                             <span style="flex: 1;">${rp.domain}</span>
-                                            <i data-lucide="archive" style="width: 12px; cursor: pointer; color: var(--text-secondary);" title="Return to Stock" onclick="event.stopPropagation(); app.unassignRP('${rp.id}')"></i>
-                                            <i data-lucide="trash-2" style="width: 12px; cursor: pointer; color: var(--error); margin-right: 8px;" title="Delete RP" onclick="event.stopPropagation(); confirmDeleteRP('${rp.id}')"></i>
+                                            <span onclick="event.stopPropagation(); app.unassignRP('${rp.id}')" style="cursor: pointer;" title="Return to Stock">
+                                                <i data-lucide="archive" style="width: 12px; color: var(--text-secondary);"></i>
+                                            </span>
+                                            <span onclick="event.stopPropagation(); confirmDeleteRP('${rp.id}')" style="cursor: pointer; margin-right: 8px;" title="Delete RP">
+                                                <i data-lucide="trash-2" style="width: 12px; color: var(--error);"></i>
+                                            </span>
                                             <span class="badge badge-rp">Unlinked</span>
                                         </div>
                                     `).join('')}
