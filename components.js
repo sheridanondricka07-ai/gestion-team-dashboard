@@ -224,27 +224,27 @@ function renderManagement(app, container) {
                 </div>
                 <div class="pool-content">
                     <div style="color: var(--text-secondary); font-size: 0.7rem; margin-bottom: 8px; text-transform: uppercase;">Unlinked RPs</div>
-                    <div class="drop-zone" data-type="stock-rp" style="min-height: 50px;">
+                    <div class="drop-zone" data-type="stock-rp" style="min-height: 80px; border: 1px dashed var(--border-color); border-radius: 8px; margin-bottom: 12px;">
                         ${stockRps.map(rp => `
                             <div class="draggable-item" draggable="true" ondragstart="handleDragStart(event, 'rp', '${rp.id}')">
-                                <span style="flex: 1;">${rp.domain}</span>
-                                <span onclick="event.stopPropagation(); app.deleteRP('${rp.id}')" style="cursor: pointer; margin-right: 8px;">
-                                    <i data-lucide="trash-2" style="width: 12px; color: var(--error);"></i>
+                                <span style="flex: 1; font-weight: 500;">${rp.domain}</span>
+                                <span class="action-icon delete" onclick="event.stopPropagation(); deleteRP('${rp.id}')" title="Delete RP">
+                                    <i data-lucide="trash-2" style="width: 14px; color: var(--error);"></i>
                                 </span>
-                                <span class="badge badge-rp">RP</span>
+                                <span class="badge badge-rp" style="margin-left: 8px;">RP</span>
                             </div>
                         `).join('')}
                     </div>
 
                     <div style="color: var(--text-secondary); font-size: 0.7rem; margin: 16px 0 8px; text-transform: uppercase;">Unassigned Servers</div>
-                    <div class="drop-zone" data-type="stock-srv" style="min-height: 50px;">
+                    <div class="drop-zone" data-type="stock-srv" style="min-height: 80px; border: 1px dashed var(--border-color); border-radius: 8px;">
                         ${stockSrvs.map(srv => `
                             <div class="draggable-item" draggable="true" ondragstart="handleDragStart(event, 'srv', '${srv.id}')">
-                                <span style="flex: 1;">${srv.name}</span>
-                                <span onclick="event.stopPropagation(); app.deleteServer('${srv.id}')" style="cursor: pointer; margin-right: 8px;">
-                                    <i data-lucide="trash-2" style="width: 12px; color: var(--error);"></i>
+                                <span style="flex: 1; font-weight: 500;">${srv.name}</span>
+                                <span class="action-icon delete" onclick="event.stopPropagation(); deleteServer('${srv.id}')" title="Delete Server">
+                                    <i data-lucide="trash-2" style="width: 14px; color: var(--error);"></i>
                                 </span>
-                                <span class="badge badge-srv">SRV</span>
+                                <span class="badge badge-srv" style="margin-left: 8px;">SRV</span>
                             </div>
                         `).join('')}
                     </div>
@@ -267,32 +267,32 @@ function renderManagement(app, container) {
                                 ${mSrvs.map(srv => {
                                     const srvRps = rps.filter(r => r.serverId === srv.id);
                                     return `
-                                        <div class="server-container draggable-item" draggable="true" ondragstart="handleDragStart(event, 'srv', '${srv.id}')">
+                                        <div class="server-container draggable-item" draggable="true" ondragstart="handleDragStart(event, 'srv', '${srv.id}')" style="display: block; padding: 0;">
                                             <div class="server-header">
-                                                <span style="flex: 1;">${srv.name} (${srv.ip})</span>
-                                                <div style="display: flex; gap: 8px; align-items: center;">
-                                                    <span onclick="event.stopPropagation(); app.unassignServer('${srv.id}')" style="cursor: pointer;" title="Return to Stock">
-                                                        <i data-lucide="archive" style="width: 12px; color: var(--text-secondary);"></i>
+                                                <span style="flex: 1; font-weight: 600;">${srv.name} (${srv.ip})</span>
+                                                <div style="display: flex; gap: 4px; align-items: center;">
+                                                    <span class="action-icon" onclick="event.stopPropagation(); unassignServer('${srv.id}')" title="Return to Stock">
+                                                        <i data-lucide="archive" style="width: 14px; color: var(--text-secondary);"></i>
                                                     </span>
-                                                    <span onclick="event.stopPropagation(); app.deleteServer('${srv.id}')" style="cursor: pointer;" title="Delete Server">
-                                                        <i data-lucide="trash-2" style="width: 12px; color: var(--error);"></i>
+                                                    <span class="action-icon delete" onclick="event.stopPropagation(); deleteServer('${srv.id}')" title="Delete Server">
+                                                        <i data-lucide="trash-2" style="width: 14px; color: var(--error);"></i>
                                                     </span>
                                                 </div>
                                             </div>
                                             <div class="rp-list drop-zone" data-type="server" data-id="${srv.id}" style="min-height: 30px;">
                                                 ${srvRps.map(rp => `
                                                     <div class="rp-item draggable-item" draggable="true" ondragstart="handleDragStart(event, 'rp', '${rp.id}')">
-                                                        <span style="flex: 1;">${rp.domain}</span>
+                                                        <span style="flex: 1; font-weight: 500;">${rp.domain}</span>
                                                         <div style="display: flex; gap: 4px; align-items: center;">
-                                                            <span style="font-size: 0.6rem; opacity: 0.7;">${rp.assignedIps.length} IPs</span>
-                                                            <span onclick="event.stopPropagation(); showIPSelectionModal('${rp.id}')" style="cursor: pointer;">
-                                                                <i data-lucide="edit-3" style="width: 10px;"></i>
+                                                            <span style="font-size: 0.6rem; opacity: 0.7; margin-right: 4px;">${rp.assignedIps.length} IPs</span>
+                                                            <span class="action-icon" onclick="event.stopPropagation(); showIPSelectionModal('${rp.id}')" title="Config IPs">
+                                                                <i data-lucide="edit-3" style="width: 12px;"></i>
                                                             </span>
-                                                            <span onclick="event.stopPropagation(); app.unassignRP('${rp.id}')" style="cursor: pointer;" title="Return to Stock">
-                                                                <i data-lucide="archive" style="width: 10px; color: var(--text-secondary);"></i>
+                                                            <span class="action-icon" onclick="event.stopPropagation(); unassignRP('${rp.id}')" title="Return to Stock">
+                                                                <i data-lucide="archive" style="width: 12px; color: var(--text-secondary);"></i>
                                                             </span>
-                                                            <span onclick="event.stopPropagation(); app.deleteRP('${rp.id}')" style="cursor: pointer;" title="Delete RP">
-                                                                <i data-lucide="trash-2" style="width: 10px; color: var(--error);"></i>
+                                                            <span class="action-icon delete" onclick="event.stopPropagation(); deleteRP('${rp.id}')" title="Delete RP">
+                                                                <i data-lucide="trash-2" style="width: 12px; color: var(--error);"></i>
                                                             </span>
                                                         </div>
                                                     </div>
@@ -307,14 +307,14 @@ function renderManagement(app, container) {
                                     <div style="color: var(--text-secondary); font-size: 0.65rem; margin-top: 8px;">Standalone RPs:</div>
                                     ${mStandaloneRps.map(rp => `
                                         <div class="draggable-item" draggable="true" ondragstart="handleDragStart(event, 'rp', '${rp.id}')">
-                                            <span style="flex: 1;">${rp.domain}</span>
-                                            <span onclick="event.stopPropagation(); app.unassignRP('${rp.id}')" style="cursor: pointer;" title="Return to Stock">
-                                                <i data-lucide="archive" style="width: 12px; color: var(--text-secondary);"></i>
+                                            <span style="flex: 1; font-weight: 500;">${rp.domain}</span>
+                                            <span class="action-icon" onclick="event.stopPropagation(); unassignRP('${rp.id}')" title="Return to Stock">
+                                                <i data-lucide="archive" style="width: 14px; color: var(--text-secondary);"></i>
                                             </span>
-                                            <span onclick="event.stopPropagation(); app.deleteRP('${rp.id}')" style="cursor: pointer; margin-right: 8px;" title="Delete RP">
-                                                <i data-lucide="trash-2" style="width: 12px; color: var(--error);"></i>
+                                            <span class="action-icon delete" onclick="event.stopPropagation(); deleteRP('${rp.id}')" title="Delete RP">
+                                                <i data-lucide="trash-2" style="width: 14px; color: var(--error);"></i>
                                             </span>
-                                            <span class="badge badge-rp">Unlinked</span>
+                                            <span class="badge badge-rp" style="margin-left: 8px;">Unlinked</span>
                                         </div>
                                     `).join('')}
                                 ` : ''}
@@ -584,9 +584,14 @@ function setupDragAndDrop(app) {
                 const srv = app.state.servers.find(s => s.id === id);
                 if (srv) {
                     srv.mailerId = null;
-                    // RPs remain in the server but lose mailerId
+                    // RPs move back to stock RPs as well
                     app.state.rps.forEach(r => {
-                        if (r.serverId === srv.id) r.mailerId = null;
+                        if (r.serverId === srv.id) {
+                            r.mailerId = null;
+                            r.serverId = null;
+                            r.assignedIps = [];
+                            r.status = 'stock';
+                        }
                     });
                 }
             }

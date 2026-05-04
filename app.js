@@ -241,3 +241,9 @@ class TeamApp {
 
 // Initialize the app
 window.app = new TeamApp();
+
+// Global Helpers for click handlers
+window.deleteRP = (id) => window.app.deleteRP(id);
+window.deleteServer = (id) => window.app.deleteServer(id);
+window.unassignRP = (id) => window.app.unassignRP(id);
+window.unassignServer = (id) => window.app.unassignServer(id);

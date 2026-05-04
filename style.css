@@ -457,3 +457,27 @@ button:active {
     background: var(--accent-primary);
     color: white;
 }
+
+/* Action Icons */
+.action-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    cursor: pointer;
+    margin-left: 4px;
+}
+
+.action-icon:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+.action-icon.delete:hover {
+    background: rgba(218, 54, 51, 0.2);
+}
+
+.action-icon i {
+    pointer-events: none;
+}
