@@ -120,25 +120,53 @@ class TeamApp {
     }
 
     deleteServer(serverId) {
-        // Removed confirm() for testing click reliability
-        this.state.rps.forEach(rp => {
-            if (rp.serverId === serverId) {
-                rp.serverId = null;
-                rp.mailerId = null;
-                rp.assignedIps = [];
-                rp.status = 'stock';
-            }
+        this.showConfirm("Are you sure you want to delete this server? All linked RPs will be moved back to stock.", () => {
+            this.state.rps.forEach(rp => {
+                if (rp.serverId === serverId) {
+                    rp.serverId = null;
+                    rp.mailerId = null;
+                    rp.assignedIps = [];
+                    rp.status = 'stock';
+                }
+            });
+            this.state.servers = this.state.servers.filter(s => s.id !== serverId);
+            this.saveState();
+            this.updateDashboard();
         });
-        this.state.servers = this.state.servers.filter(s => s.id !== serverId);
-        this.saveState();
-        this.updateDashboard();
     }
 
     deleteRP(rpId) {
-        // Removed confirm() for testing click reliability
-        this.state.rps = this.state.rps.filter(r => r.id !== rpId);
-        this.saveState();
-        this.updateDashboard();
+        this.showConfirm("Are you sure you want to permanently delete this RP?", () => {
+            this.state.rps = this.state.rps.filter(r => r.id !== rpId);
+            this.saveState();
+            this.updateDashboard();
+        });
+    }
+
+    showConfirm(message, onConfirm) {
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.innerHTML = `
+            <div class="modal" style="max-width: 400px; text-align: center;">
+                <div style="margin-bottom: 24px; color: var(--error);">
+                    <i data-lucide="alert-triangle" style="width: 48px; height: 48px; margin-bottom: 16px;"></i>
+                    <h2 style="color: var(--text-primary);">Confirm Action</h2>
+                </div>
+                <p style="margin-bottom: 32px; color: var(--text-secondary); line-height: 1.6;">${message}</p>
+                <div style="display: flex; gap: 12px;">
+                    <button id="confirm-yes" style="flex: 1; background: var(--error);">Yes, Delete</button>
+                    <button id="confirm-no" style="flex: 1; background: var(--bg-tertiary);">Cancel</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        if (window.lucide) window.lucide.createIcons();
+
+        document.getElementById('confirm-yes').onclick = () => {
+            onConfirm();
+            overlay.remove();
+        };
+        document.getElementById('confirm-no').onclick = () => overlay.remove();
     }
 
     unassignRP(rpId) {
@@ -217,7 +245,7 @@ class TeamApp {
 // Initialize the app
 window.app = new TeamApp();
 
-// Global Helpers (Point directly to app instance)
+// Global Helpers
 window.deleteRP = (id) => window.app.deleteRP(id);
 window.deleteServer = (id) => window.app.deleteServer(id);
 window.unassignRP = (id) => window.app.unassignRP(id);

@@ -231,9 +231,16 @@ function renderManagement(app, container) {
                                             <div class="rp-list drop-zone" data-type="server" data-id="${srv.id}" style="min-height: 30px;">
                                                 ${srvRps.map(rp => `
                                                     <div class="rp-item draggable-item" draggable="true" ondragstart="handleDragStart(event, 'rp', '${rp.id}')">
-                                                        <span style="flex: 1; font-weight: 500;">${rp.domain}</span>
+                                                        <div style="flex: 1;">
+                                                            <div style="font-weight: 500;">${rp.domain}</div>
+                                                            <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;">
+                                                                ${rp.assignedIps.map(ip => `
+                                                                    <span style="font-size: 0.6rem; background: var(--bg-primary); padding: 1px 4px; border-radius: 4px; color: var(--accent-primary); border: 1px solid var(--accent-primary);">${ip}</span>
+                                                                `).join('')}
+                                                                ${rp.assignedIps.length === 0 ? '<span style="font-size: 0.6rem; color: var(--text-secondary);">No IPs assigned</span>' : ''}
+                                                            </div>
+                                                        </div>
                                                         <div style="display: flex; gap: 4px; align-items: center;">
-                                                            <span style="font-size: 0.6rem; opacity: 0.7; margin-right: 4px;">${rp.assignedIps.length} IPs</span>
                                                             <span class="action-icon" onclick="event.stopPropagation(); showIPSelectionModal('${rp.id}')" title="Config IPs">
                                                                 <i data-lucide="edit-3" style="width: 12px;"></i>
                                                             </span>
