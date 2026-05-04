@@ -173,7 +173,54 @@ class TeamApp {
             const srv = this.state.servers.find(s => s.id === resourceId);
             if (srv) {
                 srv.mailerId = mailerId;
+                // Cascade: when server goes to stock, all its RPs go to stock too
+                this.state.rps.forEach(rp => {
+                    if (rp.serverId === srv.id) {
+                        rp.mailerId = mailerId;
+                        if (!mailerId) {
+                            rp.serverId = null;
+                            rp.assignedIps = [];
+                            rp.status = 'stock';
+                        }
+                    }
+                });
             }
+        }
+        this.saveState();
+        this.updateDashboard();
+    }
+
+    deleteRP(rpId) {
+        this.state.rps = this.state.rps.filter(r => r.id !== rpId);
+        this.saveState();
+        this.updateDashboard();
+    }
+
+    unassignRP(rpId) {
+        const rp = this.state.rps.find(r => r.id === rpId);
+        if (rp) {
+            rp.mailerId = null;
+            rp.serverId = null;
+            rp.assignedIps = [];
+            rp.status = 'stock';
+        }
+        this.saveState();
+        this.updateDashboard();
+    }
+
+    unassignServer(serverId) {
+        const srv = this.state.servers.find(s => s.id === serverId);
+        if (srv) {
+            srv.mailerId = null;
+            // Move all RPs in this server back to stock
+            this.state.rps.forEach(rp => {
+                if (rp.serverId === srv.id) {
+                    rp.mailerId = null;
+                    rp.serverId = null;
+                    rp.assignedIps = [];
+                    rp.status = 'stock';
+                }
+            });
         }
         this.saveState();
         this.updateDashboard();

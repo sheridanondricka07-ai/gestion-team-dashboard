@@ -227,7 +227,8 @@ function renderManagement(app, container) {
                     <div class="drop-zone" data-type="stock-rp" style="min-height: 50px;">
                         ${stockRps.map(rp => `
                             <div class="draggable-item" draggable="true" ondragstart="handleDragStart(event, 'rp', '${rp.id}')">
-                                <span>${rp.domain}</span>
+                                <span style="flex: 1;">${rp.domain}</span>
+                                <i data-lucide="trash-2" style="width: 12px; cursor: pointer; color: var(--error); margin-right: 8px;" onclick="event.stopPropagation(); confirmDeleteRP('${rp.id}')"></i>
                                 <span class="badge badge-rp">RP</span>
                             </div>
                         `).join('')}
@@ -266,17 +267,19 @@ function renderManagement(app, container) {
                                             <div class="server-header">
                                                 <span style="flex: 1;">${srv.name} (${srv.ip})</span>
                                                 <div style="display: flex; gap: 8px; align-items: center;">
-                                                    <i data-lucide="archive" style="width: 12px; cursor: pointer; color: var(--text-secondary);" title="Return to Stock" onclick="app.assignResource('srv', '${srv.id}', null)"></i>
-                                                    <i data-lucide="trash-2" style="width: 12px; cursor: pointer; color: var(--error);" title="Delete Server" onclick="confirmDeleteServer('${srv.id}')"></i>
+                                                    <i data-lucide="archive" style="width: 12px; cursor: pointer; color: var(--text-secondary);" title="Return to Stock" onclick="event.stopPropagation(); app.unassignServer('${srv.id}')"></i>
+                                                    <i data-lucide="trash-2" style="width: 12px; cursor: pointer; color: var(--error);" title="Delete Server" onclick="event.stopPropagation(); confirmDeleteServer('${srv.id}')"></i>
                                                 </div>
                                             </div>
                                             <div class="rp-list drop-zone" data-type="server" data-id="${srv.id}" style="min-height: 30px;">
                                                 ${srvRps.map(rp => `
                                                     <div class="rp-item draggable-item" draggable="true" ondragstart="handleDragStart(event, 'rp', '${rp.id}')">
-                                                        <span>${rp.domain}</span>
+                                                        <span style="flex: 1;">${rp.domain}</span>
                                                         <div style="display: flex; gap: 4px; align-items: center;">
                                                             <span style="font-size: 0.6rem; opacity: 0.7;">${rp.assignedIps.length} IPs</span>
-                                                            <i data-lucide="edit-3" style="width: 10px; cursor: pointer;" onclick="showIPSelectionModal('${rp.id}')"></i>
+                                                            <i data-lucide="edit-3" style="width: 10px; cursor: pointer;" onclick="event.stopPropagation(); showIPSelectionModal('${rp.id}')"></i>
+                                                            <i data-lucide="archive" style="width: 10px; cursor: pointer; color: var(--text-secondary);" title="Return to Stock" onclick="event.stopPropagation(); app.unassignRP('${rp.id}')"></i>
+                                                            <i data-lucide="trash-2" style="width: 10px; cursor: pointer; color: var(--error);" title="Delete RP" onclick="event.stopPropagation(); confirmDeleteRP('${rp.id}')"></i>
                                                         </div>
                                                     </div>
                                                 `).join('')}
@@ -290,7 +293,9 @@ function renderManagement(app, container) {
                                     <div style="color: var(--text-secondary); font-size: 0.65rem; margin-top: 8px;">Standalone RPs:</div>
                                     ${mStandaloneRps.map(rp => `
                                         <div class="draggable-item" draggable="true" ondragstart="handleDragStart(event, 'rp', '${rp.id}')">
-                                            <span>${rp.domain}</span>
+                                            <span style="flex: 1;">${rp.domain}</span>
+                                            <i data-lucide="archive" style="width: 12px; cursor: pointer; color: var(--text-secondary);" title="Return to Stock" onclick="event.stopPropagation(); app.unassignRP('${rp.id}')"></i>
+                                            <i data-lucide="trash-2" style="width: 12px; cursor: pointer; color: var(--error); margin-right: 8px;" title="Delete RP" onclick="event.stopPropagation(); confirmDeleteRP('${rp.id}')"></i>
                                             <span class="badge badge-rp">Unlinked</span>
                                         </div>
                                     `).join('')}
@@ -503,6 +508,12 @@ window.saveRPIps = (rpId, btn) => {
 window.confirmDeleteServer = (serverId) => {
     if (confirm("Are you sure you want to delete this server? All linked RPs will be moved back to the stock pool.")) {
         window.app.deleteServer(serverId);
+    }
+};
+
+window.confirmDeleteRP = (rpId) => {
+    if (confirm("Are you sure you want to permanently delete this RP?")) {
+        window.app.deleteRP(rpId);
     }
 };
 
