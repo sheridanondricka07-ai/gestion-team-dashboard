@@ -22,8 +22,8 @@ export function renderLogin(app) {
 
     document.getElementById('login-form').addEventListener('submit', (e) => {
         e.preventDefault();
-        const email = document.getElementById('login-email').value;
-        const password = document.getElementById('login-password').value;
+        const email = document.getElementById('login-email').value.trim();
+        const password = document.getElementById('login-password').value.trim();
         if (!app.login(email, password)) {
             alert('Invalid credentials');
         }

@@ -61,9 +61,9 @@ class TeamApp {
     addMailer(mailerData) {
         const newMailer = {
             id: 'm' + Date.now(),
-            name: mailerData.name,
-            email: mailerData.email,
-            password: mailerData.password,
+            name: mailerData.name.trim(),
+            email: mailerData.email.trim().toLowerCase(),
+            password: mailerData.password.trim(),
             role: 'mailer'
         };
         this.state.mailers.push(newMailer);
@@ -242,7 +242,14 @@ class TeamApp {
     }
 
     login(email, password) {
-        const user = this.state.mailers.find(u => u.email === email && u.password === password);
+        const cleanEmail = email.trim().toLowerCase();
+        const cleanPass = password.trim();
+        
+        const user = this.state.mailers.find(u => 
+            u.email.toLowerCase() === cleanEmail && 
+            u.password === cleanPass
+        );
+        
         if (user) {
             this.state.currentUser = user;
             this.saveState();
