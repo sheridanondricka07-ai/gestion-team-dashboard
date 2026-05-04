@@ -31,14 +31,12 @@ class TeamApp {
         this.init();
     }
 
-    // ... (rest of methods)
-
     addServer(name, ips) {
         const ipList = ips.split('\n').map(i => i.trim()).filter(i => i !== '');
         const newServer = {
             id: 'srv' + Date.now(),
             name,
-            ip: ipList[0] || 'No IP', // Use first IP as display IP
+            ip: ipList[0] || 'No IP',
             ips: ipList,
             mailerId: null
         };
@@ -73,8 +71,16 @@ class TeamApp {
         this.updateDashboard();
     }
 
+    updateRPIps(rpId, ips) {
+        const rp = this.state.rps.find(r => r.id === rpId);
+        if (rp) {
+            rp.assignedIps = ips;
+        }
+        this.saveState();
+        this.updateDashboard();
+    }
+
     deleteServer(serverId) {
-        // Move any RPs in this server back to stock
         this.state.rps.forEach(rp => {
             if (rp.serverId === serverId) {
                 rp.serverId = null;
@@ -82,8 +88,6 @@ class TeamApp {
                 rp.assignedIps = [];
             }
         });
-        
-        // Remove the server
         this.state.servers = this.state.servers.filter(s => s.id !== serverId);
         this.saveState();
         this.updateDashboard();
