@@ -181,6 +181,9 @@ function renderManagement(app, container) {
                         ${stockRps.map(rp => `
                             <div class="draggable-item" draggable="true" ondragstart="handleDragStart(event, 'rp', '${rp.id}')">
                                 <span style="flex: 1; font-weight: 500;">${rp.domain}</span>
+                                <span class="action-icon delete" onclick="event.stopPropagation(); deleteRP('${rp.id}')" title="Delete RP">
+                                    <i data-lucide="trash-2" style="width: 14px; color: var(--error);"></i>
+                                </span>
                                 <span class="badge badge-rp" style="margin-left: 8px;">RP</span>
                             </div>
                         `).join('')}
@@ -191,6 +194,9 @@ function renderManagement(app, container) {
                         ${stockSrvs.map(srv => `
                             <div class="draggable-item" draggable="true" ondragstart="handleDragStart(event, 'srv', '${srv.id}')">
                                 <span style="flex: 1; font-weight: 500;">${srv.name}</span>
+                                <span class="action-icon delete" onclick="event.stopPropagation(); deleteServer('${srv.id}')" title="Delete Server">
+                                    <i data-lucide="trash-2" style="width: 14px; color: var(--error);"></i>
+                                </span>
                                 <span class="badge badge-srv" style="margin-left: 8px;">SRV</span>
                             </div>
                         `).join('')}
