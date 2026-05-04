@@ -67,7 +67,6 @@ class TeamApp {
         this.updateDashboard();
     }
 
-    // Data Actions
     assignResource(type, resourceId, mailerId) {
         if (this.state.currentUser.role !== 'admin') return;
 
@@ -75,7 +74,6 @@ class TeamApp {
             const rp = this.state.rps.find(r => r.id === resourceId);
             if (rp) {
                 rp.mailerId = mailerId;
-                // If unassigning from mailer, also unassign from server
                 if (!mailerId) {
                     rp.serverId = null;
                     rp.assignedIps = [];
@@ -88,11 +86,9 @@ class TeamApp {
             const srv = this.state.servers.find(s => s.id === resourceId);
             if (srv) {
                 srv.mailerId = mailerId;
-                // Cascade to RPs: if server moves to mailer/stock, its RPs follow
                 this.state.rps.forEach(rp => {
                     if (rp.serverId === srv.id) {
                         rp.mailerId = mailerId;
-                        // If server goes to stock, RPs go to stock (unlinked from server)
                         if (!mailerId) {
                             rp.serverId = null;
                             rp.assignedIps = [];
@@ -111,7 +107,6 @@ class TeamApp {
         const srv = this.state.servers.find(s => s.id === serverId);
         if (rp) {
             rp.serverId = serverId;
-            // RP inherits mailer from server
             rp.mailerId = srv ? srv.mailerId : null;
             if (!serverId) {
                 rp.assignedIps = [];
@@ -125,7 +120,7 @@ class TeamApp {
     }
 
     deleteServer(serverId) {
-        // Move any RPs in this server back to stock
+        // Removed confirm() for testing click reliability
         this.state.rps.forEach(rp => {
             if (rp.serverId === serverId) {
                 rp.serverId = null;
@@ -134,14 +129,13 @@ class TeamApp {
                 rp.status = 'stock';
             }
         });
-        
-        // Remove the server
         this.state.servers = this.state.servers.filter(s => s.id !== serverId);
         this.saveState();
         this.updateDashboard();
     }
 
     deleteRP(rpId) {
+        // Removed confirm() for testing click reliability
         this.state.rps = this.state.rps.filter(r => r.id !== rpId);
         this.saveState();
         this.updateDashboard();
@@ -158,7 +152,6 @@ class TeamApp {
     init() {
         this.loadState();
         this.checkAuth();
-        this.attachGlobalEvents();
     }
 
     loadState() {
@@ -219,22 +212,17 @@ class TeamApp {
         this.state.currentView = viewName;
         this.updateDashboard();
     }
-
-    attachGlobalEvents() { }
 }
 
 // Initialize the app
 window.app = new TeamApp();
 
-// Global Helpers for click handlers
-window.deleteRP = (id) => {
-    if(confirm("Permanently delete this RP?")) window.app.deleteRP(id);
-};
-window.deleteServer = (id) => {
-    if(confirm("Delete this server and move its RPs to stock?")) window.app.deleteServer(id);
-};
+// Global Helpers (Point directly to app instance)
+window.deleteRP = (id) => window.app.deleteRP(id);
+window.deleteServer = (id) => window.app.deleteServer(id);
 window.unassignRP = (id) => window.app.unassignRP(id);
 window.unassignServer = (id) => window.app.unassignServer(id);
+
 window.showIPSelectionModal = (rpId) => {
     const rp = window.app.state.rps.find(r => r.id === rpId);
     if (!rp || !rp.serverId) return;
