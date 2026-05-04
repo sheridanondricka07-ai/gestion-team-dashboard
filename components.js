@@ -181,9 +181,6 @@ function renderManagement(app, container) {
                         ${stockRps.map(rp => `
                             <div class="draggable-item" draggable="true" ondragstart="handleDragStart(event, 'rp', '${rp.id}')">
                                 <span style="flex: 1; font-weight: 500;">${rp.domain}</span>
-                                <span class="action-icon delete" onclick="event.stopPropagation(); deleteRP('${rp.id}')" title="Delete RP">
-                                    <i data-lucide="trash-2" style="width: 14px; color: var(--error);"></i>
-                                </span>
                                 <span class="badge badge-rp" style="margin-left: 8px;">RP</span>
                             </div>
                         `).join('')}
@@ -194,9 +191,6 @@ function renderManagement(app, container) {
                         ${stockSrvs.map(srv => `
                             <div class="draggable-item" draggable="true" ondragstart="handleDragStart(event, 'srv', '${srv.id}')">
                                 <span style="flex: 1; font-weight: 500;">${srv.name}</span>
-                                <span class="action-icon delete" onclick="event.stopPropagation(); deleteServer('${srv.id}')" title="Delete Server">
-                                    <i data-lucide="trash-2" style="width: 14px; color: var(--error);"></i>
-                                </span>
                                 <span class="badge badge-srv" style="margin-left: 8px;">SRV</span>
                             </div>
                         `).join('')}
@@ -226,9 +220,6 @@ function renderManagement(app, container) {
                                                     <span class="action-icon" onclick="event.stopPropagation(); unassignServer('${srv.id}')" title="Return to Stock">
                                                         <i data-lucide="archive" style="width: 14px; color: var(--text-secondary);"></i>
                                                     </span>
-                                                    <span class="action-icon delete" onclick="event.stopPropagation(); deleteServer('${srv.id}')" title="Delete Server">
-                                                        <i data-lucide="trash-2" style="width: 14px; color: var(--error);"></i>
-                                                    </span>
                                                 </div>
                                             </div>
                                             <div class="rp-list drop-zone" data-type="server" data-id="${srv.id}" style="min-height: 30px;">
@@ -242,9 +233,6 @@ function renderManagement(app, container) {
                                                             </span>
                                                             <span class="action-icon" onclick="event.stopPropagation(); unassignRP('${rp.id}')" title="Return to Stock">
                                                                 <i data-lucide="archive" style="width: 12px; color: var(--text-secondary);"></i>
-                                                            </span>
-                                                            <span class="action-icon delete" onclick="event.stopPropagation(); deleteRP('${rp.id}')" title="Delete RP">
-                                                                <i data-lucide="trash-2" style="width: 12px; color: var(--error);"></i>
                                                             </span>
                                                         </div>
                                                     </div>
@@ -262,9 +250,6 @@ function renderManagement(app, container) {
                                             <span style="flex: 1; font-weight: 500;">${rp.domain}</span>
                                             <span class="action-icon" onclick="event.stopPropagation(); unassignRP('${rp.id}')" title="Return to Stock">
                                                 <i data-lucide="archive" style="width: 14px; color: var(--text-secondary);"></i>
-                                            </span>
-                                            <span class="action-icon delete" onclick="event.stopPropagation(); deleteRP('${rp.id}')" title="Delete RP">
-                                                <i data-lucide="trash-2" style="width: 14px; color: var(--error);"></i>
                                             </span>
                                             <span class="badge badge-rp" style="margin-left: 8px;">Unlinked</span>
                                         </div>
