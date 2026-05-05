@@ -151,11 +151,11 @@ function renderTools(app, container) {
                                 </button>
                             ` : ''}
                         </div>
-                        <div>
+                        <div style="flex: 1;">
                             <h3 style="font-size: 1rem; margin-bottom: 4px;">${tool.name}</h3>
                             <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4;">${tool.description || 'No description provided'}</p>
                         </div>
-                        <a href="${tool.url}" target="_blank" style="margin-top: 8px; background: var(--accent-primary); color: white; text-decoration: none; padding: 8px; border-radius: 6px; text-align: center; font-size: 0.85rem; font-weight: 500;">Open Tool</a>
+                        <a href="${tool.url}" target="_blank" style="margin-top: auto; background: var(--accent-primary); color: white; text-decoration: none; padding: 8px; border-radius: 6px; text-align: center; font-size: 0.85rem; font-weight: 500;">Open Tool</a>
                     </div>
                 `).join('')}
                 ${(!tools || tools.length === 0) ? `
@@ -464,6 +464,13 @@ window.showAddMailerModal = () => {
                 <label>Password</label>
                 <input type="text" id="m-pass" placeholder="Password" autocomplete="off">
             </div>
+            <div class="form-group">
+                <label>Account Type</label>
+                <select id="m-role">
+                    <option value="mailer">Standard Mailer</option>
+                    <option value="admin">Administrator</option>
+                </select>
+            </div>
             <p style="font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 16px;">Note: Password is visible during creation for accuracy.</p>
             <div style="display: flex; gap: 12px;">
                 <button onclick="saveMailer(this)" style="flex: 1;">Create Account</button>
@@ -478,10 +485,11 @@ window.saveMailer = async (btn) => {
     const name = document.getElementById('m-name').value;
     const email = document.getElementById('m-email').value;
     const password = document.getElementById('m-pass').value;
+    const role = document.getElementById('m-role').value;
     if (name && email && password) {
         btn.innerText = 'Creating...';
         btn.disabled = true;
-        await window.app.addMailer({ name, email, password });
+        await window.app.addMailer({ name, email, password, role });
         btn.closest('.modal-overlay').remove();
     }
 };

@@ -80,15 +80,15 @@ class TeamApp {
         await this.saveState();
     }
 
-    async addMailer(mailerData) {
-        const newMailer = {
-            id: 'm' + Date.now(),
-            name: mailerData.name.trim(),
-            email: mailerData.email.trim().toLowerCase(),
-            password: mailerData.password.trim(),
-            role: 'mailer'
+    async addMailer(data) {
+        const mailer = {
+            id: 'm_' + Date.now(),
+            name: data.name,
+            email: data.email,
+            password: data.password,
+            role: data.role || 'mailer'
         };
-        this.state.mailers.push(newMailer);
+        this.state.mailers.push(mailer);
         await this.saveState();
     }
 
