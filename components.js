@@ -7,6 +7,10 @@ export function renderLogin(app) {
                 <p>Management Dashboard</p>
             </div>
             <form id="login-form">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 20px; font-size: 0.75rem; color: ${app.state.dbConnected ? 'var(--accent-primary)' : 'var(--error)'};">
+                    <span style="width: 8px; height: 8px; border-radius: 50%; background: ${app.state.dbConnected ? 'var(--accent-primary)' : 'var(--error)'}; box-shadow: 0 0 10px ${app.state.dbConnected ? 'var(--accent-primary)' : 'var(--error)'};"></span>
+                    ${app.state.dbConnected ? 'Cloud Database Connected' : 'Database Offline (Check Vercel KV)'}
+                </div>
                 <div class="form-group">
                     <label>Email Address</label>
                     <input type="email" id="login-email" placeholder="admin@admin.com" required autocomplete="email">

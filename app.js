@@ -5,6 +5,7 @@ class TeamApp {
         this.state = {
             currentUser: null,
             currentView: 'overview',
+            dbConnected: false,
             mailers: [
                 { id: 'admin', name: 'Team Leader', email: 'admin@admin.com', password: 'admin', role: 'admin' },
                 { id: '1', name: 'Moussa ADEMOU', email: 'moussa@test.com', password: 'password', role: 'mailer' },
@@ -212,20 +213,9 @@ class TeamApp {
     }
 
     async init() {
-        // Show loading state
-        const loader = document.createElement('div');
-        loader.id = 'app-loader';
-        loader.style = 'position: fixed; inset: 0; background: var(--bg-primary); display: flex; align-items: center; justify-content: center; z-index: 9999;';
-        loader.innerHTML = '<div style="text-align: center;"><div class="spinner" style="width: 40px; height: 40px; border: 3px solid var(--border-color); border-top-color: var(--accent-primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 16px;"></div><p style="color: var(--text-secondary); font-size: 0.9rem;">Syncing Dashboard...</p></div>';
-        document.body.appendChild(loader);
-
         await this.loadState();
-        
-        if (loader) loader.remove();
         this.checkAuth();
-        
-        // Setup background polling to keep state fresh (every 30 seconds)
-        setInterval(() => this.loadState(true), 30000);
+        setInterval(() => this.loadState(true), 15000); // Poll every 15s
     }
 
     async loadState(isBackground = false) {
@@ -233,38 +223,40 @@ class TeamApp {
             const response = await fetch('/api/state');
             if (response.ok) {
                 const cloudState = await response.json();
+                this.state.dbConnected = true;
                 if (cloudState && cloudState.mailers) {
-                    // Cache the current user as it's the only local-only state we want to preserve
                     const currentUser = this.state.currentUser;
-                    this.state = { ...this.state, ...cloudState, currentUser };
-                    if (!isBackground) console.log("Cloud state synchronized");
+                    this.state = { ...this.state, ...cloudState, currentUser, dbConnected: true };
                     if (isBackground && this.state.currentUser) this.updateDashboard();
                 }
+            } else {
+                this.state.dbConnected = false;
             }
         } catch (e) {
-            console.error("Failed to sync with cloud:", e);
+            this.state.dbConnected = false;
         }
+        if (!this.state.currentUser) renderLogin(this);
     }
 
     async saveState() {
         try {
-            // We don't want to save the currentUser to the shared DB
             const stateToSave = { ...this.state };
             delete stateToSave.currentUser;
+            delete stateToSave.dbConnected;
 
-            await fetch('/api/state', {
+            const res = await fetch('/api/state', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(stateToSave)
             });
-            console.log("Cloud state saved");
+            this.state.dbConnected = res.ok;
         } catch (e) {
-            console.error("Failed to save to cloud:", e);
+            this.state.dbConnected = false;
         }
     }
 
     async resetApp() {
-        if(confirm("This will clear the SHARED database for everyone. Are you sure?")) {
+        if(confirm("This will clear the SHARED database. Are you sure?")) {
             this.state = {
                 currentUser: this.state.currentUser,
                 currentView: 'overview',
@@ -291,7 +283,6 @@ class TeamApp {
         const cleanEmail = email.trim().toLowerCase();
         const cleanPass = password.trim();
         
-        // Refresh state before login attempt to ensure we have latest mailers
         await this.loadState(true);
         
         const user = this.state.mailers.find(u => 
@@ -334,10 +325,9 @@ class TeamApp {
     }
 }
 
-// Initialize the app
 window.app = new TeamApp();
 
-// Global Helpers
+// Helpers
 window.deleteRP = (id) => window.app.deleteRP(id);
 window.deleteServer = (id) => window.app.deleteServer(id);
 window.deleteMailer = (id) => window.app.deleteMailer(id);
