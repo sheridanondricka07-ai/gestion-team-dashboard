@@ -42,10 +42,9 @@ class TeamApp {
                 { id: '3', name: 'Zaka LABRI LIKER', email: 'zaka@test.com', password: 'password', role: 'mailer' }
             ],
             servers: [],
-            rps: [],
             tools: []
         };
-        this.collapsedServers = new Set();
+        this.expandedServers = new Set();
         this.init();
     }
 
@@ -270,11 +269,11 @@ class TeamApp {
 
     logout() { this.state.currentUser = null; this.state.currentView = 'overview'; this.checkAuth(); }
     
-    toggleServerCollapse(serverId) {
-        if (this.collapsedServers.has(serverId)) {
-            this.collapsedServers.delete(serverId);
+    toggleServerExpand(serverId) {
+        if (this.expandedServers.has(serverId)) {
+            this.expandedServers.delete(serverId);
         } else {
-            this.collapsedServers.add(serverId);
+            this.expandedServers.add(serverId);
         }
         this.updateDashboard();
     }
