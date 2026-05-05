@@ -44,6 +44,7 @@ class TeamApp {
             servers: [],
             rps: []
         };
+        this.collapsedServers = new Set();
         this.init();
     }
 
@@ -267,6 +268,16 @@ class TeamApp {
     }
 
     logout() { this.state.currentUser = null; this.state.currentView = 'overview'; this.checkAuth(); }
+    
+    toggleServerCollapse(serverId) {
+        if (this.collapsedServers.has(serverId)) {
+            this.collapsedServers.delete(serverId);
+        } else {
+            this.collapsedServers.add(serverId);
+        }
+        this.updateDashboard();
+    }
+
     showScreen(screenName) {
         document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
         const screen = document.getElementById(`${screenName}-screen`);

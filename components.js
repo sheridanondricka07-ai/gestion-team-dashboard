@@ -163,13 +163,17 @@ function renderOverview(app, container) {
             <div class="infrastructure-list">
                 ${myServers.map(srv => {
                     const srvRps = rps.filter(r => r.serverId === srv.id);
+                    const isCollapsed = app.collapsedServers.has(srv.id);
                     return `
-                        <div class="server-container" style="background: var(--bg-secondary); margin-bottom: 12px;">
-                            <div class="server-header" style="padding: 12px;">
-                                <span>${srv.name} (${srv.ip})</span>
+                        <div class="server-container" style="background: var(--bg-secondary); margin-bottom: 12px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                            <div class="server-header" onclick="app.toggleServerCollapse('${srv.id}')" style="padding: 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.03);">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <i data-lucide="chevron-${isCollapsed ? 'right' : 'down'}" style="width: 16px; color: var(--text-secondary);"></i>
+                                    <span style="font-weight: 600;">${srv.name} (${srv.ip})</span>
+                                </div>
                                 <span class="badge badge-srv">${srvRps.length} RPs</span>
                             </div>
-                            <div class="rp-list" style="padding: 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px;">
+                            <div class="rp-list" style="padding: 12px; display: ${isCollapsed ? 'none' : 'grid'}; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px;">
                                 ${srvRps.map(rp => `
                                     <div class="rp-item" style="background: var(--bg-tertiary); margin-bottom: 0;">
                                         <div style="flex: 1;">
@@ -259,17 +263,21 @@ function renderManagement(app, container) {
                             <div class="drop-zone" data-type="mailer" data-id="${m.id}" style="min-height: 100px;">
                                 ${mSrvs.map(srv => {
                                     const srvRps = rps.filter(r => r.serverId === srv.id);
+                                    const isCollapsed = app.collapsedServers.has(srv.id);
                                     return `
-                                        <div class="server-container draggable-item" draggable="true" ondragstart="handleDragStart(event, 'srv', '${srv.id}')" style="display: block; padding: 0;">
-                                            <div class="server-header">
-                                                <span style="flex: 1; font-weight: 600;">${srv.name} (${srv.ip})</span>
-                                                <div style="display: flex; gap: 4px; align-items: center;">
-                                                    <span class="action-icon" onclick="event.stopPropagation(); unassignServer('${srv.id}')" title="Return to Stock">
+                                        <div class="server-container draggable-item" draggable="true" ondragstart="handleDragStart(event, 'srv', '${srv.id}')" style="display: block; padding: 0; margin-bottom: 8px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                                            <div class="server-header" onclick="app.toggleServerCollapse('${srv.id}')" style="cursor: pointer; background: rgba(255,255,255,0.03);">
+                                                <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+                                                    <i data-lucide="chevron-${isCollapsed ? 'right' : 'down'}" style="width: 14px; color: var(--text-secondary);"></i>
+                                                    <span style="font-weight: 600; font-size: 0.85rem;">${srv.name} (${srv.ip})</span>
+                                                </div>
+                                                <div style="display: flex; gap: 4px; align-items: center;" onclick="event.stopPropagation()">
+                                                    <span class="action-icon" onclick="unassignServer('${srv.id}')" title="Return to Stock">
                                                         <i data-lucide="archive" style="width: 14px; color: var(--text-secondary);"></i>
                                                     </span>
                                                 </div>
                                             </div>
-                                            <div class="rp-list drop-zone" data-type="server" data-id="${srv.id}" style="min-height: 30px;">
+                                            <div class="rp-list drop-zone" data-type="server" data-id="${srv.id}" style="min-height: 30px; display: ${isCollapsed ? 'none' : 'block'};">
                                                 ${srvRps.map(rp => `
                                                     <div class="rp-item draggable-item" draggable="true" ondragstart="handleDragStart(event, 'rp', '${rp.id}')">
                                                         <div style="flex: 1;">
