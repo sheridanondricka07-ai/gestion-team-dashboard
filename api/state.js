@@ -1,11 +1,9 @@
-import { kv } from '@vercel/kv';
+const { kv } = require('@vercel/kv');
 
-export default async function handler(req, res) {
-  // Simple check to ensure we only handle GET/POST
+module.exports = async function handler(req, res) {
   if (req.method === 'GET') {
     try {
       const state = await kv.get('GESTION_TEAM_SHARED_STATE');
-      // If no state exists yet, return empty object so app uses defaults
       return res.status(200).json(state || null);
     } catch (error) {
       console.error('KV Get Error:', error);
@@ -28,4 +26,4 @@ export default async function handler(req, res) {
   }
 
   return res.status(405).json({ error: 'Method not allowed' });
-}
+};
