@@ -290,6 +290,16 @@ class TeamApp {
         await this.saveState();
     }
 
+    async updateProfile(userData) {
+        const userIndex = this.state.mailers.findIndex(m => m.id === this.state.currentUser.id);
+        if (userIndex !== -1) {
+            this.state.mailers[userIndex] = { ...this.state.mailers[userIndex], ...userData };
+            this.state.currentUser = this.state.mailers[userIndex];
+            await this.saveState();
+            this.updateDashboard();
+        }
+    }
+
     showScreen(screenName) {
         document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
         const screen = document.getElementById(`${screenName}-screen`);

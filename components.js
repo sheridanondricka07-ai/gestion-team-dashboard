@@ -105,8 +105,11 @@ function renderTopBar(app) {
             ${app.state.currentUser.role === 'admin' && app.state.currentView === 'tools' ? `
                 <button onclick="showAddToolModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto;">+ Tool</button>
             ` : ''}
-            <div style="text-align: right;">
-                <div style="font-size: 0.85rem; font-weight: 600;">${app.state.currentUser.name}</div>
+            <div style="text-align: right; cursor: pointer; padding: 4px 8px; border-radius: 8px; transition: background 0.2s;" onclick="showProfileModal()" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
+                <div style="font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                    ${app.state.currentUser.name}
+                    <i data-lucide="chevron-down" style="width: 12px; color: var(--text-secondary);"></i>
+                </div>
                 <div style="font-size: 0.7rem; color: var(--text-secondary);">${app.state.currentUser.role.toUpperCase()}</div>
             </div>
         </div>
@@ -676,5 +679,49 @@ window.saveTool = async (btn) => {
 window.deleteTool = async (id) => {
     if (confirm("Are you sure you want to remove this tool link?")) {
         await window.app.deleteTool(id);
+    }
+};
+
+window.showProfileModal = () => {
+    const user = window.app.state.currentUser;
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+        <div class="modal">
+            <h2 style="margin-bottom: 8px;">Account Settings</h2>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 20px;">Update your login credentials and profile info.</p>
+            
+            <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" id="p-name" value="${user.name}">
+            </div>
+            <div class="form-group">
+                <label>Email (Login)</label>
+                <input type="email" id="p-email" value="${user.email}">
+            </div>
+            <div class="form-group">
+                <label>New Password</label>
+                <input type="text" id="p-pass" value="${user.password}">
+            </div>
+            
+            <div style="display: flex; gap: 12px; margin-top: 24px;">
+                <button onclick="saveProfile(this)" style="flex: 1;">Save Changes</button>
+                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary);">Cancel</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+};
+
+window.saveProfile = async (btn) => {
+    const name = document.getElementById('p-name').value;
+    const email = document.getElementById('p-email').value;
+    const password = document.getElementById('p-pass').value;
+    
+    if (name && email && password) {
+        btn.innerText = 'Saving...';
+        btn.disabled = true;
+        await window.app.updateProfile({ name, email, password });
+        btn.closest('.modal-overlay').remove();
     }
 };
