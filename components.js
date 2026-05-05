@@ -197,8 +197,10 @@ function renderOverview(app, container) {
 function renderManagement(app, container) {
     const { rps, servers, mailers } = app.state;
     const activeMailers = mailers.filter(m => m.role === 'mailer');
-    const stockRps = rps.filter(r => !r.serverId && !r.mailerId);
-    const stockSrvs = servers.filter(s => !s.mailerId);
+    const query = (app.state.searchQuery || '').toLowerCase();
+    
+    const stockRps = rps.filter(r => !r.serverId && !r.mailerId && r.domain.toLowerCase().includes(query));
+    const stockSrvs = servers.filter(s => !s.mailerId && (s.name.toLowerCase().includes(query) || s.ip.includes(query)));
 
     container.innerHTML = `
         <div class="resource-manager">
@@ -206,6 +208,13 @@ function renderManagement(app, container) {
                 <div class="pool-header">
                     <span>Stock Pool</span>
                     <i data-lucide="database" style="width: 14px;"></i>
+                </div>
+                <div style="padding: 12px; border-bottom: 1px solid var(--border-color);">
+                    <div style="position: relative;">
+                        <i data-lucide="search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; color: var(--text-secondary);"></i>
+                        <input type="text" id="pool-search" placeholder="Search domains/IPs..." value="${app.state.searchQuery || ''}" 
+                               style="width: 100%; padding: 8px 12px 8px 32px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.8rem; color: white;">
+                    </div>
                 </div>
                 <div class="pool-content">
                     <div style="color: var(--text-secondary); font-size: 0.7rem; margin-bottom: 8px; text-transform: uppercase;">Unlinked RPs</div>
@@ -309,6 +318,21 @@ function renderManagement(app, container) {
     `;
 
     setupDragAndDrop(app);
+    
+    const searchInput = document.getElementById('pool-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            app.state.searchQuery = e.target.value;
+            // No saveState needed for search query as it's local UI state
+            renderManagement(app, container);
+        });
+        searchInput.focus();
+        // Set cursor to end
+        const val = searchInput.value;
+        searchInput.value = '';
+        searchInput.value = val;
+    }
+
     if (window.lucide) window.lucide.createIcons();
 }
 
