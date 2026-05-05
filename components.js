@@ -9,24 +9,37 @@ export function renderLogin(app) {
             <form id="login-form">
                 <div class="form-group">
                     <label>Email Address</label>
-                    <input type="email" id="login-email" placeholder="admin@admin.com" required>
+                    <input type="email" id="login-email" placeholder="admin@admin.com" required autocomplete="email">
                 </div>
                 <div class="form-group">
                     <label>Password</label>
-                    <input type="password" id="login-password" placeholder="••••••••" required>
+                    <input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password">
                 </div>
-                <button type="submit">Sign In</button>
+                <button type="submit" id="login-btn">Sign In</button>
             </form>
+            <div style="margin-top: 24px; text-align: center;">
+                <a href="#" onclick="event.preventDefault(); resetApp();" style="color: var(--text-secondary); font-size: 0.75rem; text-decoration: none; opacity: 0.6;">System Reset</a>
+            </div>
         </div>
     `;
 
     document.getElementById('login-form').addEventListener('submit', (e) => {
         e.preventDefault();
+        const btn = document.getElementById('login-btn');
         const email = document.getElementById('login-email').value.trim();
         const password = document.getElementById('login-password').value.trim();
-        if (!app.login(email, password)) {
-            alert('Invalid credentials');
-        }
+        
+        btn.innerText = 'Verifying...';
+        btn.disabled = true;
+
+        // Small timeout to allow UI update and prevent double submission
+        setTimeout(() => {
+            if (!app.login(email, password)) {
+                alert('Invalid credentials. Please check your email and password.');
+                btn.innerText = 'Sign In';
+                btn.disabled = false;
+            }
+        }, 300);
     });
 }
 
@@ -354,16 +367,17 @@ window.showAddMailerModal = () => {
             <h2 style="margin-bottom: 16px;">Add New Mailer</h2>
             <div class="form-group">
                 <label>Full Name</label>
-                <input type="text" id="m-name" placeholder="John Doe">
+                <input type="text" id="m-name" placeholder="John Doe" autocomplete="off">
             </div>
             <div class="form-group">
                 <label>Email Address</label>
-                <input type="email" id="m-email" placeholder="john@example.com">
+                <input type="email" id="m-email" placeholder="john@example.com" autocomplete="off">
             </div>
             <div class="form-group">
                 <label>Password</label>
-                <input type="password" id="m-pass" placeholder="••••••••">
+                <input type="text" id="m-pass" placeholder="Password" autocomplete="off">
             </div>
+            <p style="font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 16px;">Note: Password is visible during creation for accuracy.</p>
             <div style="display: flex; gap: 12px;">
                 <button onclick="saveMailer(this)" style="flex: 1;">Create Account</button>
                 <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary);">Cancel</button>

@@ -4,7 +4,7 @@ class TeamApp {
     constructor() {
         this.state = {
             currentUser: null,
-            currentView: 'overview', // 'overview', 'management', 'team'
+            currentView: 'overview',
             mailers: [
                 { id: 'admin', name: 'Team Leader', email: 'admin@admin.com', password: 'admin', role: 'admin' },
                 { id: '1', name: 'Moussa ADEMOU', email: 'moussa@test.com', password: 'password', role: 'mailer' },
@@ -30,7 +30,7 @@ class TeamApp {
         
         const newServer = {
             id: 's' + Date.now(),
-            name: serverData.name,
+            name: serverData.name.trim(),
             ip: mainIp,
             allIps: ips,
             mailerId: null,
@@ -69,17 +69,16 @@ class TeamApp {
         this.state.mailers.push(newMailer);
         this.saveState();
         this.updateDashboard();
+        console.log("New mailer added:", newMailer);
     }
 
     deleteMailer(mailerId) {
-        if (mailerId === 'admin') return; // Cannot delete admin
+        if (mailerId === 'admin') return;
         
         this.showConfirm("Are you sure you want to remove this mailer? All their assigned servers and RPs will be moved back to stock.", () => {
-            // Unassign all servers from this mailer
             this.state.servers.forEach(s => {
                 if (s.mailerId === mailerId) s.mailerId = null;
             });
-            // Unassign all RPs from this mailer
             this.state.rps.forEach(rp => {
                 if (rp.mailerId === mailerId) {
                     rp.mailerId = null;
@@ -88,7 +87,6 @@ class TeamApp {
                     rp.status = 'stock';
                 }
             });
-            
             this.state.mailers = this.state.mailers.filter(m => m.id !== mailerId);
             this.saveState();
             this.updateDashboard();
@@ -220,15 +218,32 @@ class TeamApp {
     }
 
     loadState() {
-        const savedState = localStorage.getItem('team_management_state');
-        if (savedState) {
-            const parsed = JSON.parse(savedState);
-            this.state = { ...this.state, ...parsed };
+        try {
+            const savedState = localStorage.getItem('team_management_state');
+            if (savedState) {
+                const parsed = JSON.parse(savedState);
+                // Deep merge or at least ensure mailers are merged correctly
+                this.state = { ...this.state, ...parsed };
+                console.log("State loaded:", this.state.mailers.length, "mailers found");
+            }
+        } catch (e) {
+            console.error("Failed to load state:", e);
         }
     }
 
     saveState() {
-        localStorage.setItem('team_management_state', JSON.stringify(this.state));
+        try {
+            localStorage.setItem('team_management_state', JSON.stringify(this.state));
+        } catch (e) {
+            console.error("Failed to save state:", e);
+        }
+    }
+
+    resetApp() {
+        if(confirm("This will clear all local data and reset the system. Continue?")) {
+            localStorage.removeItem('team_management_state');
+            window.location.reload();
+        }
     }
 
     checkAuth() {
@@ -245,9 +260,11 @@ class TeamApp {
         const cleanEmail = email.trim().toLowerCase();
         const cleanPass = password.trim();
         
+        console.log("Attempting login for:", cleanEmail);
+        
         const user = this.state.mailers.find(u => 
-            u.email.toLowerCase() === cleanEmail && 
-            u.password === cleanPass
+            u.email.trim().toLowerCase() === cleanEmail && 
+            u.password.trim() === cleanPass
         );
         
         if (user) {
@@ -256,6 +273,8 @@ class TeamApp {
             this.checkAuth();
             return true;
         }
+        
+        console.error("Login failed. Available mailers:", this.state.mailers.map(m => m.email).join(', '));
         return false;
     }
 
@@ -268,7 +287,8 @@ class TeamApp {
 
     showScreen(screenName) {
         document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
-        document.getElementById(`${screenName}-screen`).classList.remove('hidden');
+        const screen = document.getElementById(`${screenName}-screen`);
+        if (screen) screen.classList.remove('hidden');
     }
 
     updateDashboard() {
@@ -295,6 +315,7 @@ window.deleteServer = (id) => window.app.deleteServer(id);
 window.deleteMailer = (id) => window.app.deleteMailer(id);
 window.unassignRP = (id) => window.app.unassignRP(id);
 window.unassignServer = (id) => window.app.unassignServer(id);
+window.resetApp = () => window.app.resetApp();
 
 window.showIPSelectionModal = (rpId) => {
     const rp = window.app.state.rps.find(r => r.id === rpId);
