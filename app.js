@@ -16,7 +16,7 @@ const firebaseConfig = {
 // Wait for all scripts to load before starting
 window.onload = function() {
     try {
-        if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "AIzaSyBMyS1E2kYkAOfUMUVivaHlcxRUXiodrPA") {
+        if (typeof firebase !== 'undefined' && firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY") {
             console.log("Firebase detected, initializing...");
             firebase.initializeApp(firebaseConfig);
             window.db = firebase.database();
