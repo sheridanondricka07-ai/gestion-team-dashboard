@@ -1,0 +1,8 @@
+{
+  "name": "gestion-team-dashboard",
+  "version": "1.0.0",
+  "main": "index.html",
+  "dependencies": {
+    "@vercel/kv": "^1.0.1"
+  }
+}

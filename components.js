@@ -387,12 +387,14 @@ window.showAddMailerModal = () => {
     document.body.appendChild(overlay);
 };
 
-window.saveMailer = (btn) => {
+window.saveMailer = async (btn) => {
     const name = document.getElementById('m-name').value;
     const email = document.getElementById('m-email').value;
     const password = document.getElementById('m-pass').value;
     if (name && email && password) {
-        window.app.addMailer({ name, email, password });
+        btn.innerText = 'Creating...';
+        btn.disabled = true;
+        await window.app.addMailer({ name, email, password });
         btn.closest('.modal-overlay').remove();
     }
 };
@@ -420,11 +422,13 @@ window.showAddServerModal = () => {
     document.body.appendChild(overlay);
 };
 
-window.saveServer = (btn) => {
+window.saveServer = async (btn) => {
     const name = document.getElementById('srv-name').value;
     const ips = document.getElementById('srv-ips').value;
     if (name && ips) {
-        window.app.addServer({ name, ips });
+        btn.innerText = 'Saving...';
+        btn.disabled = true;
+        await window.app.addServer({ name, ips });
         btn.closest('.modal-overlay').remove();
     }
 };
@@ -448,10 +452,12 @@ window.showAddRPModal = () => {
     document.body.appendChild(overlay);
 };
 
-window.saveRP = (btn) => {
+window.saveRP = async (btn) => {
     const domain = document.getElementById('rp-domains').value;
     if (domain) {
-        window.app.addRP({ domain });
+        btn.innerText = 'Adding...';
+        btn.disabled = true;
+        await window.app.addRP({ domain });
         btn.closest('.modal-overlay').remove();
     }
 };

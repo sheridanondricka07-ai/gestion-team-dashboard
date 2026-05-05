@@ -24,7 +24,7 @@ class TeamApp {
         this.init();
     }
 
-    addServer(serverData) {
+    async addServer(serverData) {
         const ips = serverData.ips.split('\n').map(ip => ip.trim()).filter(ip => ip !== '');
         const mainIp = ips[0] || '0.0.0.0';
         
@@ -37,11 +37,11 @@ class TeamApp {
             status: 'stock'
         };
         this.state.servers.push(newServer);
-        this.saveState();
+        await this.saveState();
         this.updateDashboard();
     }
 
-    addRP(rpData) {
+    async addRP(rpData) {
         const domains = rpData.domain.split('\n').map(d => d.trim()).filter(d => d !== '');
         domains.forEach(domain => {
             const newRP = {
@@ -54,11 +54,11 @@ class TeamApp {
             };
             this.state.rps.push(newRP);
         });
-        this.saveState();
+        await this.saveState();
         this.updateDashboard();
     }
 
-    addMailer(mailerData) {
+    async addMailer(mailerData) {
         const newMailer = {
             id: 'm' + Date.now(),
             name: mailerData.name.trim(),
@@ -67,15 +67,14 @@ class TeamApp {
             role: 'mailer'
         };
         this.state.mailers.push(newMailer);
-        this.saveState();
+        await this.saveState();
         this.updateDashboard();
-        console.log("New mailer added:", newMailer);
     }
 
-    deleteMailer(mailerId) {
+    async deleteMailer(mailerId) {
         if (mailerId === 'admin') return;
         
-        this.showConfirm("Are you sure you want to remove this mailer? All their assigned servers and RPs will be moved back to stock.", () => {
+        this.showConfirm("Are you sure you want to remove this mailer? All their assigned servers and RPs will be moved back to stock.", async () => {
             this.state.servers.forEach(s => {
                 if (s.mailerId === mailerId) s.mailerId = null;
             });
@@ -88,21 +87,21 @@ class TeamApp {
                 }
             });
             this.state.mailers = this.state.mailers.filter(m => m.id !== mailerId);
-            this.saveState();
+            await this.saveState();
             this.updateDashboard();
         });
     }
 
-    updateRPIps(rpId, ips) {
+    async updateRPIps(rpId, ips) {
         const rp = this.state.rps.find(r => r.id === rpId);
         if (rp) {
             rp.assignedIps = ips;
         }
-        this.saveState();
+        await this.saveState();
         this.updateDashboard();
     }
 
-    assignResource(type, resourceId, mailerId) {
+    async assignResource(type, resourceId, mailerId) {
         if (this.state.currentUser.role !== 'admin') return;
 
         if (type === 'rp') {
@@ -133,11 +132,11 @@ class TeamApp {
                 });
             }
         }
-        this.saveState();
+        await this.saveState();
         this.updateDashboard();
     }
 
-    assignRPtoServer(rpId, serverId) {
+    async assignRPtoServer(rpId, serverId) {
         const rp = this.state.rps.find(r => r.id === rpId);
         const srv = this.state.servers.find(s => s.id === serverId);
         if (rp) {
@@ -150,12 +149,12 @@ class TeamApp {
                 rp.status = 'active';
             }
         }
-        this.saveState();
+        await this.saveState();
         this.updateDashboard();
     }
 
-    deleteServer(serverId) {
-        this.showConfirm("Are you sure you want to delete this server? All linked RPs will be moved back to stock.", () => {
+    async deleteServer(serverId) {
+        this.showConfirm("Are you sure you want to delete this server? All linked RPs will be moved back to stock.", async () => {
             this.state.rps.forEach(rp => {
                 if (rp.serverId === serverId) {
                     rp.serverId = null;
@@ -165,15 +164,15 @@ class TeamApp {
                 }
             });
             this.state.servers = this.state.servers.filter(s => s.id !== serverId);
-            this.saveState();
+            await this.saveState();
             this.updateDashboard();
         });
     }
 
-    deleteRP(rpId) {
-        this.showConfirm("Are you sure you want to permanently delete this RP?", () => {
+    async deleteRP(rpId) {
+        this.showConfirm("Are you sure you want to permanently delete this RP?", async () => {
             this.state.rps = this.state.rps.filter(r => r.id !== rpId);
-            this.saveState();
+            await this.saveState();
             this.updateDashboard();
         });
     }
@@ -197,8 +196,8 @@ class TeamApp {
         document.body.appendChild(overlay);
         if (window.lucide) window.lucide.createIcons();
 
-        document.getElementById('confirm-yes').onclick = () => {
-            onConfirm();
+        document.getElementById('confirm-yes').onclick = async () => {
+            await onConfirm();
             overlay.remove();
         };
         document.getElementById('confirm-no').onclick = () => overlay.remove();
@@ -212,36 +211,68 @@ class TeamApp {
         this.assignResource('srv', serverId, null);
     }
 
-    init() {
-        this.loadState();
+    async init() {
+        // Show loading state
+        const loader = document.createElement('div');
+        loader.id = 'app-loader';
+        loader.style = 'position: fixed; inset: 0; background: var(--bg-primary); display: flex; align-items: center; justify-content: center; z-index: 9999;';
+        loader.innerHTML = '<div style="text-align: center;"><div class="spinner" style="width: 40px; height: 40px; border: 3px solid var(--border-color); border-top-color: var(--accent-primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 16px;"></div><p style="color: var(--text-secondary); font-size: 0.9rem;">Syncing Dashboard...</p></div>';
+        document.body.appendChild(loader);
+
+        await this.loadState();
+        
+        if (loader) loader.remove();
         this.checkAuth();
+        
+        // Setup background polling to keep state fresh (every 30 seconds)
+        setInterval(() => this.loadState(true), 30000);
     }
 
-    loadState() {
+    async loadState(isBackground = false) {
         try {
-            const savedState = localStorage.getItem('team_management_state');
-            if (savedState) {
-                const parsed = JSON.parse(savedState);
-                // Deep merge or at least ensure mailers are merged correctly
-                this.state = { ...this.state, ...parsed };
-                console.log("State loaded:", this.state.mailers.length, "mailers found");
+            const response = await fetch('/api/state');
+            if (response.ok) {
+                const cloudState = await response.json();
+                if (cloudState && cloudState.mailers) {
+                    // Cache the current user as it's the only local-only state we want to preserve
+                    const currentUser = this.state.currentUser;
+                    this.state = { ...this.state, ...cloudState, currentUser };
+                    if (!isBackground) console.log("Cloud state synchronized");
+                    if (isBackground && this.state.currentUser) this.updateDashboard();
+                }
             }
         } catch (e) {
-            console.error("Failed to load state:", e);
+            console.error("Failed to sync with cloud:", e);
         }
     }
 
-    saveState() {
+    async saveState() {
         try {
-            localStorage.setItem('team_management_state', JSON.stringify(this.state));
+            // We don't want to save the currentUser to the shared DB
+            const stateToSave = { ...this.state };
+            delete stateToSave.currentUser;
+
+            await fetch('/api/state', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(stateToSave)
+            });
+            console.log("Cloud state saved");
         } catch (e) {
-            console.error("Failed to save state:", e);
+            console.error("Failed to save to cloud:", e);
         }
     }
 
-    resetApp() {
-        if(confirm("This will clear all local data and reset the system. Continue?")) {
-            localStorage.removeItem('team_management_state');
+    async resetApp() {
+        if(confirm("This will clear the SHARED database for everyone. Are you sure?")) {
+            this.state = {
+                currentUser: this.state.currentUser,
+                currentView: 'overview',
+                mailers: [{ id: 'admin', name: 'Team Leader', email: 'admin@admin.com', password: 'admin', role: 'admin' }],
+                servers: [],
+                rps: []
+            };
+            await this.saveState();
             window.location.reload();
         }
     }
@@ -256,11 +287,12 @@ class TeamApp {
         }
     }
 
-    login(email, password) {
+    async login(email, password) {
         const cleanEmail = email.trim().toLowerCase();
         const cleanPass = password.trim();
         
-        console.log("Attempting login for:", cleanEmail);
+        // Refresh state before login attempt to ensure we have latest mailers
+        await this.loadState(true);
         
         const user = this.state.mailers.find(u => 
             u.email.trim().toLowerCase() === cleanEmail && 
@@ -269,19 +301,15 @@ class TeamApp {
         
         if (user) {
             this.state.currentUser = user;
-            this.saveState();
             this.checkAuth();
             return true;
         }
-        
-        console.error("Login failed. Available mailers:", this.state.mailers.map(m => m.email).join(', '));
         return false;
     }
 
     logout() {
         this.state.currentUser = null;
         this.state.currentView = 'overview';
-        this.saveState();
         this.checkAuth();
     }
 
@@ -316,33 +344,4 @@ window.deleteMailer = (id) => window.app.deleteMailer(id);
 window.unassignRP = (id) => window.app.unassignRP(id);
 window.unassignServer = (id) => window.app.unassignServer(id);
 window.resetApp = () => window.app.resetApp();
-
-window.showIPSelectionModal = (rpId) => {
-    const rp = window.app.state.rps.find(r => r.id === rpId);
-    if (!rp || !rp.serverId) return;
-    const srv = window.app.state.servers.find(s => s.id === rp.serverId);
-    if (!srv || !srv.allIps) return;
-
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.innerHTML = `
-        <div class="modal">
-            <h2 style="margin-bottom: 16px;">Assign IPs to ${rp.domain}</h2>
-            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 16px;">Server: ${srv.name} (${srv.ip})</p>
-            <div class="ip-selection-grid" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px;">
-                ${srv.allIps.map(ip => `
-                    <div class="ip-pill ${rp.assignedIps.includes(ip) ? 'selected' : ''}" 
-                         data-ip="${ip}" 
-                         onclick="this.classList.toggle('selected')">
-                        ${ip}
-                    </div>
-                `).join('')}
-            </div>
-            <div style="display: flex; gap: 12px;">
-                <button onclick="saveRPIps('${rpId}', this)" style="flex: 1;">Save Configuration</button>
-                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary);">Cancel</button>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(overlay);
-};
+window.saveRPIps = (rpId, btn) => window.app.updateRPIps(rpId, Array.from(btn.closest('.modal').querySelectorAll('.ip-pill.selected')).map(el => el.dataset.ip)).then(() => btn.closest('.modal-overlay').remove());
