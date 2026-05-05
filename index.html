@@ -6,11 +6,6 @@
     <title>Team Management | Emailing Pro</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/lucide@latest"></script>
-    
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -27,16 +22,26 @@
             </main>
         </div>
     </div>
+    <!-- Scripts at the bottom for safety -->
+    <script src="https://unpkg.com/lucide@latest" crossorigin></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js" crossorigin></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js" crossorigin></script>
+    
     <script>
         window.onerror = function(msg, url, lineNo, columnNo, error) {
+            console.error("Caught error:", msg, url, lineNo);
+            if (msg.toLowerCase().includes("script error")) {
+                // Ignore silent cross-origin errors as we handle them in app.js
+                return true; 
+            }
             const errDiv = document.createElement('div');
             errDiv.style = 'position:fixed; top:20px; left:20px; right:20px; background:rgba(255,0,0,0.9); color:white; padding:20px; border-radius:8px; z-index:10000; font-family:monospace;';
-            errDiv.innerHTML = '<h3>Critical Script Error</h3>' + msg + '<br>Line: ' + lineNo + '<br>URL: ' + url;
+            errDiv.innerHTML = '<h3>Initialization Error</h3>' + msg + '<br><button onclick="location.reload()" style="margin-top:10px; padding:5px 10px; cursor:pointer;">Retry</button>';
             document.body.appendChild(errDiv);
             return false;
         };
     </script>
-    <script src="components.js?v=2.0"></script>
-    <script src="app.js?v=2.0"></script>
+    <script src="components.js?v=3.0"></script>
+    <script src="app.js?v=3.0"></script>
 </body>
 </html>

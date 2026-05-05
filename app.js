@@ -13,20 +13,21 @@ const firebaseConfig = {
     measurementId: "G-RPNVMR8GX8"
 };
 
-// Initialize Firebase with Error Handling
-try {
-    if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "YOUR_API_KEY") {
-        console.log("Initializing Firebase...");
-        firebase.initializeApp(firebaseConfig);
-        window.db = firebase.database();
-        console.log("Firebase initialized successfully.");
-    } else {
-        console.warn("Firebase not configured. Using Local Storage.");
+// Wait for all scripts to load before starting
+window.onload = function() {
+    try {
+        if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "AIzaSyBMyS1E2kYkAOfUMUVivaHlcxRUXiodrPA") {
+            console.log("Firebase detected, initializing...");
+            firebase.initializeApp(firebaseConfig);
+            window.db = firebase.database();
+        }
+    } catch (err) {
+        console.warn("Firebase failed to initialize, continuing in local mode:", err);
     }
-} catch (err) {
-    console.error("Firebase Init Error:", err);
-    alert("Firebase Error: " + err.message);
-}
+    
+    // Start App regardless of Firebase status
+    window.app = new TeamApp();
+};
 
 class TeamApp {
     constructor() {
@@ -282,7 +283,7 @@ class TeamApp {
     setView(viewName) { this.state.currentView = viewName; this.updateDashboard(); }
 }
 
-window.app = new TeamApp();
+// App is instantiated in window.onload at the top of the file
 
 // Helpers
 window.deleteRP = (id) => window.app.deleteRP(id);
