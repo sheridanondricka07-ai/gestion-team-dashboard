@@ -27,7 +27,16 @@
             </main>
         </div>
     </div>
-    <script src="components.js"></script>
-    <script src="app.js"></script>
+    <script>
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+            const errDiv = document.createElement('div');
+            errDiv.style = 'position:fixed; top:20px; left:20px; right:20px; background:rgba(255,0,0,0.9); color:white; padding:20px; border-radius:8px; z-index:10000; font-family:monospace;';
+            errDiv.innerHTML = '<h3>Critical Script Error</h3>' + msg + '<br>Line: ' + lineNo + '<br>URL: ' + url;
+            document.body.appendChild(errDiv);
+            return false;
+        };
+    </script>
+    <script src="components.js?v=2.0"></script>
+    <script src="app.js?v=2.0"></script>
 </body>
 </html>
