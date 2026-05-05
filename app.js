@@ -1,6 +1,4 @@
-import { renderLogin, renderSidebar, renderTopBar, renderView } from './components.js';
-
-// --- FIREBASE CONFIGURATION ---
+// Global scope - no imports needed as scripts load sequentially in index.html
 // 1. Go to console.firebase.google.com
 // 2. Create a project and add a Web App
 // 3. Paste your config here:

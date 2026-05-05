@@ -1,4 +1,4 @@
-export function renderLogin(app) {
+function renderLogin(app) {
     const container = document.getElementById('login-screen');
     container.innerHTML = `
         <div class="login-card">
@@ -47,7 +47,7 @@ export function renderLogin(app) {
     });
 }
 
-export function renderSidebar(app) {
+function renderSidebar(app) {
     const container = document.getElementById('sidebar');
     const view = app.state.currentView;
     const role = app.state.currentUser.role;
@@ -84,7 +84,7 @@ export function renderSidebar(app) {
     if (window.lucide) window.lucide.createIcons();
 }
 
-export function renderTopBar(app) {
+function renderTopBar(app) {
     const container = document.getElementById('top-bar');
     container.innerHTML = `
         <div style="display: flex; align-items: center; gap: var(--spacing-md);">
@@ -107,7 +107,7 @@ export function renderTopBar(app) {
     if (window.lucide) window.lucide.createIcons();
 }
 
-export function renderView(app) {
+function renderView(app) {
     const container = document.getElementById('view-container');
     const view = app.state.currentView;
 
