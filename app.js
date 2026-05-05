@@ -274,6 +274,7 @@ class TeamApp {
     }
 
     updateDashboard() {
+        if (!this.state.currentUser) return;
         renderSidebar(this);
         renderTopBar(this);
         renderView(this);
