@@ -472,6 +472,44 @@ window.saveRPIps = (rpId, btn) => {
     btn.closest('.modal-overlay').remove();
 };
 
+window.showIPSelectionModal = (rpId) => {
+    const rp = window.app.state.rps.find(r => r.id === rpId);
+    const srv = window.app.state.servers.find(s => s.id === rp.serverId);
+    if (!srv) {
+        alert("This RP is not linked to a server. Assign it to a server first!");
+        return;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+        <div class="modal" style="max-width: 500px;">
+            <h2 style="margin-bottom: 8px;">Configure IP Assignments</h2>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 20px;">Select IPs from ${srv.name} to assign to ${rp.domain}</p>
+            
+            <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px;">
+                ${srv.allIps.map(ip => {
+                    const isSelected = rp.assignedIps.includes(ip);
+                    return `
+                        <div class="ip-pill ${isSelected ? 'selected' : ''}" 
+                             data-ip="${ip}" 
+                             onclick="this.classList.toggle('selected')"
+                             style="cursor: pointer; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border-color); font-family: monospace; font-size: 0.85rem; transition: all 0.2s;">
+                            ${ip}
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+
+            <div style="display: flex; gap: 12px;">
+                <button onclick="saveRPIps('${rpId}', this)" style="flex: 1;">Save Changes</button>
+                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary);">Cancel</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+};
+
 function setupDragAndDrop(app) {
     const zones = document.querySelectorAll('.drop-zone');
     
