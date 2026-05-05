@@ -5,13 +5,14 @@ import { renderLogin, renderSidebar, renderTopBar, renderView } from './componen
 // 2. Create a project and add a Web App
 // 3. Paste your config here:
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyBMyS1E2kYkAOfUMUVivaHlcxRUXiodrPA",
+    authDomain: "gestion-team-c.firebaseapp.com",
+    databaseURL: "https://gestion-team-c-default-rtdb.firebaseio.com",
+    projectId: "gestion-team-c",
+    storageBucket: "gestion-team-c.firebasestorage.app",
+    messagingSenderId: "561570845581",
+    appId: "1:561570845581:web:bf7262c514d2413e4b63c4",
+    measurementId: "G-RPNVMR8GX8"
 };
 
 // Initialize Firebase
