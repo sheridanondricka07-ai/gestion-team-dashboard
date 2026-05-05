@@ -39,6 +39,11 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    caret-color: transparent; /* Remove typewriter cursor everywhere */
+}
+
+input, textarea, [contenteditable="true"] {
+    caret-color: var(--accent-primary); /* Only allow it in text boxes */
 }
 
 body {
@@ -89,6 +94,7 @@ body {
     align-items: center;
     gap: var(--spacing-sm);
     color: var(--accent-primary);
+    user-select: none; /* Prevent selection blue line */
 }
 
 .nav-group {
