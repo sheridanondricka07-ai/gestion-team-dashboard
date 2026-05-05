@@ -175,7 +175,7 @@ function renderOverview(app, container) {
                                         <div style="flex: 1;">
                                             <div style="font-weight: 500;">${rp.domain}</div>
                                             <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;">
-                                                ${rp.assignedIps.map(ip => `
+                                                ${(rp.assignedIps || []).map(ip => `
                                                     <span style="font-size: 0.6rem; background: var(--bg-primary); padding: 1px 4px; border-radius: 4px; color: var(--accent-primary); border: 1px solid var(--accent-primary);">${ip}</span>
                                                 `).join('')}
                                             </div>
@@ -266,10 +266,10 @@ function renderManagement(app, container) {
                                                         <div style="flex: 1;">
                                                             <div style="font-weight: 500;">${rp.domain}</div>
                                                             <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;">
-                                                                ${rp.assignedIps.map(ip => `
+                                                                ${(rp.assignedIps || []).map(ip => `
                                                                     <span style="font-size: 0.6rem; background: var(--bg-primary); padding: 1px 4px; border-radius: 4px; color: var(--accent-primary); border: 1px solid var(--accent-primary);">${ip}</span>
                                                                 `).join('')}
-                                                                ${rp.assignedIps.length === 0 ? '<span style="font-size: 0.6rem; color: var(--text-secondary);">No IPs assigned</span>' : ''}
+                                                                ${(!rp.assignedIps || rp.assignedIps.length === 0) ? '<span style="font-size: 0.6rem; color: var(--text-secondary);">No IPs assigned</span>' : ''}
                                                             </div>
                                                         </div>
                                                         <div style="display: flex; gap: 4px; align-items: center;">
