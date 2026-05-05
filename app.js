@@ -42,7 +42,8 @@ class TeamApp {
                 { id: '3', name: 'Zaka LABRI LIKER', email: 'zaka@test.com', password: 'password', role: 'mailer' }
             ],
             servers: [],
-            rps: []
+            rps: [],
+            tools: []
         };
         this.collapsedServers = new Set();
         this.init();
@@ -276,6 +277,17 @@ class TeamApp {
             this.collapsedServers.add(serverId);
         }
         this.updateDashboard();
+    }
+
+    async addTool(tool) {
+        tool.id = 'tool_' + Date.now();
+        this.state.tools.push(tool);
+        await this.saveState();
+    }
+
+    async deleteTool(id) {
+        this.state.tools = this.state.tools.filter(t => t.id !== id);
+        await this.saveState();
     }
 
     showScreen(screenName) {

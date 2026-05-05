@@ -73,6 +73,10 @@ function renderSidebar(app) {
                     <span>Team</span>
                 </div>
             ` : ''}
+            <div class="nav-item ${view === 'tools' ? 'active' : ''}" onclick="app.setView('tools')">
+                <i data-lucide="wrench"></i>
+                <span>Tools</span>
+            </div>
         </div>
         <div style="margin-top: auto;">
             <div class="nav-item" onclick="app.logout()">
@@ -98,6 +102,9 @@ function renderTopBar(app) {
             ${app.state.currentUser.role === 'admin' && app.state.currentView === 'team' ? `
                 <button onclick="showAddMailerModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto;">+ Mailer</button>
             ` : ''}
+            ${app.state.currentUser.role === 'admin' && app.state.currentView === 'tools' ? `
+                <button onclick="showAddToolModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto;">+ Tool</button>
+            ` : ''}
             <div style="text-align: right;">
                 <div style="font-size: 0.85rem; font-weight: 600;">${app.state.currentUser.name}</div>
                 <div style="font-size: 0.7rem; color: var(--text-secondary);">${app.state.currentUser.role.toUpperCase()}</div>
@@ -117,7 +124,48 @@ function renderView(app) {
         renderManagement(app, container);
     } else if (view === 'team') {
         renderTeamManagement(app, container);
+    } else if (view === 'tools') {
+        renderTools(app, container);
     }
+}
+
+function renderTools(app, container) {
+    const { tools } = app.state;
+    const role = app.state.currentUser.role;
+
+    container.innerHTML = `
+        <div style="padding: 24px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
+                ${(tools || []).map(tool => `
+                    <div class="card" style="padding: 20px; position: relative; display: flex; flex-direction: column; gap: 12px; transition: transform 0.2s; cursor: default;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div style="width: 42px; height: 42px; border-radius: 10px; background: rgba(59,130,246,0.1); display: flex; align-items: center; justify-content: center; color: var(--accent-primary);">
+                                <i data-lucide="external-link" style="width: 20px;"></i>
+                            </div>
+                            ${role === 'admin' ? `
+                                <button onclick="deleteTool('${tool.id}')" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px;">
+                                    <i data-lucide="trash-2" style="width: 14px;"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                        <div>
+                            <h3 style="font-size: 1rem; margin-bottom: 4px;">${tool.name}</h3>
+                            <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4;">${tool.description || 'No description provided'}</p>
+                        </div>
+                        <a href="${tool.url}" target="_blank" style="margin-top: 8px; background: var(--accent-primary); color: white; text-decoration: none; padding: 8px; border-radius: 6px; text-align: center; font-size: 0.85rem; font-weight: 500;">Open Tool</a>
+                    </div>
+                `).join('')}
+                ${(!tools || tools.length === 0) ? `
+                    <div style="grid-column: 1/-1; text-align: center; padding: 60px; background: var(--bg-secondary); border-radius: 12px; border: 1px dashed var(--border-color);">
+                        <i data-lucide="wrench" style="width: 48px; height: 48px; color: var(--text-secondary); margin-bottom: 16px; opacity: 0.3;"></i>
+                        <h3 style="color: var(--text-secondary);">No tools added yet</h3>
+                        ${role === 'admin' ? '<p style="color: var(--text-secondary); font-size: 0.9rem;">Click the "+ Tool" button to add your first web tool.</p>' : ''}
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    `;
+    if (window.lucide) window.lucide.createIcons();
 }
 
 function renderOverview(app, container) {
@@ -584,4 +632,49 @@ function setupDragAndDrop(app) {
 window.handleDragStart = (e, type, id) => {
     e.dataTransfer.setData('type', type);
     e.dataTransfer.setData('id', id);
+};
+
+window.showAddToolModal = () => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+        <div class="modal">
+            <h2 style="margin-bottom: 16px;">Add Web Tool</h2>
+            <div class="form-group">
+                <label>Tool Name</label>
+                <input type="text" id="tool-name" placeholder="E.g. DNS Checker">
+            </div>
+            <div class="form-group">
+                <label>Tool URL</label>
+                <input type="url" id="tool-url" placeholder="https://example.com">
+            </div>
+            <div class="form-group">
+                <label>Description (Optional)</label>
+                <textarea id="tool-desc" style="width:100%; height:80px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:white; border-radius:8px; padding:12px;"></textarea>
+            </div>
+            <div style="display: flex; gap: 12px;">
+                <button onclick="saveTool(this)" style="flex: 1;">Add to Dashboard</button>
+                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary);">Cancel</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+};
+
+window.saveTool = async (btn) => {
+    const name = document.getElementById('tool-name').value;
+    const url = document.getElementById('tool-url').value;
+    const description = document.getElementById('tool-desc').value;
+    if (name && url) {
+        btn.innerText = 'Adding...';
+        btn.disabled = true;
+        await window.app.addTool({ name, url, description });
+        btn.closest('.modal-overlay').remove();
+    }
+};
+
+window.deleteTool = async (id) => {
+    if (confirm("Are you sure you want to remove this tool link?")) {
+        await window.app.deleteTool(id);
+    }
 };
