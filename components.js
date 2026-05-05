@@ -489,7 +489,7 @@ window.showIPSelectionModal = (rpId) => {
             
             <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px;">
                 ${srv.allIps.map(ip => {
-                    const isSelected = rp.assignedIps.includes(ip);
+                    const isSelected = (rp.assignedIps || []).includes(ip);
                     return `
                         <div class="ip-pill ${isSelected ? 'selected' : ''}" 
                              data-ip="${ip}" 
