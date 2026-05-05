@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   // Simple check to ensure we only handle GET/POST
   if (req.method === 'GET') {
     try {
-      const state = await kv.get('team_state');
+      const state = await kv.get('GESTION_TEAM_SHARED_STATE');
       // If no state exists yet, return empty object so app uses defaults
       return res.status(200).json(state || null);
     } catch (error) {
@@ -19,7 +19,7 @@ export default async function handler(req, res) {
       if (!newState) {
         return res.status(400).json({ error: 'No state provided' });
       }
-      await kv.set('team_state', newState);
+      await kv.set('GESTION_TEAM_SHARED_STATE', newState);
       return res.status(200).json({ success: true });
     } catch (error) {
       console.error('KV Set Error:', error);
