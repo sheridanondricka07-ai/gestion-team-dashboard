@@ -15,10 +15,19 @@ const firebaseConfig = {
     measurementId: "G-RPNVMR8GX8"
 };
 
-// Initialize Firebase
-if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "YOUR_API_KEY") {
-    firebase.initializeApp(firebaseConfig);
-    window.db = firebase.database();
+// Initialize Firebase with Error Handling
+try {
+    if (typeof firebase !== 'undefined' && firebaseConfig.apiKey !== "YOUR_API_KEY") {
+        console.log("Initializing Firebase...");
+        firebase.initializeApp(firebaseConfig);
+        window.db = firebase.database();
+        console.log("Firebase initialized successfully.");
+    } else {
+        console.warn("Firebase not configured. Using Local Storage.");
+    }
+} catch (err) {
+    console.error("Firebase Init Error:", err);
+    alert("Firebase Error: " + err.message);
 }
 
 class TeamApp {
@@ -184,22 +193,38 @@ class TeamApp {
     unassignServer(serverId) { this.assignResource('srv', serverId, null); }
 
     async init() {
-        if (typeof window.db !== 'undefined') {
-            this.state.dbConnected = true;
-            window.db.ref('state').on('value', (snapshot) => {
-                const cloudData = snapshot.val();
-                if (cloudData) {
-                    const currentUser = this.state.currentUser;
-                    this.state = { ...this.state, ...cloudData, currentUser, dbConnected: true };
-                    this.updateDashboard();
-                    if (!this.state.currentUser) renderLogin(this);
-                }
-            });
-        } else {
-            this.state.dbConnected = false;
-            // Fallback to local storage if Firebase not configured
-            this.loadLocalState();
-            this.checkAuth();
+        console.log("App Initializing...");
+        try {
+            if (typeof window.db !== 'undefined') {
+                console.log("Connecting to Firebase Database...");
+                this.state.dbConnected = true;
+                window.db.ref('state').on('value', (snapshot) => {
+                    console.log("Data received from Firebase");
+                    const cloudData = snapshot.val();
+                    if (cloudData) {
+                        const currentUser = this.state.currentUser;
+                        this.state = { ...this.state, ...cloudData, currentUser, dbConnected: true };
+                        this.updateDashboard();
+                        if (!this.state.currentUser) renderLogin(this);
+                    } else {
+                        console.log("Database is empty. Using defaults.");
+                        this.checkAuth();
+                    }
+                }, (error) => {
+                    console.error("Firebase Read Error:", error);
+                    this.state.dbConnected = false;
+                    this.loadLocalState();
+                    this.checkAuth();
+                });
+            } else {
+                console.warn("No Database Connection. Falling back to Local Storage.");
+                this.state.dbConnected = false;
+                this.loadLocalState();
+                this.checkAuth();
+            }
+        } catch (err) {
+            console.error("Critical App Error:", err);
+            document.body.innerHTML = `<div style="padding:40px; color:white; text-align:center;"><h2>Critical Error</h2><p>${err.message}</p></div>`;
         }
     }
 
