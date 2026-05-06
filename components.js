@@ -79,6 +79,10 @@ function renderSidebar(app) {
             <div style="padding: 12px; font-size: 0.7rem; color: var(--text-secondary); text-align: center; border-top: 1px solid var(--border-color); margin-bottom: 8px; opacity: 0.5;">
                 by Med Reda ZARYOUH
             </div>
+            <div class="nav-item" onclick="toggleTheme()">
+                <i data-lucide="${document.body.classList.contains('light-theme') ? 'moon' : 'sun'}"></i>
+                <span>${document.body.classList.contains('light-theme') ? 'Dark Mode' : 'Light Mode'}</span>
+            </div>
             <div class="nav-item" onclick="app.logout()">
                 <i data-lucide="log-out"></i>
                 <span>Logout</span>
@@ -655,6 +659,20 @@ function setupDragAndDrop(app) {
         });
     });
 }
+
+// Theme toggle
+window.toggleTheme = () => {
+    document.body.classList.toggle('light-theme');
+    localStorage.setItem('theme', document.body.classList.contains('light-theme') ? 'light' : 'dark');
+    if (window.app) window.app.updateDashboard();
+};
+
+// Restore saved theme on load
+(function() {
+    if (localStorage.getItem('theme') === 'light') {
+        document.body.classList.add('light-theme');
+    }
+})();
 
 window.handleDragStart = (e, type, id) => {
     e.dataTransfer.setData('type', type);
