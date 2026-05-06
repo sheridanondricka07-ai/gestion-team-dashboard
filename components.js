@@ -781,10 +781,10 @@ window.copyAllLinkedRps = (btn) => {
 };
 
 window.copyUnassignedServerIps = (el) => {
-    const ips = window.app.state.servers.filter(s => !s.mailerId).map(s => s.ip);
-    if (ips.length === 0) return;
+    const names = window.app.state.servers.filter(s => !s.mailerId).map(s => s.name);
+    if (names.length === 0) return;
 
-    navigator.clipboard.writeText(ips.join('\n')).then(() => {
+    navigator.clipboard.writeText(names.join('\n')).then(() => {
         const originalHtml = el.innerHTML;
         el.innerHTML = '<i data-lucide="check" style="width: 12px; color: var(--success);"></i>';
         if (window.lucide) window.lucide.createIcons();
