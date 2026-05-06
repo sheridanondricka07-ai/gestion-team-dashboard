@@ -226,7 +226,7 @@ function renderOverview(app, container) {
                             <div class="server-header" onclick="app.toggleServerExpand('${srv.id}')" style="padding: 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.03);">
                                 <div style="display: flex; align-items: center; gap: 8px;">
                                     <i data-lucide="chevron-${isExpanded ? 'down' : 'right'}" style="width: 16px; color: var(--text-secondary);"></i>
-                                    <span style="font-weight: 600;">${srv.name} (${srv.ip})</span>
+                                    <span style="font-weight: 600;">${srv.name} <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.85rem;">(${srvRps.length} RPs)</span></span>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 12px;">
                                     <span class="action-icon" onclick="event.stopPropagation(); copyServerRps('${srv.id}', this)" title="Copy all RPs in this server">
@@ -331,7 +331,7 @@ function renderManagement(app, container) {
                                             <div class="server-header" onclick="app.toggleServerExpand('${srv.id}')" style="cursor: pointer; background: rgba(255,255,255,0.03);">
                                                 <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
                                                     <i data-lucide="chevron-${isExpanded ? 'down' : 'right'}" style="width: 14px; color: var(--text-secondary);"></i>
-                                                    <span style="font-weight: 600; font-size: 0.85rem;">${srv.name} (${srv.ip})</span>
+                                                    <span style="font-weight: 600; font-size: 0.85rem;">${srv.name} <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.75rem;">(${srvRps.length} RPs)</span></span>
                                                 </div>
                                                 <div style="display: flex; gap: 4px; align-items: center;" onclick="event.stopPropagation()">
                                                     <span class="action-icon" onclick="unassignServer('${srv.id}')" title="Return to Stock">
