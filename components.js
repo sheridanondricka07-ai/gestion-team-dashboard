@@ -76,6 +76,9 @@ function renderSidebar(app) {
             </div>
         </div>
         <div style="margin-top: auto;">
+            <div style="padding: 12px; font-size: 0.7rem; color: var(--text-secondary); text-align: center; border-top: 1px solid var(--border-color); margin-bottom: 8px; opacity: 0.5;">
+                by Med Reda ZARYOUH
+            </div>
             <div class="nav-item" onclick="app.logout()">
                 <i data-lucide="log-out"></i>
                 <span>Logout</span>
