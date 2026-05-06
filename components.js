@@ -210,7 +210,13 @@ function renderOverview(app, container) {
         </div>
 
         <div class="card">
-            <h3 style="margin-bottom: 16px;">My Infrastructure</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3 style="margin: 0;">My Infrastructure</h3>
+                <button onclick="copyAllLinkedRps(this)" style="padding: 6px 12px; font-size: 0.75rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); width: auto;">
+                    <i data-lucide="copy" style="width: 12px; margin-right: 6px;"></i>
+                    Copy All Linked RPs
+                </button>
+            </div>
             <div class="infrastructure-list">
                 ${myServers.map(srv => {
                     const srvRps = rps.filter(r => r.serverId === srv.id);
@@ -222,7 +228,12 @@ function renderOverview(app, container) {
                                     <i data-lucide="chevron-${isExpanded ? 'down' : 'right'}" style="width: 16px; color: var(--text-secondary);"></i>
                                     <span style="font-weight: 600;">${srv.name} (${srv.ip})</span>
                                 </div>
-                                <span class="badge badge-srv">${srvRps.length} RPs</span>
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <span class="action-icon" onclick="event.stopPropagation(); copyServerRps('${srv.id}', this)" title="Copy all RPs in this server">
+                                        <i data-lucide="copy" style="width: 14px; color: var(--text-secondary);"></i>
+                                    </span>
+                                    <span class="badge badge-srv">${srvRps.length} RPs</span>
+                                </div>
                             </div>
                             <div class="rp-list" style="padding: 12px; display: ${isExpanded ? 'grid' : 'none'}; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px;">
                                 ${srvRps.map(rp => `
@@ -732,4 +743,34 @@ window.saveProfile = async (btn) => {
         await window.app.updateProfile({ name, email, password });
         btn.closest('.modal-overlay').remove();
     }
+};
+
+window.copyServerRps = (serverId, el) => {
+    const rps = window.app.state.rps.filter(r => r.serverId === serverId).map(r => r.domain);
+    if (rps.length === 0) return;
+    
+    navigator.clipboard.writeText(rps.join('\n')).then(() => {
+        const originalHtml = el.innerHTML;
+        el.innerHTML = '<i data-lucide="check" style="width: 14px; color: var(--success);"></i>';
+        if (window.lucide) window.lucide.createIcons();
+        setTimeout(() => {
+            el.innerHTML = originalHtml;
+            if (window.lucide) window.lucide.createIcons();
+        }, 2000);
+    });
+};
+
+window.copyAllLinkedRps = (btn) => {
+    const rps = window.app.state.rps.filter(r => r.serverId).map(r => r.domain);
+    if (rps.length === 0) return;
+
+    navigator.clipboard.writeText(rps.join('\n')).then(() => {
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i data-lucide="check" style="width: 12px; margin-right: 6px;"></i> Copied!';
+        if (window.lucide) window.lucide.createIcons();
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+            if (window.lucide) window.lucide.createIcons();
+        }, 2000);
+    });
 };
