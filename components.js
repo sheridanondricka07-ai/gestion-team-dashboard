@@ -296,7 +296,12 @@ function renderManagement(app, container) {
                         `).join('')}
                     </div>
 
-                    <div style="color: var(--text-secondary); font-size: 0.7rem; margin: 16px 0 8px; text-transform: uppercase;">Unassigned Servers</div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin: 16px 0 8px;">
+                        <div style="color: var(--text-secondary); font-size: 0.7rem; text-transform: uppercase;">Unassigned Servers</div>
+                        <span class="action-icon" onclick="copyUnassignedServerIps(this)" title="Copy all unassigned IPs">
+                            <i data-lucide="copy" style="width: 12px; color: var(--text-secondary);"></i>
+                        </span>
+                    </div>
                     <div class="drop-zone" data-type="stock-srv" style="min-height: 80px; border: 1px dashed var(--border-color); border-radius: 8px;">
                         ${stockSrvs.map(srv => `
                             <div class="draggable-item" draggable="true" ondragstart="handleDragStart(event, 'srv', '${srv.id}')">
@@ -770,6 +775,21 @@ window.copyAllLinkedRps = (btn) => {
         if (window.lucide) window.lucide.createIcons();
         setTimeout(() => {
             btn.innerHTML = originalText;
+            if (window.lucide) window.lucide.createIcons();
+        }, 2000);
+    });
+};
+
+window.copyUnassignedServerIps = (el) => {
+    const ips = window.app.state.servers.filter(s => !s.mailerId).map(s => s.ip);
+    if (ips.length === 0) return;
+
+    navigator.clipboard.writeText(ips.join('\n')).then(() => {
+        const originalHtml = el.innerHTML;
+        el.innerHTML = '<i data-lucide="check" style="width: 12px; color: var(--success);"></i>';
+        if (window.lucide) window.lucide.createIcons();
+        setTimeout(() => {
+            el.innerHTML = originalHtml;
             if (window.lucide) window.lucide.createIcons();
         }, 2000);
     });
