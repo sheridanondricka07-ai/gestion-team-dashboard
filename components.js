@@ -3,8 +3,8 @@ function renderLogin(app) {
     container.innerHTML = `
         <div class="login-card">
             <div class="login-header">
-                <h1>Emailing Pro</h1>
-                <p>Management Dashboard</p>
+                <h1>Team Management</h1>
+                <p>Dashboard Access</p>
             </div>
             <form id="login-form">
                 <div style="display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 20px; font-size: 0.75rem; color: ${app.state.dbConnected ? 'var(--accent-primary)' : 'var(--error)'};">
@@ -21,9 +21,6 @@ function renderLogin(app) {
                 </div>
                 <button type="submit" id="login-btn">Sign In</button>
             </form>
-            <div style="margin-top: 24px; text-align: center;">
-                <a href="#" onclick="event.preventDefault(); resetApp();" style="color: var(--text-secondary); font-size: 0.75rem; text-decoration: none; opacity: 0.6;">System Reset</a>
-            </div>
         </div>
     `;
 
@@ -55,7 +52,7 @@ function renderSidebar(app) {
     container.innerHTML = `
         <div class="sidebar-logo">
             <i data-lucide="shield-check"></i>
-            <span>TeamDash</span>
+            <span>Management</span>
         </div>
         <div class="nav-group">
             <div class="nav-label">Main</div>
