@@ -814,8 +814,7 @@ const STATUS_TYPES = [
     { id: 'paused', label: 'PAUSED', color: '#3b82f6' },
     { id: 'change_dom', label: 'Change DOM', color: '#eab308' },
     { id: 'rdns', label: 'RDNS', color: '#166534' },
-    { id: 'down', label: 'DOWN', color: '#f97316' },
-    { id: 'bounce', label: 'BOUNCE', color: '#f97316' }
+    { id: 'down_bounce', label: 'DOWN + BOUNCE', color: '#f97316' }
 ];
 
 function renderStatus(app, container) {
@@ -848,7 +847,8 @@ function renderStatus(app, container) {
         servers.forEach(srv => {
             (srv.allIps || []).forEach(ip => {
                 const safeIp = ip.replace(/\./g, '_');
-                const sid = (statuses && statuses[safeIp] && statuses[safeIp][day]) || 'none';
+                let sid = (statuses && statuses[safeIp] && statuses[safeIp][day]) || 'none';
+                if (sid === 'down' || sid === 'bounce') sid = 'down_bounce';
                 if (sid !== 'none' && counts[sid] !== undefined) counts[sid]++;
             });
         });
@@ -920,7 +920,8 @@ function renderStatus(app, container) {
                                         <td style="padding: 12px; font-family: monospace; border-right: 1px solid var(--border-color); position: sticky; left: 120px; background: ${rowBg}; z-index: 4; border-bottom: ${borderBottom};">${ip}</td>
                                         ${days.map(date => {
                                             const safeIp = ip.replace(/\./g, '_');
-                                            const currentStatusId = (statuses && statuses[safeIp] && statuses[safeIp][date]) || 'none';
+                                            let currentStatusId = (statuses && statuses[safeIp] && statuses[safeIp][date]) || 'none';
+                                            if (currentStatusId === 'down' || currentStatusId === 'bounce') currentStatusId = 'down_bounce';
                                             const currentStatus = STATUS_TYPES.find(s => s.id === currentStatusId) || STATUS_TYPES[0];
                                             return `
                                                 <td class="status-cell" 
@@ -1013,7 +1014,8 @@ window.saveBulkStatus = async (btn) => {
 
 window.cycleStatus = (ip, date, el) => {
     const safeIp = ip.replace(/\./g, '_');
-    const currentStatusId = (window.app.state.statuses && window.app.state.statuses[safeIp] && window.app.state.statuses[safeIp][date]) || 'none';
+    let currentStatusId = (window.app.state.statuses && window.app.state.statuses[safeIp] && window.app.state.statuses[safeIp][date]) || 'none';
+    if (currentStatusId === 'down' || currentStatusId === 'bounce') currentStatusId = 'down_bounce';
     const currentIndex = STATUS_TYPES.findIndex(s => s.id === currentStatusId);
     const nextIndex = (currentIndex + 1) % STATUS_TYPES.length;
     const nextStatus = STATUS_TYPES[nextIndex];
