@@ -63,11 +63,11 @@ function renderSidebar(app) {
                 <i data-lucide="layout-dashboard"></i>
                 <span>Overview</span>
             </div>
+            <div class="nav-item ${view === 'management' ? 'active' : ''}" onclick="app.setView('management')">
+                <i data-lucide="settings"></i>
+                <span>Management</span>
+            </div>
             ${role === 'admin' ? `
-                <div class="nav-item ${view === 'management' ? 'active' : ''}" onclick="app.setView('management')">
-                    <i data-lucide="settings"></i>
-                    <span>Management</span>
-                </div>
                 <div class="nav-item ${view === 'team' ? 'active' : ''}" onclick="app.setView('team')">
                     <i data-lucide="users"></i>
                     <span>Team</span>
@@ -274,7 +274,9 @@ function renderOverview(app, container) {
 }
 
 function renderManagement(app, container) {
-    const { rps, servers, mailers } = app.state;
+    const { rps, servers, mailers, currentUser } = app.state;
+    const role = currentUser.role;
+    const isAdmin = role === 'admin';
     const activeMailers = mailers.filter(m => m.role === 'mailer');
     const query = (app.state.searchQuery || '').toLowerCase();
     
@@ -299,11 +301,13 @@ function renderManagement(app, container) {
                     <div style="color: var(--text-secondary); font-size: 0.7rem; margin-bottom: 8px; text-transform: uppercase;">Unlinked RPs</div>
                     <div class="drop-zone" data-type="stock-rp" style="min-height: 80px; border: 1px dashed var(--border-color); border-radius: 8px; margin-bottom: 12px;">
                         ${stockRps.map(rp => `
-                            <div class="draggable-item" draggable="true" ondragstart="handleDragStart(event, 'rp', '${rp.id}')">
+                            <div class="draggable-item" ${isAdmin ? 'draggable="true" ondragstart="handleDragStart(event, \'rp\', \'' + rp.id + '\')"' : ''}>
                                 <span style="flex: 1; font-weight: 500;">${rp.domain}</span>
-                                <span class="action-icon delete" onclick="event.stopPropagation(); deleteRP('${rp.id}')" title="Delete RP">
-                                    <i data-lucide="trash-2" style="width: 14px; color: var(--error);"></i>
-                                </span>
+                                ${isAdmin ? `
+                                    <span class="action-icon delete" onclick="event.stopPropagation(); deleteRP('${rp.id}')" title="Delete RP">
+                                        <i data-lucide="trash-2" style="width: 14px; color: var(--error);"></i>
+                                    </span>
+                                ` : ''}
                                 <span class="badge badge-rp" style="margin-left: 8px;">RP</span>
                             </div>
                         `).join('')}
@@ -317,11 +321,13 @@ function renderManagement(app, container) {
                     </div>
                     <div class="drop-zone" data-type="stock-srv" style="min-height: 80px; border: 1px dashed var(--border-color); border-radius: 8px;">
                         ${stockSrvs.map(srv => `
-                            <div class="draggable-item" draggable="true" ondragstart="handleDragStart(event, 'srv', '${srv.id}')">
+                            <div class="draggable-item" ${isAdmin ? 'draggable="true" ondragstart="handleDragStart(event, \'srv\', \'' + srv.id + '\')"' : ''}>
                                 <span style="flex: 1; font-weight: 500;">${srv.name}</span>
-                                <span class="action-icon delete" onclick="event.stopPropagation(); deleteServer('${srv.id}')" title="Delete Server">
-                                    <i data-lucide="trash-2" style="width: 14px; color: var(--error);"></i>
-                                </span>
+                                ${isAdmin ? `
+                                    <span class="action-icon delete" onclick="event.stopPropagation(); deleteServer('${srv.id}')" title="Delete Server">
+                                        <i data-lucide="trash-2" style="width: 14px; color: var(--error);"></i>
+                                    </span>
+                                ` : ''}
                                 <span class="badge badge-srv" style="margin-left: 8px;">SRV</span>
                             </div>
                         `).join('')}
@@ -345,7 +351,7 @@ function renderManagement(app, container) {
                                     const srvRps = rps.filter(r => r.serverId === srv.id);
                                     const isExpanded = app.expandedServers.has(srv.id);
                                     return `
-                                        <div class="server-container draggable-item" draggable="true" ondragstart="handleDragStart(event, 'srv', '${srv.id}')" style="display: block; padding: 0; margin-bottom: 8px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                                        <div class="server-container draggable-item" ${isAdmin ? 'draggable="true" ondragstart="handleDragStart(event, \'srv\', \'' + srv.id + '\')"' : ''} style="display: block; padding: 0; margin-bottom: 8px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
                                             <div class="server-header" onclick="app.toggleServerExpand('${srv.id}')" style="cursor: pointer; background: rgba(255,255,255,0.03);">
                                                 <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
                                                     <i data-lucide="chevron-${isExpanded ? 'down' : 'right'}" style="width: 14px; color: var(--text-secondary);"></i>
@@ -355,14 +361,16 @@ function renderManagement(app, container) {
                                                     <span class="action-icon" onclick="copyServerRps('${srv.id}', this)" title="Copy all RPs in this server">
                                                         <i data-lucide="copy" style="width: 14px; color: var(--text-secondary);"></i>
                                                     </span>
-                                                    <span class="action-icon" onclick="unassignServer('${srv.id}')" title="Return to Stock">
-                                                        <i data-lucide="archive" style="width: 14px; color: var(--text-secondary);"></i>
-                                                    </span>
+                                                    ${isAdmin ? `
+                                                        <span class="action-icon" onclick="unassignServer('${srv.id}')" title="Return to Stock">
+                                                            <i data-lucide="archive" style="width: 14px; color: var(--text-secondary);"></i>
+                                                        </span>
+                                                    ` : ''}
                                                 </div>
                                             </div>
                                             <div class="rp-list drop-zone" data-type="server" data-id="${srv.id}" style="min-height: 30px; display: ${isExpanded ? 'block' : 'none'};">
                                                 ${srvRps.map(rp => `
-                                                    <div class="rp-item draggable-item" draggable="true" ondragstart="handleDragStart(event, 'rp', '${rp.id}')">
+                                                    <div class="rp-item draggable-item" ${isAdmin ? 'draggable="true" ondragstart="handleDragStart(event, \'rp\', \'' + rp.id + '\')"' : ''}>
                                                         <div style="flex: 1;">
                                                             <div style="font-weight: 500;">${rp.domain}</div>
                                                             <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;">
@@ -373,16 +381,18 @@ function renderManagement(app, container) {
                                                             </div>
                                                         </div>
                                                         <div style="display: flex; gap: 4px; align-items: center;">
-                                                            <span class="action-icon" onclick="event.stopPropagation(); showIPSelectionModal('${rp.id}')" title="Config IPs">
-                                                                <i data-lucide="edit-3" style="width: 12px;"></i>
-                                                            </span>
-                                                            <span class="action-icon" onclick="event.stopPropagation(); unassignRP('${rp.id}')" title="Return to Stock">
-                                                                <i data-lucide="archive" style="width: 12px; color: var(--text-secondary);"></i>
-                                                            </span>
+                                                            ${isAdmin ? `
+                                                                <span class="action-icon" onclick="event.stopPropagation(); showIPSelectionModal('${rp.id}')" title="Config IPs">
+                                                                    <i data-lucide="edit-3" style="width: 12px;"></i>
+                                                                </span>
+                                                                <span class="action-icon" onclick="event.stopPropagation(); unassignRP('${rp.id}')" title="Return to Stock">
+                                                                    <i data-lucide="archive" style="width: 12px; color: var(--text-secondary);"></i>
+                                                                </span>
+                                                            ` : ''}
                                                         </div>
                                                     </div>
                                                 `).join('')}
-                                                ${srvRps.length === 0 ? '<div style="font-size: 0.65rem; color: var(--text-secondary); text-align: center;">Drop RP here</div>' : ''}
+                                                ${srvRps.length === 0 && isAdmin ? '<div style="font-size: 0.65rem; color: var(--text-secondary); text-align: center;">Drop RP here</div>' : ''}
                                             </div>
                                         </div>
                                     `;
@@ -391,11 +401,13 @@ function renderManagement(app, container) {
                                 ${mStandaloneRps.length > 0 ? `
                                     <div style="color: var(--text-secondary); font-size: 0.65rem; margin-top: 8px;">Standalone RPs:</div>
                                     ${mStandaloneRps.map(rp => `
-                                        <div class="draggable-item" draggable="true" ondragstart="handleDragStart(event, 'rp', '${rp.id}')">
+                                        <div class="draggable-item" ${isAdmin ? 'draggable="true" ondragstart="handleDragStart(event, \'rp\', \'' + rp.id + '\')"' : ''}>
                                             <span style="flex: 1; font-weight: 500;">${rp.domain}</span>
-                                            <span class="action-icon" onclick="event.stopPropagation(); unassignRP('${rp.id}')" title="Return to Stock">
-                                                <i data-lucide="archive" style="width: 14px; color: var(--text-secondary);"></i>
-                                            </span>
+                                            ${isAdmin ? `
+                                                <span class="action-icon" onclick="event.stopPropagation(); unassignRP('${rp.id}')" title="Return to Stock">
+                                                    <i data-lucide="archive" style="width: 14px; color: var(--text-secondary);"></i>
+                                                </span>
+                                            ` : ''}
                                             <span class="badge badge-rp" style="margin-left: 8px;">Unlinked</span>
                                         </div>
                                     `).join('')}
@@ -408,7 +420,9 @@ function renderManagement(app, container) {
         </div>
     `;
 
-    setupDragAndDrop(app);
+    if (isAdmin) {
+        setupDragAndDrop(app);
+    }
     
     const searchInput = document.getElementById('pool-search');
     if (searchInput) {
