@@ -50,9 +50,9 @@ function renderSidebar(app) {
     const role = app.state.currentUser.role;
 
     container.innerHTML = `
-        <div class="sidebar-logo">
-            <i data-lucide="shield-check"></i>
-            <span>Management</span>
+        <div class="sidebar-logo" style="display: flex; align-items: center; gap: 10px; margin-bottom: 24px;">
+            <img src="logo.png" alt="GestiQ" style="height: 32px; width: 32px; object-fit: contain;" onerror="this.outerHTML='<i data-lucide=\\'shield-check\\' style=\\'color: var(--accent-primary);\\'></i>'">
+            <span style="font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px; background: linear-gradient(135deg, var(--text-primary), var(--accent-primary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">GestiQ</span>
         </div>
         <div class="nav-group">
             <div class="nav-label">Main</div>
