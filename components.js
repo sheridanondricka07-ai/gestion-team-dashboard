@@ -828,11 +828,14 @@ window.startCellDrag = (e, ip, date, el) => {
     if (e.button !== 0) return; // Only left click
     window.isDraggingCells = true;
     
-    if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
-        window.clearCellSelection();
+    const key = `${ip}|${date}`;
+    // If the cell is already selected, don't clear the selection (they are likely clicking to open the menu)
+    if (!window.selectedCellsMap.has(key)) {
+        if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
+            window.clearCellSelection();
+        }
+        window.selectCell(ip, date, el);
     }
-    
-    window.selectCell(ip, date, el);
 };
 
 window.enterCellDrag = (e, ip, date, el) => {
