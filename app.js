@@ -42,7 +42,8 @@ class TeamApp {
                 { id: '3', name: 'Zaka LABRI LIKER', email: 'zaka@test.com', password: 'password', role: 'mailer' }
             ],
             servers: [],
-            tools: []
+            tools: [],
+            statuses: {}
         };
         this.expandedServers = new Set();
         this.init();
@@ -314,6 +315,13 @@ class TeamApp {
     }
 
     setView(viewName) { this.state.currentView = viewName; this.updateDashboard(); }
+
+    async updateIPStatus(ip, date, status) {
+        if (!this.state.statuses) this.state.statuses = {};
+        if (!this.state.statuses[ip]) this.state.statuses[ip] = {};
+        this.state.statuses[ip][date] = status;
+        await this.saveState();
+    }
 }
 
 // App is instantiated in window.onload at the top of the file

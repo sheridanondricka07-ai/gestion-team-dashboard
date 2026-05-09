@@ -74,6 +74,10 @@ function renderSidebar(app) {
                 <i data-lucide="wrench"></i>
                 <span>Tools</span>
             </div>
+            <div class="nav-item ${view === 'status' ? 'active' : ''}" onclick="app.setView('status')">
+                <i data-lucide="shield-alert"></i>
+                <span>IP Status</span>
+            </div>
         </div>
         <div style="margin-top: auto;">
             <div style="padding: 12px; font-size: 0.7rem; color: var(--text-secondary); text-align: center; border-top: 1px solid var(--border-color); margin-bottom: 8px; opacity: 0.5;">
@@ -133,6 +137,8 @@ function renderView(app) {
         renderTeamManagement(app, container);
     } else if (view === 'tools') {
         renderTools(app, container);
+    } else if (view === 'status') {
+        renderStatus(app, container);
     }
 }
 
@@ -799,6 +805,99 @@ window.copyAllLinkedRps = (btn) => {
             if (window.lucide) window.lucide.createIcons();
         }, 2000);
     });
+};
+
+const STATUS_TYPES = [
+    { id: 'none', label: 'None', color: 'transparent' },
+    { id: 'rp_test', label: 'RP TEST', color: '#22c55e' },
+    { id: 'spam', label: 'SPAM', color: '#ef4444' },
+    { id: 'paused', label: 'PAUSED', color: '#3b82f6' },
+    { id: 'change_dom', label: 'Change DOM', color: '#eab308' },
+    { id: 'rdns', label: 'RDNS', color: '#166534' },
+    { id: 'down', label: 'DOWN', color: '#f97316' },
+    { id: 'bounce', label: 'BOUNCE', color: '#f97316' }
+];
+
+function renderStatus(app, container) {
+    const { servers, statuses } = app.state;
+    
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        days.push(d.toISOString().split('T')[0]);
+    }
+
+    container.innerHTML = `
+        <div class="status-view-container">
+            <div class="status-legend card" style="margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-color);">
+                ${STATUS_TYPES.filter(s => s.id !== 'none').map(s => `
+                    <div style="display: flex; align-items: center; gap: 6px; font-size: 0.7rem; font-weight: 500;">
+                        <span style="width: 14px; height: 14px; background: ${s.color}; border-radius: 3px; border: 1px solid rgba(255,255,255,0.1);"></span>
+                        <span>${s.label}</span>
+                    </div>
+                `).join('')}
+            </div>
+
+            <div class="card" style="padding: 0; overflow: hidden; border: 1px solid var(--border-color); background: var(--bg-secondary);">
+                <div style="overflow: auto; max-height: calc(100vh - 250px);">
+                    <table class="status-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem;">
+                        <thead style="position: sticky; top: 0; z-index: 5; background: var(--bg-tertiary);">
+                            <tr>
+                                <th style="padding: 12px; text-align: left; border-bottom: 1px solid var(--border-color); border-right: 1px solid var(--border-color); position: sticky; left: 0; z-index: 6; background: var(--bg-tertiary);">Server</th>
+                                <th style="padding: 12px; text-align: left; border-bottom: 1px solid var(--border-color); border-right: 1px solid var(--border-color); position: sticky; left: 100px; z-index: 6; background: var(--bg-tertiary); width: 120px;">IP Address</th>
+                                ${days.map(d => {
+                                    const [y, m, day] = d.split('-');
+                                    return `<th style="padding: 12px; text-align: center; border-bottom: 1px solid var(--border-color); min-width: 80px;">${day}/${m}</th>`;
+                                }).join('')}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${servers.map(srv => {
+                                const srvIps = srv.allIps || [];
+                                return srvIps.map((ip, idx) => `
+                                    <tr style="border-bottom: 1px solid var(--border-color);">
+                                        ${idx === 0 ? `<td rowspan="${srvIps.length}" style="padding: 12px; font-weight: 700; border-right: 1px solid var(--border-color); position: sticky; left: 0; background: var(--bg-secondary); z-index: 4; vertical-align: top;">${srv.name}</td>` : ''}
+                                        <td style="padding: 12px; font-family: monospace; border-right: 1px solid var(--border-color); position: sticky; left: 100px; background: var(--bg-secondary); z-index: 4; border-bottom: 1px solid var(--border-color);">${ip}</td>
+                                        ${days.map(date => {
+                                            const currentStatusId = (statuses && statuses[ip] && statuses[ip][date]) || 'none';
+                                            const currentStatus = STATUS_TYPES.find(s => s.id === currentStatusId) || STATUS_TYPES[0];
+                                            return `
+                                                <td class="status-cell" 
+                                                    style="background: ${currentStatus.id === 'none' ? 'transparent' : currentStatus.color}; text-align: center; cursor: pointer; transition: opacity 0.2s; color: ${currentStatus.id === 'none' ? 'var(--text-secondary)' : 'white'}; font-weight: 600; font-size: 0.65rem; border: 1px solid var(--border-color); height: 40px;" 
+                                                    onclick="cycleStatus('${ip}', '${date}', this)"
+                                                    onmouseover="this.style.opacity='0.8'"
+                                                    onmouseout="this.style.opacity='1'"
+                                                    title="${currentStatus.label}">
+                                                    ${currentStatus.id !== 'none' ? currentStatus.label : ''}
+                                                </td>
+                                            `;
+                                        }).join('')}
+                                    </tr>
+                                `).join('');
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+
+    if (window.lucide) window.lucide.createIcons();
+}
+
+window.cycleStatus = (ip, date, el) => {
+    const currentStatusId = (window.app.state.statuses && window.app.state.statuses[ip] && window.app.state.statuses[ip][date]) || 'none';
+    const currentIndex = STATUS_TYPES.findIndex(s => s.id === currentStatusId);
+    const nextIndex = (currentIndex + 1) % STATUS_TYPES.length;
+    const nextStatus = STATUS_TYPES[nextIndex];
+
+    el.style.background = nextStatus.id === 'none' ? 'transparent' : nextStatus.color;
+    el.style.color = nextStatus.id === 'none' ? 'var(--text-secondary)' : 'white';
+    el.innerText = nextStatus.id !== 'none' ? nextStatus.label : '';
+    el.title = nextStatus.label;
+    
+    window.app.updateIPStatus(ip, date, nextStatus.id);
 };
 
 window.copyUnassignedServerIps = (el) => {
