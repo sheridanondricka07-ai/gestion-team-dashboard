@@ -343,6 +343,9 @@ function renderManagement(app, container) {
                                                     <span style="font-weight: 600; font-size: 0.85rem;">${srv.name} <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.75rem;">(${srvRps.length} RPs)</span></span>
                                                 </div>
                                                 <div style="display: flex; gap: 4px; align-items: center;" onclick="event.stopPropagation()">
+                                                    <span class="action-icon" onclick="copyServerRps('${srv.id}', this)" title="Copy all RPs in this server">
+                                                        <i data-lucide="copy" style="width: 14px; color: var(--text-secondary);"></i>
+                                                    </span>
                                                     <span class="action-icon" onclick="unassignServer('${srv.id}')" title="Return to Stock">
                                                         <i data-lucide="archive" style="width: 14px; color: var(--text-secondary);"></i>
                                                     </span>
