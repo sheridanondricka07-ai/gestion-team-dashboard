@@ -942,6 +942,7 @@ function renderStatus(app, container) {
                             style="width: auto; padding: 8px; font-size: 0.8rem; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px;">
                         <option value="7" ${range === 7 ? 'selected' : ''}>Week (7 Days)</option>
                         <option value="30" ${range === 30 ? 'selected' : ''}>Month (30 Days)</option>
+                        <option value="60" ${range === 60 ? 'selected' : ''}>2 Months (60 Days)</option>
                     </select>
                 </div>
                 <button onclick="showBulkUpdateModal()" style="width: auto; padding: 8px 16px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px; background: var(--accent-primary); border-radius: 6px;">
