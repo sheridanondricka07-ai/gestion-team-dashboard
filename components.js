@@ -818,6 +818,47 @@ const STATUS_TYPES = [
     { id: 'bounce', label: 'BOUNCE', color: '#f97316' }
 ];
 
+window.isDraggingCells = false;
+window.selectedCellsMap = new Map();
+
+window.startCellDrag = (e, ip, date, el) => {
+    if (e.button !== 0) return; // Only left click
+    window.isDraggingCells = true;
+    
+    if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        window.clearCellSelection();
+    }
+    
+    window.selectCell(ip, date, el);
+};
+
+window.enterCellDrag = (e, ip, date, el) => {
+    if (window.isDraggingCells) {
+        window.selectCell(ip, date, el);
+    }
+};
+
+window.stopCellDrag = () => {
+    window.isDraggingCells = false;
+};
+
+document.addEventListener('mouseup', window.stopCellDrag);
+
+window.selectCell = (ip, date, el) => {
+    const key = `${ip}|${date}`;
+    if (!window.selectedCellsMap.has(key)) {
+        window.selectedCellsMap.set(key, { ip, date, el });
+        el.style.boxShadow = 'inset 0 0 0 2px var(--accent-primary)';
+    }
+};
+
+window.clearCellSelection = () => {
+    window.selectedCellsMap.forEach(cell => {
+        cell.el.style.boxShadow = 'none';
+    });
+    window.selectedCellsMap.clear();
+};
+
 function renderStatus(app, container) {
     let scrollPosTop = 0;
     let scrollPosLeft = 0;
@@ -969,12 +1010,13 @@ function renderStatus(app, container) {
                                             const currentStatus = STATUS_TYPES.find(s => s.id === currentStatusId) || STATUS_TYPES[0];
                                             return `
                                                 <td class="status-cell" 
-                                                    style="background: ${currentStatus.id === 'none' ? 'transparent' : currentStatus.color}; text-align: center; cursor: pointer; transition: opacity 0.2s; color: ${currentStatus.id === 'none' ? 'var(--text-secondary)' : 'white'}; font-weight: 600; font-size: 0.65rem; border-right: 1px solid var(--border-color); border-bottom: ${borderBottom}; height: 40px;" 
-                                                    onclick="cycleStatus('${ip}', '${date}', this)"
-                                                    oncontextmenu="openStatusMenu(event, '${ip}', '${date}', this)"
+                                                    style="background: ${currentStatus.id === 'none' ? 'transparent' : currentStatus.color}; text-align: center; cursor: cell; transition: opacity 0.2s; color: ${currentStatus.id === 'none' ? 'var(--text-secondary)' : 'white'}; font-weight: 600; font-size: 0.65rem; border-right: 1px solid var(--border-color); border-bottom: ${borderBottom}; height: 40px; user-select: none;" 
+                                                    onclick="openStatusMenu(event, '${ip}', '${date}', this)"
+                                                    onmousedown="startCellDrag(event, '${ip}', '${date}', this)"
+                                                    onmouseenter="enterCellDrag(event, '${ip}', '${date}', this)"
                                                     onmouseover="this.style.opacity='0.8'"
                                                     onmouseout="this.style.opacity='1'"
-                                                    title="Left-click to cycle, Right-click to choose">
+                                                    title="Click and drag to select cells, click to choose status">
                                                     ${currentStatus.id !== 'none' ? currentStatus.label : ''}
                                                 </td>
                                             `;
@@ -1091,6 +1133,14 @@ window.toggleStatusFilter = (sId) => {
 
 window.openStatusMenu = (e, ip, date, el) => {
     e.preventDefault();
+    e.stopPropagation();
+    
+    // If clicked cell is not in selection, select only this cell
+    const key = `${ip}|${date}`;
+    if (!window.selectedCellsMap.has(key)) {
+        window.clearCellSelection();
+        window.selectCell(ip, date, el);
+    }
     
     const existing = document.getElementById('status-context-menu');
     if (existing) existing.remove();
@@ -1127,12 +1177,27 @@ window.openStatusMenu = (e, ip, date, el) => {
         
         item.onmouseover = () => item.style.background = 'var(--bg-tertiary)';
         item.onmouseout = () => item.style.background = 'transparent';
-        item.onclick = () => {
-            el.style.background = s.id === 'none' ? 'transparent' : s.color;
-            el.style.color = s.id === 'none' ? 'var(--text-secondary)' : 'white';
-            el.innerText = s.id !== 'none' ? s.label : '';
-            window.app.updateIPStatus(ip, date, s.id);
+        item.onclick = async () => {
+            const updates = Array.from(window.selectedCellsMap.values());
+            
+            // Visual feedback instantly
+            updates.forEach(cell => {
+                cell.el.style.background = s.id === 'none' ? 'transparent' : s.color;
+                cell.el.style.color = s.id === 'none' ? 'var(--text-secondary)' : 'white';
+                cell.el.innerText = s.id !== 'none' ? s.label : '';
+                cell.el.title = s.label;
+            });
+            
             menu.remove();
+            
+            try {
+                await window.app.batchUpdateIPStatuses(updates, s.id);
+            } catch (err) {
+                console.error("Batch save error:", err);
+                alert("Error saving statuses to database.");
+            }
+            
+            window.clearCellSelection();
         };
         menu.appendChild(item);
     });
@@ -1142,6 +1207,7 @@ window.openStatusMenu = (e, ip, date, el) => {
             menu.remove();
             document.removeEventListener('click', closeListener);
             document.removeEventListener('contextmenu', closeListener);
+            window.clearCellSelection();
         }
     };
     
@@ -1152,7 +1218,6 @@ window.openStatusMenu = (e, ip, date, el) => {
     
     document.body.appendChild(menu);
     
-    // Keep menu on screen
     const rect = menu.getBoundingClientRect();
     if (rect.right > window.innerWidth) menu.style.left = `${window.innerWidth - rect.width - 10}px`;
     if (rect.bottom > window.innerHeight) menu.style.top = `${window.innerHeight - rect.height - 10}px`;

@@ -348,6 +348,23 @@ class TeamApp {
             throw e;
         }
     }
+
+    async batchUpdateIPStatuses(updates, statusId) {
+        if (!this.state.statuses) this.state.statuses = {};
+        
+        updates.forEach(({ ip, date }) => {
+            const safeIp = ip.replace(/\./g, '_');
+            if (!this.state.statuses[safeIp]) this.state.statuses[safeIp] = {};
+            this.state.statuses[safeIp][date] = statusId;
+        });
+        
+        try {
+            await this.saveState();
+        } catch(e) {
+            console.error("Firebase save error:", e);
+            throw e;
+        }
+    }
 }
 
 // App is instantiated in window.onload at the top of the file
