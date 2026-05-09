@@ -824,7 +824,7 @@ function renderStatus(app, container) {
     const query = (app.statusSearch || '').toLowerCase();
     
     const days = [];
-    for (let i = range - 1; i >= 0; i--) {
+    for (let i = 0; i < range; i++) {
         const d = new Date();
         d.setDate(d.getDate() - i);
         days.push(d.toISOString().split('T')[0]);
