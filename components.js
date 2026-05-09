@@ -907,19 +907,24 @@ function renderStatus(app, container) {
                             </tr>
                         </thead>
                         <tbody>
-                            ${filteredServers.map(srv => {
+                            ${filteredServers.map((srv, srvIdx) => {
                                 const srvIps = srv.filteredIps || [];
-                                return srvIps.map((ip, idx) => `
-                                    <tr style="border-bottom: 1px solid var(--border-color);">
-                                        ${idx === 0 ? `<td rowspan="${srvIps.length}" style="padding: 12px; font-weight: 700; border-right: 1px solid var(--border-color); position: sticky; left: 0; background: var(--bg-secondary); z-index: 4; vertical-align: top; border-bottom: 1px solid var(--border-color);">${srv.name}</td>` : ''}
-                                        <td style="padding: 12px; font-family: monospace; border-right: 1px solid var(--border-color); position: sticky; left: 120px; background: var(--bg-secondary); z-index: 4; border-bottom: 1px solid var(--border-color);">${ip}</td>
+                                const rowBg = srvIdx % 2 === 0 ? 'var(--bg-secondary)' : 'var(--bg-primary)';
+                                return srvIps.map((ip, idx) => {
+                                    const isLastRow = idx === srvIps.length - 1;
+                                    const borderBottom = isLastRow ? '3px solid var(--border-color)' : '1px solid var(--border-color)';
+                                    
+                                    return `
+                                    <tr style="border-bottom: ${borderBottom};">
+                                        ${idx === 0 ? `<td rowspan="${srvIps.length}" style="padding: 12px; font-weight: 700; border-right: 1px solid var(--border-color); position: sticky; left: 0; background: ${rowBg}; z-index: 4; vertical-align: top; border-bottom: 3px solid var(--border-color);">${srv.name}</td>` : ''}
+                                        <td style="padding: 12px; font-family: monospace; border-right: 1px solid var(--border-color); position: sticky; left: 120px; background: ${rowBg}; z-index: 4; border-bottom: ${borderBottom};">${ip}</td>
                                         ${days.map(date => {
                                             const safeIp = ip.replace(/\./g, '_');
                                             const currentStatusId = (statuses && statuses[safeIp] && statuses[safeIp][date]) || 'none';
                                             const currentStatus = STATUS_TYPES.find(s => s.id === currentStatusId) || STATUS_TYPES[0];
                                             return `
                                                 <td class="status-cell" 
-                                                    style="background: ${currentStatus.id === 'none' ? 'transparent' : currentStatus.color}; text-align: center; cursor: pointer; transition: opacity 0.2s; color: ${currentStatus.id === 'none' ? 'var(--text-secondary)' : 'white'}; font-weight: 600; font-size: 0.65rem; border: 1px solid var(--border-color); height: 40px;" 
+                                                    style="background: ${currentStatus.id === 'none' ? 'transparent' : currentStatus.color}; text-align: center; cursor: pointer; transition: opacity 0.2s; color: ${currentStatus.id === 'none' ? 'var(--text-secondary)' : 'white'}; font-weight: 600; font-size: 0.65rem; border-right: 1px solid var(--border-color); border-bottom: ${borderBottom}; height: 40px;" 
                                                     onclick="cycleStatus('${ip}', '${date}', this)"
                                                     onmouseover="this.style.opacity='0.8'"
                                                     onmouseout="this.style.opacity='1'"
@@ -929,7 +934,8 @@ function renderStatus(app, container) {
                                             `;
                                         }).join('')}
                                     </tr>
-                                `).join('');
+                                    `;
+                                }).join('');
                             }).join('')}
                         </tbody>
                     </table>
