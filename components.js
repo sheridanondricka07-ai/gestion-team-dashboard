@@ -971,9 +971,10 @@ function renderStatus(app, container) {
                                                 <td class="status-cell" 
                                                     style="background: ${currentStatus.id === 'none' ? 'transparent' : currentStatus.color}; text-align: center; cursor: pointer; transition: opacity 0.2s; color: ${currentStatus.id === 'none' ? 'var(--text-secondary)' : 'white'}; font-weight: 600; font-size: 0.65rem; border-right: 1px solid var(--border-color); border-bottom: ${borderBottom}; height: 40px;" 
                                                     onclick="cycleStatus('${ip}', '${date}', this)"
+                                                    oncontextmenu="openStatusMenu(event, '${ip}', '${date}', this)"
                                                     onmouseover="this.style.opacity='0.8'"
                                                     onmouseout="this.style.opacity='1'"
-                                                    title="${currentStatus.label}">
+                                                    title="Left-click to cycle, Right-click to choose">
                                                     ${currentStatus.id !== 'none' ? currentStatus.label : ''}
                                                 </td>
                                             `;
@@ -1086,6 +1087,75 @@ window.toggleStatusFilter = (sId) => {
         window.app.statusFilters.splice(idx, 1);
     }
     window.app.updateDashboard();
+};
+
+window.openStatusMenu = (e, ip, date, el) => {
+    e.preventDefault();
+    
+    const existing = document.getElementById('status-context-menu');
+    if (existing) existing.remove();
+    
+    const menu = document.createElement('div');
+    menu.id = 'status-context-menu';
+    menu.style.position = 'fixed';
+    menu.style.left = `${e.clientX}px`;
+    menu.style.top = `${e.clientY}px`;
+    menu.style.background = 'var(--bg-secondary)';
+    menu.style.border = '1px solid var(--border-color)';
+    menu.style.borderRadius = '8px';
+    menu.style.padding = '8px';
+    menu.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+    menu.style.zIndex = '1000';
+    menu.style.display = 'flex';
+    menu.style.flexDirection = 'column';
+    menu.style.gap = '4px';
+    
+    STATUS_TYPES.forEach(s => {
+        const item = document.createElement('div');
+        item.style.padding = '8px 12px';
+        item.style.borderRadius = '4px';
+        item.style.cursor = 'pointer';
+        item.style.fontSize = '0.75rem';
+        item.style.fontWeight = '600';
+        item.style.display = 'flex';
+        item.style.alignItems = 'center';
+        item.style.gap = '8px';
+        item.innerHTML = `
+            <span style="width: 14px; height: 14px; border-radius: 3px; background: ${s.color}; border: 1px solid rgba(0,0,0,0.1)"></span>
+            <span style="color: var(--text-primary)">${s.label}</span>
+        `;
+        
+        item.onmouseover = () => item.style.background = 'var(--bg-tertiary)';
+        item.onmouseout = () => item.style.background = 'transparent';
+        item.onclick = () => {
+            el.style.background = s.id === 'none' ? 'transparent' : s.color;
+            el.style.color = s.id === 'none' ? 'var(--text-secondary)' : 'white';
+            el.innerText = s.id !== 'none' ? s.label : '';
+            window.app.updateIPStatus(ip, date, s.id);
+            menu.remove();
+        };
+        menu.appendChild(item);
+    });
+    
+    const closeListener = (evt) => {
+        if (!menu.contains(evt.target)) {
+            menu.remove();
+            document.removeEventListener('click', closeListener);
+            document.removeEventListener('contextmenu', closeListener);
+        }
+    };
+    
+    setTimeout(() => {
+        document.addEventListener('click', closeListener);
+        document.addEventListener('contextmenu', closeListener);
+    }, 0);
+    
+    document.body.appendChild(menu);
+    
+    // Keep menu on screen
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) menu.style.left = `${window.innerWidth - rect.width - 10}px`;
+    if (rect.bottom > window.innerHeight) menu.style.top = `${window.innerHeight - rect.height - 10}px`;
 };
 
 window.copyUnassignedServerIps = (el) => {
