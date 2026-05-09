@@ -2,9 +2,12 @@ function renderLogin(app) {
     const container = document.getElementById('login-screen');
     container.innerHTML = `
         <div class="login-card">
-            <div class="login-header">
-                <h1>Team Management</h1>
-                <p>Dashboard Access</p>
+            <div class="login-header" style="display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 24px;">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
+                    <img src="logo.png" alt="GestiQ" style="height: 48px; width: 48px; object-fit: contain;" onerror="this.outerHTML='<i data-lucide=\\'shield-check\\' style=\\'color: var(--accent-primary); width: 40px; height: 40px;\\'></i>'; if(window.lucide) window.lucide.createIcons();">
+                    <h1 style="font-size: 2.25rem; font-weight: 800; letter-spacing: -0.5px; background: linear-gradient(135deg, var(--text-primary), var(--accent-primary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0;">GestiQ</h1>
+                </div>
+                <p style="margin: 0; color: var(--text-secondary);">Dashboard Access</p>
             </div>
             <form id="login-form">
                 <div style="display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 20px; font-size: 0.75rem; color: ${app.state.dbConnected ? 'var(--accent-primary)' : 'var(--error)'};">
@@ -51,7 +54,7 @@ function renderSidebar(app) {
 
     container.innerHTML = `
         <div class="sidebar-logo" style="display: flex; align-items: center; gap: 10px; margin-bottom: 24px;">
-            <img src="logo.png" alt="GestiQ" style="height: 32px; width: 32px; object-fit: contain;" onerror="this.outerHTML='<i data-lucide=\\'shield-check\\' style=\\'color: var(--accent-primary);\\'></i>'">
+            <img src="logo.png" alt="GestiQ" style="height: 32px; width: 32px; object-fit: contain;" onerror="this.outerHTML='<i data-lucide=\\'shield-check\\' style=\\'color: var(--accent-primary);\\'></i>'; if(window.lucide) window.lucide.createIcons();">
             <span style="font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px; background: linear-gradient(135deg, var(--text-primary), var(--accent-primary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">GestiQ</span>
         </div>
         <div class="nav-group">
