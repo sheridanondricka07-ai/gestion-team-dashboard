@@ -990,7 +990,14 @@ function renderStatus(app, container) {
                                 `;
                             }).join('')}
                             <tr>
-                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color); border-right: 1px solid var(--border-color); position: sticky; left: 0; z-index: 11; background: var(--bg-tertiary); min-width: 120px;">Server (${totalServers})</th>
+                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color); border-right: 1px solid var(--border-color); position: sticky; left: 0; z-index: 11; background: var(--bg-tertiary); min-width: 120px;">
+                                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                                        <span>Server (${totalServers})</span>
+                                        <div data-ips="${filteredServers.map(s => s.name).join(',')}" onclick="window.copyIPsFromAttr(this)" style="cursor: pointer; padding: 4px; border-radius: 4px; display: flex;" title="Copy all shown Servers" onmouseover="this.style.background='var(--bg-primary)'" onmouseout="this.style.background='transparent'">
+                                            <i data-lucide="copy" style="width: 14px; color: var(--text-secondary);"></i>
+                                        </div>
+                                    </div>
+                                </th>
                                 <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color); border-right: 1px solid var(--border-color); position: sticky; left: 120px; z-index: 11; background: var(--bg-tertiary); width: 140px;">
                                     <div style="display: flex; align-items: center; justify-content: space-between;">
                                         <span>IP Address (${totalIps})</span>
@@ -1015,14 +1022,7 @@ function renderStatus(app, container) {
                                     
                                     return `
                                     <tr style="border-bottom: ${borderBottom};">
-                                        ${idx === 0 ? `<td rowspan="${srvIps.length}" style="padding: 12px; font-weight: 700; border-right: 1px solid var(--border-color); position: sticky; left: 0; background: ${rowBg}; z-index: 4; vertical-align: top; border-bottom: 3px solid var(--border-color);">
-                                            <div style="display: flex; align-items: center; justify-content: space-between;">
-                                                <span>${srv.name}</span>
-                                                <div data-ips="${srvIps.join(',')}" onclick="window.copyIPsFromAttr(this)" style="cursor: pointer; padding: 4px; border-radius: 4px; display: flex;" title="Copy server IPs" onmouseover="this.style.background='var(--bg-tertiary)'" onmouseout="this.style.background='transparent'">
-                                                    <i data-lucide="copy" style="width: 14px; color: var(--text-secondary);"></i>
-                                                </div>
-                                            </div>
-                                        </td>` : ''}
+                                        ${idx === 0 ? `<td rowspan="${srvIps.length}" style="padding: 12px; font-weight: 700; border-right: 1px solid var(--border-color); position: sticky; left: 0; background: ${rowBg}; z-index: 4; vertical-align: top; border-bottom: 3px solid var(--border-color);">${srv.name}</td>` : ''}
                                         <td style="padding: 12px; font-family: monospace; border-right: 1px solid var(--border-color); position: sticky; left: 120px; background: ${rowBg}; z-index: 4; border-bottom: ${borderBottom};">${ip}</td>
                                         ${days.map(date => {
                                             const safeIp = ip.replace(/\./g, '_');
