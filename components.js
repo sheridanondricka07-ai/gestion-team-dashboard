@@ -814,7 +814,8 @@ const STATUS_TYPES = [
     { id: 'paused', label: 'PAUSED', color: '#3b82f6' },
     { id: 'change_dom', label: 'Change DOM', color: '#eab308' },
     { id: 'rdns', label: 'RDNS', color: '#166534' },
-    { id: 'down_bounce', label: 'DOWN + BOUNCE', color: '#f97316' }
+    { id: 'down', label: 'DOWN', color: '#f97316' },
+    { id: 'bounce', label: 'BOUNCE', color: '#f97316' }
 ];
 
 function renderStatus(app, container) {
@@ -847,8 +848,7 @@ function renderStatus(app, container) {
         servers.forEach(srv => {
             (srv.allIps || []).forEach(ip => {
                 const safeIp = ip.replace(/\./g, '_');
-                let sid = (statuses && statuses[safeIp] && statuses[safeIp][day]) || 'none';
-                if (sid === 'down' || sid === 'bounce') sid = 'down_bounce';
+                const sid = (statuses && statuses[safeIp] && statuses[safeIp][day]) || 'none';
                 if (sid !== 'none' && counts[sid] !== undefined) counts[sid]++;
             });
         });
@@ -889,14 +889,19 @@ function renderStatus(app, container) {
                 <div style="overflow: auto; max-height: calc(100vh - 250px);">
                     <table class="status-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem;">
                         <thead style="position: sticky; top: 0; z-index: 10; background: var(--bg-tertiary);">
-                            ${STATUS_TYPES.filter(s => s.id !== 'none').map(s => `
+                            ${STATUS_TYPES.filter(s => s.id !== 'none' && s.id !== 'bounce').map(s => {
+                                const isDown = s.id === 'down';
+                                const rowLabel = isDown ? 'DOWN + BOUNCE' : s.label;
+                                return `
                                 <tr style="font-size: 0.65rem;">
-                                    <th colspan="2" style="padding: 4px 12px; text-align: right; background: var(--bg-tertiary); border-bottom: 1px solid var(--border-color); color: ${s.color}; font-weight: 700; border-right: 1px solid var(--border-color); position: sticky; left: 0; z-index: 11;">${s.label}</th>
-                                    ${days.map((day, dIdx) => `
-                                        <th style="padding: 4px; text-align: center; background: ${s.color}; color: white; border-bottom: 1px solid var(--border-color); border-right: 1px solid var(--border-color); font-weight: 800;">${dailyStats[dIdx][s.id] || 0}</th>
-                                    `).join('')}
+                                    <th colspan="2" style="padding: 4px 12px; text-align: right; background: var(--bg-tertiary); border-bottom: 1px solid var(--border-color); color: ${s.color}; font-weight: 700; border-right: 1px solid var(--border-color); position: sticky; left: 0; z-index: 11;">${rowLabel}</th>
+                                    ${days.map((day, dIdx) => {
+                                        const count = isDown ? (dailyStats[dIdx]['down'] + dailyStats[dIdx]['bounce']) : (dailyStats[dIdx][s.id] || 0);
+                                        return `<th style="padding: 4px; text-align: center; background: ${s.color}; color: white; border-bottom: 1px solid var(--border-color); border-right: 1px solid var(--border-color); font-weight: 800;">${count}</th>`;
+                                    }).join('')}
                                 </tr>
-                            `).join('')}
+                                `;
+                            }).join('')}
                             <tr>
                                 <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color); border-right: 1px solid var(--border-color); position: sticky; left: 0; z-index: 11; background: var(--bg-tertiary); min-width: 120px;">Server (${totalServers})</th>
                                 <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color); border-right: 1px solid var(--border-color); position: sticky; left: 120px; z-index: 11; background: var(--bg-tertiary); width: 140px;">IP Address (${totalIps})</th>
@@ -920,8 +925,7 @@ function renderStatus(app, container) {
                                         <td style="padding: 12px; font-family: monospace; border-right: 1px solid var(--border-color); position: sticky; left: 120px; background: ${rowBg}; z-index: 4; border-bottom: ${borderBottom};">${ip}</td>
                                         ${days.map(date => {
                                             const safeIp = ip.replace(/\./g, '_');
-                                            let currentStatusId = (statuses && statuses[safeIp] && statuses[safeIp][date]) || 'none';
-                                            if (currentStatusId === 'down' || currentStatusId === 'bounce') currentStatusId = 'down_bounce';
+                                            const currentStatusId = (statuses && statuses[safeIp] && statuses[safeIp][date]) || 'none';
                                             const currentStatus = STATUS_TYPES.find(s => s.id === currentStatusId) || STATUS_TYPES[0];
                                             return `
                                                 <td class="status-cell" 
@@ -1014,8 +1018,7 @@ window.saveBulkStatus = async (btn) => {
 
 window.cycleStatus = (ip, date, el) => {
     const safeIp = ip.replace(/\./g, '_');
-    let currentStatusId = (window.app.state.statuses && window.app.state.statuses[safeIp] && window.app.state.statuses[safeIp][date]) || 'none';
-    if (currentStatusId === 'down' || currentStatusId === 'bounce') currentStatusId = 'down_bounce';
+    const currentStatusId = (window.app.state.statuses && window.app.state.statuses[safeIp] && window.app.state.statuses[safeIp][date]) || 'none';
     const currentIndex = STATUS_TYPES.findIndex(s => s.id === currentStatusId);
     const nextIndex = (currentIndex + 1) % STATUS_TYPES.length;
     const nextStatus = STATUS_TYPES[nextIndex];
