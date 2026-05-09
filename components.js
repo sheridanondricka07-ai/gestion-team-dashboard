@@ -991,7 +991,14 @@ function renderStatus(app, container) {
                             }).join('')}
                             <tr>
                                 <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color); border-right: 1px solid var(--border-color); position: sticky; left: 0; z-index: 11; background: var(--bg-tertiary); min-width: 120px;">Server (${totalServers})</th>
-                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color); border-right: 1px solid var(--border-color); position: sticky; left: 120px; z-index: 11; background: var(--bg-tertiary); width: 140px;">IP Address (${totalIps})</th>
+                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color); border-right: 1px solid var(--border-color); position: sticky; left: 120px; z-index: 11; background: var(--bg-tertiary); width: 140px;">
+                                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                                        <span>IP Address (${totalIps})</span>
+                                        <div data-ips="${filteredServers.map(s => s.filteredIps).flat().join(',')}" onclick="window.copyIPsFromAttr(this)" style="cursor: pointer; padding: 4px; border-radius: 4px; display: flex;" title="Copy all shown IPs" onmouseover="this.style.background='var(--bg-primary)'" onmouseout="this.style.background='transparent'">
+                                            <i data-lucide="copy" style="width: 14px; color: var(--text-secondary);"></i>
+                                        </div>
+                                    </div>
+                                </th>
                                 ${days.map(d => {
                                     const [y, m, day] = d.split('-');
                                     return `<th style="padding: 12px; text-align: center; border-bottom: 2px solid var(--border-color); min-width: 80px; font-weight: 700; border-right: 1px solid var(--border-color);"> ${day}/${m}</th>`;
@@ -1008,7 +1015,14 @@ function renderStatus(app, container) {
                                     
                                     return `
                                     <tr style="border-bottom: ${borderBottom};">
-                                        ${idx === 0 ? `<td rowspan="${srvIps.length}" style="padding: 12px; font-weight: 700; border-right: 1px solid var(--border-color); position: sticky; left: 0; background: ${rowBg}; z-index: 4; vertical-align: top; border-bottom: 3px solid var(--border-color);">${srv.name}</td>` : ''}
+                                        ${idx === 0 ? `<td rowspan="${srvIps.length}" style="padding: 12px; font-weight: 700; border-right: 1px solid var(--border-color); position: sticky; left: 0; background: ${rowBg}; z-index: 4; vertical-align: top; border-bottom: 3px solid var(--border-color);">
+                                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                                <span>${srv.name}</span>
+                                                <div data-ips="${srvIps.join(',')}" onclick="window.copyIPsFromAttr(this)" style="cursor: pointer; padding: 4px; border-radius: 4px; display: flex;" title="Copy server IPs" onmouseover="this.style.background='var(--bg-tertiary)'" onmouseout="this.style.background='transparent'">
+                                                    <i data-lucide="copy" style="width: 14px; color: var(--text-secondary);"></i>
+                                                </div>
+                                            </div>
+                                        </td>` : ''}
                                         <td style="padding: 12px; font-family: monospace; border-right: 1px solid var(--border-color); position: sticky; left: 120px; background: ${rowBg}; z-index: 4; border-bottom: ${borderBottom};">${ip}</td>
                                         ${days.map(date => {
                                             const safeIp = ip.replace(/\./g, '_');
@@ -1227,6 +1241,21 @@ window.openStatusMenu = (e, ip, date, el) => {
     const rect = menu.getBoundingClientRect();
     if (rect.right > window.innerWidth) menu.style.left = `${window.innerWidth - rect.width - 10}px`;
     if (rect.bottom > window.innerHeight) menu.style.top = `${window.innerHeight - rect.height - 10}px`;
+};
+
+window.copyIPsFromAttr = (el) => {
+    const attr = el.getAttribute('data-ips');
+    if (!attr) return;
+    const ips = attr.split(',').join('\n');
+    navigator.clipboard.writeText(ips).then(() => {
+        const originalHTML = el.innerHTML;
+        el.innerHTML = '<i data-lucide="check" style="width: 14px; color: var(--accent-primary);"></i>';
+        if (window.lucide) window.lucide.createIcons();
+        setTimeout(() => {
+            el.innerHTML = originalHTML;
+            if (window.lucide) window.lucide.createIcons();
+        }, 1500);
+    });
 };
 
 window.copyUnassignedServerIps = (el) => {
