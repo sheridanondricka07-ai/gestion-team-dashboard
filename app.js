@@ -46,6 +46,8 @@ class TeamApp {
             statuses: {}
         };
         this.expandedServers = new Set();
+        this.statusRange = 7;
+        this.statusSearch = '';
         this.init();
     }
 
@@ -320,6 +322,17 @@ class TeamApp {
         if (!this.state.statuses) this.state.statuses = {};
         if (!this.state.statuses[ip]) this.state.statuses[ip] = {};
         this.state.statuses[ip][date] = status;
+        await this.saveState();
+    }
+
+    async bulkUpdateIPStatuses(ips, status, date) {
+        if (!this.state.statuses) this.state.statuses = {};
+        ips.forEach(ip => {
+            const trimmedIp = ip.trim();
+            if (!trimmedIp) return;
+            if (!this.state.statuses[trimmedIp]) this.state.statuses[trimmedIp] = {};
+            this.state.statuses[trimmedIp][date] = status;
+        });
         await this.saveState();
     }
 }

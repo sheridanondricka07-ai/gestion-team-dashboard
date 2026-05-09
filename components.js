@@ -820,16 +820,61 @@ const STATUS_TYPES = [
 
 function renderStatus(app, container) {
     const { servers, statuses } = app.state;
+    const range = app.statusRange || 7;
+    const query = (app.statusSearch || '').toLowerCase();
     
     const days = [];
-    for (let i = 6; i >= 0; i--) {
+    for (let i = range - 1; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
         days.push(d.toISOString().split('T')[0]);
     }
 
+    const filteredServers = servers.map(srv => {
+        const srvMatches = srv.name.toLowerCase().includes(query);
+        const filteredIps = (srv.allIps || []).filter(ip => ip.includes(query) || srvMatches);
+        if (filteredIps.length > 0) {
+            return { ...srv, filteredIps };
+        }
+        return null;
+    }).filter(s => s !== null);
+
+    const totalServers = servers.length;
+    const totalIps = servers.reduce((acc, s) => acc + (s.allIps || []).length, 0);
+
+    const dailyStats = days.map(day => {
+        const counts = {};
+        STATUS_TYPES.forEach(s => { if (s.id !== 'none') counts[s.id] = 0; });
+        servers.forEach(srv => {
+            (srv.allIps || []).forEach(ip => {
+                const sid = (statuses && statuses[ip] && statuses[ip][day]) || 'none';
+                if (sid !== 'none' && counts[sid] !== undefined) counts[sid]++;
+            });
+        });
+        return counts;
+    });
+
     container.innerHTML = `
         <div class="status-view-container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 16px;">
+                <div style="display: flex; gap: 12px; align-items: center; flex: 1;">
+                    <div style="position: relative; width: 300px;">
+                        <i data-lucide="search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; color: var(--text-secondary);"></i>
+                        <input type="text" id="status-search" placeholder="Search Server or IP..." value="${app.statusSearch}" 
+                               style="width: 100%; padding: 8px 12px 8px 32px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.8rem; color: white;">
+                    </div>
+                    <select onchange="window.app.statusRange = parseInt(this.value); window.app.updateDashboard();" 
+                            style="width: auto; padding: 8px; font-size: 0.8rem; background: var(--bg-secondary); border: 1px solid var(--border-color); color: white; border-radius: 6px;">
+                        <option value="7" ${range === 7 ? 'selected' : ''}>Week (7 Days)</option>
+                        <option value="30" ${range === 30 ? 'selected' : ''}>Month (30 Days)</option>
+                    </select>
+                </div>
+                <button onclick="showBulkUpdateModal()" style="width: auto; padding: 8px 16px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px; background: var(--accent-primary); border-radius: 6px;">
+                    <i data-lucide="list-checks" style="width: 16px;"></i>
+                    Bulk Update Status
+                </button>
+            </div>
+
             <div class="status-legend card" style="margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-color);">
                 ${STATUS_TYPES.filter(s => s.id !== 'none').map(s => `
                     <div style="display: flex; align-items: center; gap: 6px; font-size: 0.7rem; font-weight: 500;">
@@ -842,23 +887,31 @@ function renderStatus(app, container) {
             <div class="card" style="padding: 0; overflow: hidden; border: 1px solid var(--border-color); background: var(--bg-secondary);">
                 <div style="overflow: auto; max-height: calc(100vh - 250px);">
                     <table class="status-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem;">
-                        <thead style="position: sticky; top: 0; z-index: 5; background: var(--bg-tertiary);">
+                        <thead style="position: sticky; top: 0; z-index: 10; background: var(--bg-tertiary);">
+                            ${STATUS_TYPES.filter(s => s.id !== 'none').map(s => `
+                                <tr style="font-size: 0.65rem;">
+                                    <th colspan="2" style="padding: 4px 12px; text-align: right; background: var(--bg-tertiary); border-bottom: 1px solid var(--border-color); color: ${s.color}; font-weight: 700; border-right: 1px solid var(--border-color); position: sticky; left: 0; z-index: 11;">${s.label}</th>
+                                    ${days.map((day, dIdx) => `
+                                        <th style="padding: 4px; text-align: center; background: ${s.color}; color: white; border-bottom: 1px solid var(--border-color); border-right: 1px solid var(--border-color); font-weight: 800;">${dailyStats[dIdx][s.id] || 0}</th>
+                                    `).join('')}
+                                </tr>
+                            `).join('')}
                             <tr>
-                                <th style="padding: 12px; text-align: left; border-bottom: 1px solid var(--border-color); border-right: 1px solid var(--border-color); position: sticky; left: 0; z-index: 6; background: var(--bg-tertiary);">Server</th>
-                                <th style="padding: 12px; text-align: left; border-bottom: 1px solid var(--border-color); border-right: 1px solid var(--border-color); position: sticky; left: 100px; z-index: 6; background: var(--bg-tertiary); width: 120px;">IP Address</th>
+                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color); border-right: 1px solid var(--border-color); position: sticky; left: 0; z-index: 11; background: var(--bg-tertiary); min-width: 120px;">Server (${totalServers})</th>
+                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color); border-right: 1px solid var(--border-color); position: sticky; left: 120px; z-index: 11; background: var(--bg-tertiary); width: 140px;">IP Address (${totalIps})</th>
                                 ${days.map(d => {
                                     const [y, m, day] = d.split('-');
-                                    return `<th style="padding: 12px; text-align: center; border-bottom: 1px solid var(--border-color); min-width: 80px;">${day}/${m}</th>`;
+                                    return `<th style="padding: 12px; text-align: center; border-bottom: 2px solid var(--border-color); min-width: 80px; font-weight: 700; border-right: 1px solid var(--border-color);"> ${day}/${m}</th>`;
                                 }).join('')}
                             </tr>
                         </thead>
                         <tbody>
-                            ${servers.map(srv => {
-                                const srvIps = srv.allIps || [];
+                            ${filteredServers.map(srv => {
+                                const srvIps = srv.filteredIps || [];
                                 return srvIps.map((ip, idx) => `
                                     <tr style="border-bottom: 1px solid var(--border-color);">
-                                        ${idx === 0 ? `<td rowspan="${srvIps.length}" style="padding: 12px; font-weight: 700; border-right: 1px solid var(--border-color); position: sticky; left: 0; background: var(--bg-secondary); z-index: 4; vertical-align: top;">${srv.name}</td>` : ''}
-                                        <td style="padding: 12px; font-family: monospace; border-right: 1px solid var(--border-color); position: sticky; left: 100px; background: var(--bg-secondary); z-index: 4; border-bottom: 1px solid var(--border-color);">${ip}</td>
+                                        ${idx === 0 ? `<td rowspan="${srvIps.length}" style="padding: 12px; font-weight: 700; border-right: 1px solid var(--border-color); position: sticky; left: 0; background: var(--bg-secondary); z-index: 4; vertical-align: top; border-bottom: 1px solid var(--border-color);">${srv.name}</td>` : ''}
+                                        <td style="padding: 12px; font-family: monospace; border-right: 1px solid var(--border-color); position: sticky; left: 120px; background: var(--bg-secondary); z-index: 4; border-bottom: 1px solid var(--border-color);">${ip}</td>
                                         ${days.map(date => {
                                             const currentStatusId = (statuses && statuses[ip] && statuses[ip][date]) || 'none';
                                             const currentStatus = STATUS_TYPES.find(s => s.id === currentStatusId) || STATUS_TYPES[0];
@@ -883,8 +936,66 @@ function renderStatus(app, container) {
         </div>
     `;
 
+    const searchInput = document.getElementById('status-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            app.statusSearch = e.target.value;
+            renderStatus(app, container);
+        });
+        searchInput.focus();
+        const val = searchInput.value;
+        searchInput.value = '';
+        searchInput.value = val;
+    }
+
     if (window.lucide) window.lucide.createIcons();
 }
+
+window.showBulkUpdateModal = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+        <div class="modal" style="max-width: 500px;">
+            <h2 style="margin-bottom: 16px;">Bulk Status Update</h2>
+            <div class="form-group">
+                <label>Target Status</label>
+                <select id="bulk-status" style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: white; border-radius: 8px;">
+                    ${STATUS_TYPES.map(s => `<option value="${s.id}">${s.label}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" id="bulk-date" value="${today}" style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: white; border-radius: 8px;">
+            </div>
+            <div class="form-group">
+                <label>IP Addresses (One per line)</label>
+                <textarea id="bulk-ips" placeholder="46.105.41.176\n50.2.185.122" style="width: 100%; height: 200px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: white; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 0.85rem;"></textarea>
+            </div>
+            <div style="display: flex; gap: 12px; margin-top: 24px;">
+                <button onclick="saveBulkStatus(this)" style="flex: 1; background: var(--accent-primary);">Apply Status Update</button>
+                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary);">Cancel</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+};
+
+window.saveBulkStatus = async (btn) => {
+    const ips = document.getElementById('bulk-ips').value.split('\n').map(ip => ip.trim()).filter(ip => ip !== '');
+    const status = document.getElementById('bulk-status').value;
+    const date = document.getElementById('bulk-date').value;
+    
+    if (ips.length > 0 && status && date) {
+        btn.innerText = 'Updating...';
+        btn.disabled = true;
+        await window.app.bulkUpdateIPStatuses(ips, status, date);
+        btn.closest('.modal-overlay').remove();
+        window.app.updateDashboard();
+    } else {
+        alert("Please fill in all fields and provide at least one IP.");
+    }
+};
 
 window.cycleStatus = (ip, date, el) => {
     const currentStatusId = (window.app.state.statuses && window.app.state.statuses[ip] && window.app.state.statuses[ip][date]) || 'none';
