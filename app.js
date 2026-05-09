@@ -227,7 +227,7 @@ class TeamApp {
             }
         } catch (err) {
             console.error("Critical App Error:", err);
-            document.body.innerHTML = `<div style="padding:40px; color:white; text-align:center;"><h2>Critical Error</h2><p>${err.message}</p></div>`;
+            document.body.innerHTML = `<div style="padding:40px; color:var(--text-primary); text-align:center;"><h2>Critical Error</h2><p>${err.message}</p></div>`;
         }
     }
 

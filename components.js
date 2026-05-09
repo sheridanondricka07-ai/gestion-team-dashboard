@@ -289,7 +289,7 @@ function renderManagement(app, container) {
                     <div style="position: relative;">
                         <i data-lucide="search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; color: var(--text-secondary);"></i>
                         <input type="text" id="pool-search" placeholder="Search domains/IPs..." value="${app.state.searchQuery || ''}" 
-                               style="width: 100%; padding: 8px 12px 8px 32px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.8rem; color: white;">
+                               style="width: 100%; padding: 8px 12px 8px 32px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.8rem; color: var(--text-primary);">
                     </div>
                 </div>
                 <div class="pool-content">
@@ -535,7 +535,7 @@ window.showAddServerModal = () => {
             </div>
             <div class="form-group">
                 <label>IP Addresses (One per line)</label>
-                <textarea id="srv-ips" placeholder="192.168.1.1\n192.168.1.2" style="width:100%; height:100px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:white; border-radius:8px; padding:12px; font-family:monospace;"></textarea>
+                <textarea id="srv-ips" placeholder="192.168.1.1\n192.168.1.2" style="width:100%; height:100px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px; padding:12px; font-family:monospace;"></textarea>
             </div>
             <div style="display: flex; gap: 12px;">
                 <button onclick="saveServer(this)" style="flex: 1;">Create Server</button>
@@ -565,7 +565,7 @@ window.showAddRPModal = () => {
             <h2 style="margin-bottom: 16px;">Add New RPs</h2>
             <div class="form-group">
                 <label>Domains (One per line)</label>
-                <textarea id="rp-domains" placeholder="domain1.com\ndomain2.com" style="width:100%; height:150px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:white; border-radius:8px; padding:12px; font-family:monospace;"></textarea>
+                <textarea id="rp-domains" placeholder="domain1.com\ndomain2.com" style="width:100%; height:150px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px; padding:12px; font-family:monospace;"></textarea>
             </div>
             <div style="display: flex; gap: 12px;">
                 <button onclick="saveRP(this)" style="flex: 1;">Add Domains</button>
@@ -704,7 +704,7 @@ window.showAddToolModal = () => {
             </div>
             <div class="form-group">
                 <label>Description (Optional)</label>
-                <textarea id="tool-desc" style="width:100%; height:80px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:white; border-radius:8px; padding:12px;"></textarea>
+                <textarea id="tool-desc" style="width:100%; height:80px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px; padding:12px;"></textarea>
             </div>
             <div style="display: flex; gap: 12px;">
                 <button onclick="saveTool(this)" style="flex: 1;">Add to Dashboard</button>
@@ -983,7 +983,7 @@ window.showBulkUpdateModal = () => {
             </div>
             <div class="form-group">
                 <label>IP Addresses (One per line)</label>
-                <textarea id="bulk-ips" placeholder="46.105.41.176\n50.2.185.122" style="width: 100%; height: 200px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); color: var(--text-primary); border-radius: 8px; padding: 12px; font-family: monospace; font-size: 0.85rem;"></textarea>
+                <textarea id="bulk-ips" placeholder="46.105.41.176\n50.2.185.122" style="width: 100%; height: 200px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; padding: 12px; font-family: monospace; font-size: 0.85rem;"></textarea>
             </div>
             <div style="display: flex; gap: 12px; margin-top: 24px;">
                 <button onclick="saveBulkStatus(this)" style="flex: 1; background: var(--accent-primary);">Apply Status Update</button>
