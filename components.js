@@ -104,7 +104,7 @@ function renderTopBar(app) {
         </div>
         <div style="display: flex; align-items: center; gap: var(--spacing-md);">
             ${app.state.currentUser.role === 'admin' && app.state.currentView === 'management' ? `
-                <button onclick="showAddServerModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color);">+ Server</button>
+                <button onclick="showAddServerModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary);">+ Server</button>
                 <button onclick="showAddRPModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto;">+ RP</button>
             ` : ''}
             ${app.state.currentUser.role === 'admin' && app.state.currentView === 'team' ? `
@@ -222,7 +222,7 @@ function renderOverview(app, container) {
         <div class="card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                 <h3 style="margin: 0;">My Infrastructure</h3>
-                <button onclick="copyAllLinkedRps(this)" style="padding: 6px 12px; font-size: 0.75rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); width: auto;">
+                <button onclick="copyAllLinkedRps(this)" style="padding: 6px 12px; font-size: 0.75rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); width: auto;">
                     <i data-lucide="copy" style="width: 12px; margin-right: 6px;"></i>
                     Copy All Linked RPs
                 </button>
@@ -440,7 +440,7 @@ function renderTeamManagement(app, container) {
                     const memberSrvs = servers.filter(s => s.mailerId === member.id);
                     const memberRps = rps.filter(r => r.mailerId === member.id);
                     return `
-                        <div class="card" style="background: var(--bg-tertiary); border: 1px solid var(--border-color); position: relative;">
+                        <div class="card" style="background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); position: relative;">
                             <div style="position: absolute; top: 12px; right: 12px;">
                                 <span class="action-icon delete" onclick="deleteMailer('${member.id}')" title="Remove Mailer">
                                     <i data-lucide="user-x" style="width: 16px; color: var(--error);"></i>
@@ -503,7 +503,7 @@ window.showAddMailerModal = () => {
             <p style="font-size: 0.7rem; color: var(--text-secondary); margin-bottom: 16px;">Note: Password is visible during creation for accuracy.</p>
             <div style="display: flex; gap: 12px;">
                 <button onclick="saveMailer(this)" style="flex: 1;">Create Account</button>
-                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary);">Cancel</button>
+                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary); color: var(--text-primary);">Cancel</button>
             </div>
         </div>
     `;
@@ -539,7 +539,7 @@ window.showAddServerModal = () => {
             </div>
             <div style="display: flex; gap: 12px;">
                 <button onclick="saveServer(this)" style="flex: 1;">Create Server</button>
-                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary);">Cancel</button>
+                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary); color: var(--text-primary);">Cancel</button>
             </div>
         </div>
     `;
@@ -569,7 +569,7 @@ window.showAddRPModal = () => {
             </div>
             <div style="display: flex; gap: 12px;">
                 <button onclick="saveRP(this)" style="flex: 1;">Add Domains</button>
-                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary);">Cancel</button>
+                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary); color: var(--text-primary);">Cancel</button>
             </div>
         </div>
     `;
@@ -623,7 +623,7 @@ window.showIPSelectionModal = (rpId) => {
 
             <div style="display: flex; gap: 12px;">
                 <button onclick="saveRPIps('${rpId}', this)" style="flex: 1;">Save Changes</button>
-                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary);">Cancel</button>
+                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary); color: var(--text-primary);">Cancel</button>
             </div>
         </div>
     `;
@@ -708,7 +708,7 @@ window.showAddToolModal = () => {
             </div>
             <div style="display: flex; gap: 12px;">
                 <button onclick="saveTool(this)" style="flex: 1;">Add to Dashboard</button>
-                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary);">Cancel</button>
+                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary); color: var(--text-primary);">Cancel</button>
             </div>
         </div>
     `;
@@ -757,7 +757,7 @@ window.showProfileModal = () => {
             
             <div style="display: flex; gap: 12px; margin-top: 24px;">
                 <button onclick="saveProfile(this)" style="flex: 1;">Save Changes</button>
-                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary);">Cancel</button>
+                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary); color: var(--text-primary);">Cancel</button>
             </div>
         </div>
     `;
@@ -960,21 +960,21 @@ window.showBulkUpdateModal = () => {
             <h2 style="margin-bottom: 16px;">Bulk Status Update</h2>
             <div class="form-group">
                 <label>Target Status</label>
-                <select id="bulk-status" style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px;">
+                <select id="bulk-status" style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); color: var(--text-primary); border-radius: 8px;">
                     ${STATUS_TYPES.map(s => `<option value="${s.id}">${s.label}</option>`).join('')}
                 </select>
             </div>
             <div class="form-group">
                 <label>Date</label>
-                <input type="date" id="bulk-date" value="${today}" style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px;">
+                <input type="date" id="bulk-date" value="${today}" style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); color: var(--text-primary); border-radius: 8px;">
             </div>
             <div class="form-group">
                 <label>IP Addresses (One per line)</label>
-                <textarea id="bulk-ips" placeholder="46.105.41.176\n50.2.185.122" style="width: 100%; height: 200px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; padding: 12px; font-family: monospace; font-size: 0.85rem;"></textarea>
+                <textarea id="bulk-ips" placeholder="46.105.41.176\n50.2.185.122" style="width: 100%; height: 200px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); color: var(--text-primary); border-radius: 8px; padding: 12px; font-family: monospace; font-size: 0.85rem;"></textarea>
             </div>
             <div style="display: flex; gap: 12px; margin-top: 24px;">
                 <button onclick="saveBulkStatus(this)" style="flex: 1; background: var(--accent-primary);">Apply Status Update</button>
-                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary);">Cancel</button>
+                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary); color: var(--text-primary);">Cancel</button>
             </div>
         </div>
     `;
