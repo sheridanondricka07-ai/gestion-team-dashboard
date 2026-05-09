@@ -847,7 +847,8 @@ function renderStatus(app, container) {
         STATUS_TYPES.forEach(s => { if (s.id !== 'none') counts[s.id] = 0; });
         servers.forEach(srv => {
             (srv.allIps || []).forEach(ip => {
-                const sid = (statuses && statuses[ip] && statuses[ip][day]) || 'none';
+                const safeIp = ip.replace(/\./g, '_');
+                const sid = (statuses && statuses[safeIp] && statuses[safeIp][day]) || 'none';
                 if (sid !== 'none' && counts[sid] !== undefined) counts[sid]++;
             });
         });
@@ -913,7 +914,8 @@ function renderStatus(app, container) {
                                         ${idx === 0 ? `<td rowspan="${srvIps.length}" style="padding: 12px; font-weight: 700; border-right: 1px solid var(--border-color); position: sticky; left: 0; background: var(--bg-secondary); z-index: 4; vertical-align: top; border-bottom: 1px solid var(--border-color);">${srv.name}</td>` : ''}
                                         <td style="padding: 12px; font-family: monospace; border-right: 1px solid var(--border-color); position: sticky; left: 120px; background: var(--bg-secondary); z-index: 4; border-bottom: 1px solid var(--border-color);">${ip}</td>
                                         ${days.map(date => {
-                                            const currentStatusId = (statuses && statuses[ip] && statuses[ip][date]) || 'none';
+                                            const safeIp = ip.replace(/\./g, '_');
+                                            const currentStatusId = (statuses && statuses[safeIp] && statuses[safeIp][date]) || 'none';
                                             const currentStatus = STATUS_TYPES.find(s => s.id === currentStatusId) || STATUS_TYPES[0];
                                             return `
                                                 <td class="status-cell" 
@@ -989,16 +991,23 @@ window.saveBulkStatus = async (btn) => {
     if (ips.length > 0 && status && date) {
         btn.innerText = 'Updating...';
         btn.disabled = true;
-        await window.app.bulkUpdateIPStatuses(ips, status, date);
-        btn.closest('.modal-overlay').remove();
-        window.app.updateDashboard();
+        try {
+            await window.app.bulkUpdateIPStatuses(ips, status, date);
+            btn.closest('.modal-overlay').remove();
+            window.app.updateDashboard();
+        } catch (e) {
+            alert("Error saving to database. This is usually due to invalid characters. Error: " + e.message);
+            btn.innerText = 'Apply Status Update';
+            btn.disabled = false;
+        }
     } else {
         alert("Please fill in all fields and provide at least one IP.");
     }
 };
 
 window.cycleStatus = (ip, date, el) => {
-    const currentStatusId = (window.app.state.statuses && window.app.state.statuses[ip] && window.app.state.statuses[ip][date]) || 'none';
+    const safeIp = ip.replace(/\./g, '_');
+    const currentStatusId = (window.app.state.statuses && window.app.state.statuses[safeIp] && window.app.state.statuses[safeIp][date]) || 'none';
     const currentIndex = STATUS_TYPES.findIndex(s => s.id === currentStatusId);
     const nextIndex = (currentIndex + 1) % STATUS_TYPES.length;
     const nextStatus = STATUS_TYPES[nextIndex];

@@ -320,9 +320,15 @@ class TeamApp {
 
     async updateIPStatus(ip, date, status) {
         if (!this.state.statuses) this.state.statuses = {};
-        if (!this.state.statuses[ip]) this.state.statuses[ip] = {};
-        this.state.statuses[ip][date] = status;
-        await this.saveState();
+        const safeIp = ip.replace(/\./g, '_');
+        if (!this.state.statuses[safeIp]) this.state.statuses[safeIp] = {};
+        this.state.statuses[safeIp][date] = status;
+        
+        try {
+            await this.saveState();
+        } catch(e) {
+            console.error("Firebase save error:", e);
+        }
     }
 
     async bulkUpdateIPStatuses(ips, status, date) {
@@ -330,10 +336,17 @@ class TeamApp {
         ips.forEach(ip => {
             const trimmedIp = ip.trim();
             if (!trimmedIp) return;
-            if (!this.state.statuses[trimmedIp]) this.state.statuses[trimmedIp] = {};
-            this.state.statuses[trimmedIp][date] = status;
+            const safeIp = trimmedIp.replace(/\./g, '_');
+            if (!this.state.statuses[safeIp]) this.state.statuses[safeIp] = {};
+            this.state.statuses[safeIp][date] = status;
         });
-        await this.saveState();
+        
+        try {
+            await this.saveState();
+        } catch(e) {
+            console.error("Firebase save error:", e);
+            throw e;
+        }
     }
 }
 
