@@ -819,6 +819,14 @@ const STATUS_TYPES = [
 ];
 
 function renderStatus(app, container) {
+    let scrollPosTop = 0;
+    let scrollPosLeft = 0;
+    const scrollContainer = container.querySelector('#status-scroll-container');
+    if (scrollContainer) {
+        scrollPosTop = scrollContainer.scrollTop;
+        scrollPosLeft = scrollContainer.scrollLeft;
+    }
+
     const { servers, statuses } = app.state;
     const range = app.statusRange || 7;
     const query = (app.statusSearch || '').toLowerCase();
@@ -830,9 +838,28 @@ function renderStatus(app, container) {
         days.push(d.toISOString().split('T')[0]);
     }
 
-    const filteredServers = servers.map(srv => {
+    const filteredServers = servers.map((srv, srvIdx) => {
         const srvMatches = srv.name.toLowerCase().includes(query);
-        const filteredIps = (srv.allIps || []).filter(ip => ip.includes(query) || srvMatches);
+        const filteredIps = (srv.allIps || []).filter(ip => {
+            const matchesQuery = ip.includes(query) || srvMatches;
+            
+            let matchesStatus = true;
+            if (app.statusFilters && app.statusFilters.length > 0) {
+                matchesStatus = false;
+                const safeIp = ip.replace(/\./g, '_');
+                for (const day of days) {
+                    let sid = (statuses && statuses[safeIp] && statuses[safeIp][day]) || 'none';
+                    if (sid === 'down' || sid === 'bounce') sid = 'down_bounce';
+                    if (app.statusFilters.includes(sid)) {
+                        matchesStatus = true;
+                        break;
+                    }
+                }
+            }
+            
+            return matchesQuery && matchesStatus;
+        });
+        
         if (filteredIps.length > 0) {
             return { ...srv, filteredIps };
         }
@@ -876,17 +903,30 @@ function renderStatus(app, container) {
                 </button>
             </div>
 
-            <div class="status-legend card" style="margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-color);">
-                ${STATUS_TYPES.filter(s => s.id !== 'none').map(s => `
-                    <div style="display: flex; align-items: center; gap: 6px; font-size: 0.7rem; font-weight: 500;">
-                        <span style="width: 14px; height: 14px; background: ${s.color}; border-radius: 3px; border: 1px solid rgba(255,255,255,0.1);"></span>
-                        <span>${s.label}</span>
+            <div class="status-legend card" style="margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-color); align-items: center;">
+                <div style="font-size: 0.8rem; font-weight: 600; margin-right: 8px; color: var(--text-secondary);">Filter by Status:</div>
+                ${STATUS_TYPES.filter(s => s.id !== 'none' && s.id !== 'bounce').map(s => {
+                    const isDown = s.id === 'down';
+                    const sId = isDown ? 'down_bounce' : s.id;
+                    const label = isDown ? 'DOWN + BOUNCE' : s.label;
+                    const isActive = !(app.statusFilters && app.statusFilters.length > 0) || app.statusFilters.includes(sId);
+                    
+                    return `
+                    <div onclick="window.toggleStatusFilter('${sId}')" style="display: flex; align-items: center; gap: 6px; font-size: 0.7rem; font-weight: 600; cursor: pointer; padding: 6px 10px; border-radius: 6px; background: ${isActive ? 'var(--bg-tertiary)' : 'transparent'}; opacity: ${isActive ? '1' : '0.5'}; border: 1px solid ${isActive ? 'var(--border-color)' : 'transparent'}; transition: all 0.2s;">
+                        <span style="width: 14px; height: 14px; background: ${s.color}; border-radius: 3px; border: 1px solid rgba(0,0,0,0.1);"></span>
+                        <span>${label}</span>
                     </div>
-                `).join('')}
+                    `;
+                }).join('')}
+                ${(app.statusFilters && app.statusFilters.length > 0) ? `
+                    <div onclick="window.app.statusFilters = []; window.app.updateDashboard();" style="display: flex; align-items: center; font-size: 0.75rem; color: var(--accent-primary); font-weight: 600; cursor: pointer; padding: 4px 8px; margin-left: auto;">
+                        <i data-lucide="x" style="width: 14px; margin-right: 4px;"></i> Clear Filters
+                    </div>
+                ` : ''}
             </div>
 
             <div class="card" style="padding: 0; overflow: hidden; border: 1px solid var(--border-color); background: var(--bg-secondary);">
-                <div style="overflow: auto; max-height: calc(100vh - 250px);">
+                <div id="status-scroll-container" style="overflow: auto; max-height: calc(100vh - 250px);">
                     <table class="status-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem;">
                         <thead style="position: sticky; top: 0; z-index: 10; background: var(--bg-tertiary);">
                             ${STATUS_TYPES.filter(s => s.id !== 'none' && s.id !== 'bounce').map(s => {
@@ -948,6 +988,12 @@ function renderStatus(app, container) {
             </div>
         </div>
     `;
+
+    const newScrollContainer = container.querySelector('#status-scroll-container');
+    if (newScrollContainer) {
+        newScrollContainer.scrollTop = scrollPosTop;
+        newScrollContainer.scrollLeft = scrollPosLeft;
+    }
 
     const searchInput = document.getElementById('status-search');
     if (searchInput) {
@@ -1029,6 +1075,17 @@ window.cycleStatus = (ip, date, el) => {
     el.title = nextStatus.label;
     
     window.app.updateIPStatus(ip, date, nextStatus.id);
+};
+
+window.toggleStatusFilter = (sId) => {
+    if (!window.app.statusFilters) window.app.statusFilters = [];
+    const idx = window.app.statusFilters.indexOf(sId);
+    if (idx === -1) {
+        window.app.statusFilters.push(sId);
+    } else {
+        window.app.statusFilters.splice(idx, 1);
+    }
+    window.app.updateDashboard();
 };
 
 window.copyUnassignedServerIps = (el) => {
