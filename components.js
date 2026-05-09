@@ -861,10 +861,10 @@ function renderStatus(app, container) {
                     <div style="position: relative; width: 300px;">
                         <i data-lucide="search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; color: var(--text-secondary);"></i>
                         <input type="text" id="status-search" placeholder="Search Server or IP..." value="${app.statusSearch}" 
-                               style="width: 100%; padding: 8px 12px 8px 32px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.8rem; color: white;">
+                               style="width: 100%; padding: 8px 12px 8px 32px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.8rem; color: var(--text-primary);">
                     </div>
                     <select onchange="window.app.statusRange = parseInt(this.value); window.app.updateDashboard();" 
-                            style="width: auto; padding: 8px; font-size: 0.8rem; background: var(--bg-secondary); border: 1px solid var(--border-color); color: white; border-radius: 6px;">
+                            style="width: auto; padding: 8px; font-size: 0.8rem; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px;">
                         <option value="7" ${range === 7 ? 'selected' : ''}>Week (7 Days)</option>
                         <option value="30" ${range === 30 ? 'selected' : ''}>Month (30 Days)</option>
                     </select>
@@ -960,17 +960,17 @@ window.showBulkUpdateModal = () => {
             <h2 style="margin-bottom: 16px;">Bulk Status Update</h2>
             <div class="form-group">
                 <label>Target Status</label>
-                <select id="bulk-status" style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: white; border-radius: 8px;">
+                <select id="bulk-status" style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px;">
                     ${STATUS_TYPES.map(s => `<option value="${s.id}">${s.label}</option>`).join('')}
                 </select>
             </div>
             <div class="form-group">
                 <label>Date</label>
-                <input type="date" id="bulk-date" value="${today}" style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: white; border-radius: 8px;">
+                <input type="date" id="bulk-date" value="${today}" style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px;">
             </div>
             <div class="form-group">
                 <label>IP Addresses (One per line)</label>
-                <textarea id="bulk-ips" placeholder="46.105.41.176\n50.2.185.122" style="width: 100%; height: 200px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: white; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 0.85rem;"></textarea>
+                <textarea id="bulk-ips" placeholder="46.105.41.176\n50.2.185.122" style="width: 100%; height: 200px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; padding: 12px; font-family: monospace; font-size: 0.85rem;"></textarea>
             </div>
             <div style="display: flex; gap: 12px; margin-top: 24px;">
                 <button onclick="saveBulkStatus(this)" style="flex: 1; background: var(--accent-primary);">Apply Status Update</button>
