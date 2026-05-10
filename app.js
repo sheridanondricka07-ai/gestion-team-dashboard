@@ -53,17 +53,37 @@ class TeamApp {
 
     async addServer(serverData) {
         const ips = serverData.ips.split('\n').map(ip => ip.trim()).filter(ip => ip !== '');
-        const mainIp = ips[0] || '0.0.0.0';
-        const newServer = {
-            id: 's' + Date.now(),
-            name: serverData.name.trim(),
-            ip: mainIp,
-            allIps: ips,
-            mailerId: null,
-            status: 'stock'
-        };
-        this.state.servers.push(newServer);
-        await this.saveState();
+        const serverName = serverData.name.trim();
+        
+        const existingServer = this.state.servers.find(s => s.name === serverName);
+        
+        if (existingServer) {
+            // Server exists, merge new IPs only
+            const currentIps = existingServer.allIps || [];
+            const newUniqueIps = ips.filter(ip => !currentIps.includes(ip));
+            
+            if (newUniqueIps.length > 0) {
+                existingServer.allIps = [...currentIps, ...newUniqueIps];
+                // If existing server had no valid IP, update it with the first new one
+                if ((!existingServer.ip || existingServer.ip === '0.0.0.0') && newUniqueIps[0]) {
+                    existingServer.ip = newUniqueIps[0];
+                }
+                await this.saveState();
+            }
+        } else {
+            // Create new server
+            const mainIp = ips[0] || '0.0.0.0';
+            const newServer = {
+                id: 's' + Date.now(),
+                name: serverName,
+                ip: mainIp,
+                allIps: ips,
+                mailerId: null,
+                status: 'stock'
+            };
+            this.state.servers.push(newServer);
+            await this.saveState();
+        }
     }
 
     async addRP(rpData) {
