@@ -908,13 +908,11 @@ function renderStatus(app, container) {
             if (app.statusFilters && app.statusFilters.length > 0) {
                 matchesStatus = false;
                 const safeIp = ip.replace(/\./g, '_');
-                for (const day of days) {
-                    let sid = (statuses && statuses[safeIp] && statuses[safeIp][day]) || 'none';
-                    if (sid === 'down' || sid === 'bounce') sid = 'down_bounce';
-                    if (app.statusFilters.includes(sid)) {
-                        matchesStatus = true;
-                        break;
-                    }
+                const filterDate = app.selectedFilterDate;
+                let sid = (statuses && statuses[safeIp] && statuses[safeIp][filterDate]) || 'none';
+                if (sid === 'down' || sid === 'bounce') sid = 'down_bounce';
+                if (app.statusFilters.includes(sid)) {
+                    matchesStatus = true;
                 }
             }
             
@@ -958,6 +956,12 @@ function renderStatus(app, container) {
                         <option value="30" ${range === 30 ? 'selected' : ''}>Month (30 Days)</option>
                         <option value="60" ${range === 60 ? 'selected' : ''}>2 Months (60 Days)</option>
                     </select>
+                    <div style="display: flex; align-items: center; gap: 8px; background: var(--bg-secondary); border: 1px solid var(--border-color); padding: 4px 8px; border-radius: 6px;">
+                        <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">Filter Date:</span>
+                        <input type="date" value="${app.selectedFilterDate}" 
+                               onchange="window.app.selectedFilterDate = this.value; window.app.updateDashboard();"
+                               style="background: transparent; border: none; color: var(--text-primary); font-size: 0.8rem; font-family: inherit; outline: none; cursor: pointer;">
+                    </div>
                 </div>
                 <button onclick="showBulkUpdateModal()" style="width: auto; padding: 8px 16px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px; background: var(--accent-primary); border-radius: 6px;">
                     <i data-lucide="list-checks" style="width: 16px;"></i>
@@ -1023,7 +1027,8 @@ function renderStatus(app, container) {
                                 </th>
                                 ${days.map(d => {
                                     const [y, m, day] = d.split('-');
-                                    return `<th style="padding: 12px; text-align: center; border-bottom: 2px solid var(--border-color); min-width: 80px; font-weight: 700; border-right: 1px solid var(--border-color);"> ${day}/${m}</th>`;
+                                    const isSelected = d === app.selectedFilterDate;
+                                    return `<th style="padding: 12px; text-align: center; border-bottom: 2px solid var(--border-color); min-width: 80px; font-weight: 700; border-right: 1px solid var(--border-color); ${isSelected ? 'background: var(--bg-primary); border-top: 2px solid var(--accent-primary);' : ''}"> ${day}/${m}</th>`;
                                 }).join('')}
                             </tr>
                         </thead>
@@ -1043,9 +1048,10 @@ function renderStatus(app, container) {
                                             const safeIp = ip.replace(/\./g, '_');
                                             const currentStatusId = (statuses && statuses[safeIp] && statuses[safeIp][date]) || 'none';
                                             const currentStatus = STATUS_TYPES.find(s => s.id === currentStatusId) || STATUS_TYPES[0];
+                                            const isSelected = date === app.selectedFilterDate;
                                             return `
                                                 <td class="status-cell" 
-                                                    style="background: ${currentStatus.id === 'none' ? 'transparent' : currentStatus.color}; text-align: center; cursor: cell; transition: opacity 0.2s; color: ${currentStatus.id === 'none' ? 'var(--text-secondary)' : 'white'}; font-weight: 600; font-size: 0.65rem; border-right: 1px solid var(--border-color); border-bottom: ${borderBottom}; height: 40px; user-select: none;" 
+                                                    style="background: ${currentStatus.id === 'none' ? (isSelected ? 'rgba(255,255,255,0.02)' : 'transparent') : currentStatus.color}; text-align: center; cursor: cell; transition: opacity 0.2s; color: ${currentStatus.id === 'none' ? 'var(--text-secondary)' : 'white'}; font-weight: 600; font-size: 0.65rem; border-right: 1px solid var(--border-color); border-bottom: ${borderBottom}; height: 40px; user-select: none; ${isSelected ? 'outline: 1px inset rgba(59, 130, 246, 0.2); outline-offset: -1px;' : ''}" 
                                                     onclick="openStatusMenu(event, '${ip}', '${date}', this)"
                                                     onmousedown="startCellDrag(event, '${ip}', '${date}', this)"
                                                     onmouseenter="enterCellDrag(event, '${ip}', '${date}', this)"

@@ -48,6 +48,7 @@ class TeamApp {
         this.expandedServers = new Set();
         this.statusRange = 7;
         this.statusSearch = '';
+        this.selectedFilterDate = new Date().toISOString().split('T')[0];
         this.init();
     }
 
