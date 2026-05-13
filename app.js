@@ -44,7 +44,9 @@ class TeamApp {
             servers: [],
             tools: [],
             statuses: {},
-            spamhaus: {}
+            spamhaus: {},
+            spamhausProgress: null,
+            spamhausHistory: null
         };
         this.expandedServers = new Set();
         this.statusRange = 7;

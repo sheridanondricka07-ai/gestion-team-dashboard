@@ -67,28 +67,57 @@ export default async function handler(req, res) {
         
         const results = {};
         const timestamp = new Date().toISOString();
+        const dateKey = timestamp.split('T')[0]; // YYYY-MM-DD
 
-        for (const ip of uniqueIps) {
-            try {
-                const result = await checkIP(ip);
-                const safeIp = ip.replace(/\./g, '_');
-                results[safeIp] = {
-                    ...result,
-                    timestamp: timestamp
-                };
-                console.log(`Checked ${ip}: ${result.status}`);
-            } catch (err) {
-                console.error(`Failed to check ${ip}:`, err.message);
-            }
+        // Reset progress
+        await db.ref('state/spamhausProgress').set({
+            total: uniqueIps.length,
+            current: 0,
+            status: 'running'
+        });
+
+        // Parallel checking with simple batching (concurrency = 10)
+        const batchSize = 10;
+        for (let i = 0; i < uniqueIps.length; i += batchSize) {
+            const batch = uniqueIps.slice(i, i + batchSize);
+            await Promise.all(batch.map(async (ip) => {
+                try {
+                    const result = await checkIP(ip);
+                    const safeIp = ip.replace(/\./g, '_');
+                    results[safeIp] = {
+                        ...result,
+                        timestamp: timestamp
+                    };
+                } catch (err) {
+                    console.error(`Failed to check ${ip}:`, err.message);
+                }
+            }));
+            
+            // Update progress
+            await db.ref('state/spamhausProgress/current').set(Math.min(i + batchSize, uniqueIps.length));
         }
 
-        // Update state with new spamhaus data
+        // Update current state
         await db.ref('state/spamhaus').update(results);
         await db.ref('state/spamhausLastUpdate').set(new Date().toLocaleString());
+        
+        // Save to history
+        await db.ref(`state/spamhausHistory/${dateKey}`).set({
+            timestamp: timestamp,
+            summary: {
+                total: uniqueIps.length,
+                listed: Object.values(results).filter(r => r.status === 'listed').length
+            },
+            results: results
+        });
 
-        res.status(200).json({ success: true, checked: uniqueIps.length, results });
+        // Mark progress as completed
+        await db.ref('state/spamhausProgress/status').set('idle');
+
+        res.status(200).json({ success: true, checked: uniqueIps.length });
     } catch (error) {
         console.error('Spamhaus Check Error:', error);
+        await db.ref('state/spamhausProgress/status').set('error');
         res.status(500).send(error.message);
     }
 }

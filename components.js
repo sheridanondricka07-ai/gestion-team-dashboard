@@ -1314,7 +1314,7 @@ window.copyUnassignedServerIps = (el) => {
 };
 
 function renderSpamhaus(app, container) {
-    const { servers, spamhaus } = app.state;
+    const { servers, spamhaus, spamhausProgress } = app.state;
     const allIps = servers.reduce((acc, s) => [...acc, ...(s.allIps || [])], []);
     const uniqueIps = [...new Set(allIps)];
     
@@ -1322,6 +1322,9 @@ function renderSpamhaus(app, container) {
         const safeIp = ip.replace(/\./g, '_');
         return spamhaus && spamhaus[safeIp] && spamhaus[safeIp].status === 'listed';
     });
+
+    const isRunning = spamhausProgress && spamhausProgress.status === 'running';
+    const progressPercent = isRunning ? Math.round((spamhausProgress.current / spamhausProgress.total) * 100) : 0;
 
     container.innerHTML = `
         <div style="padding: 24px;">
@@ -1355,17 +1358,26 @@ function renderSpamhaus(app, container) {
                 </div>
             </div>
 
-            <div class="card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+            <div class="card" style="margin-bottom: 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <div>
                         <h3 style="margin: 0; font-size: 1.1rem;">Automated Spamhaus Status</h3>
-                        <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Production IPs are automatically checked every 12 hours.</p>
+                        <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Production IPs are automatically checked daily at 09:00 Moroccan time.</p>
                     </div>
                     <div style="display: flex; gap: 12px; align-items: center;">
                         <span style="font-size: 0.75rem; color: var(--text-secondary);">Last update: ${app.state.spamhausLastUpdate || 'Never'}</span>
-                        <button onclick="triggerManualSpamhausCheck(this)" style="width: auto; padding: 8px 16px; font-size: 0.8rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 8px; border-radius: 6px;">
-                            <i data-lucide="refresh-cw" style="width: 14px;"></i> Check Now
+                        <button id="spamhaus-check-btn" onclick="triggerManualSpamhausCheck(this)" ${isRunning ? 'disabled' : ''} style="width: auto; padding: 8px 16px; font-size: 0.8rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 8px; border-radius: 6px;">
+                            <i data-lucide="refresh-cw" class="${isRunning ? 'spin' : ''}" style="width: 14px;"></i> 
+                            ${isRunning ? 'Checking...' : 'Check Now'}
                         </button>
+                    </div>
+                </div>
+
+                <div id="spamhaus-progress" class="progress-container ${isRunning ? 'progress-active' : ''}">
+                    <div class="progress-bar" style="width: ${progressPercent}%"></div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 0.7rem; color: var(--text-secondary);">
+                        <span>Checking IPs in progress...</span>
+                        <span>${progressPercent}% (${spamhausProgress?.current || 0}/${spamhausProgress?.total || 0})</span>
                     </div>
                 </div>
 
@@ -1406,30 +1418,104 @@ function renderSpamhaus(app, container) {
                     </table>
                 </div>
             </div>
+
+            <div class="card">
+                <h3 style="margin: 0 0 16px 0; font-size: 1.1rem;">Daily Scan History</h3>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                        <thead>
+                            <tr style="text-align: left; border-bottom: 2px solid var(--border-color);">
+                                <th style="padding: 12px;">Date</th>
+                                <th style="padding: 12px;">Summary</th>
+                                <th style="padding: 12px; text-align: right;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${app.state.spamhausHistory ? Object.entries(app.state.spamhausHistory).reverse().map(([date, data]) => `
+                                <tr style="border-bottom: 1px solid var(--border-color);">
+                                    <td style="padding: 12px; font-weight: 500;">${date}</td>
+                                    <td style="padding: 12px;">
+                                        <span style="color: var(--text-secondary); margin-right: 12px;">Total: ${data.summary.total}</span>
+                                        <span class="badge ${data.summary.listed > 0 ? 'badge-sbl' : 'badge-clean'}">${data.summary.listed} Listed</span>
+                                    </td>
+                                    <td style="padding: 12px; text-align: right;">
+                                        <button onclick="viewHistoryDate('${date}')" style="background: transparent; border: none; color: var(--accent-primary); cursor: pointer; font-size: 0.75rem; text-decoration: underline;">View Report</button>
+                                    </td>
+                                </tr>
+                            `).join('') : '<tr><td colspan="3" style="padding: 20px; text-align: center; color: var(--text-secondary);">No history recorded yet.</td></tr>'}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     `;
     if (window.lucide) window.lucide.createIcons();
 }
 
-window.triggerManualSpamhausCheck = async (btn) => {
-    const originalText = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i data-lucide="refresh-cw" class="spin" style="width: 14px;"></i> Checking...';
+window.viewHistoryDate = (date) => {
+    const data = window.app.state.spamhausHistory[date];
+    if (!data) return;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.zIndex = '10000';
+    overlay.innerHTML = `
+        <div class="modal" style="max-width: 800px; max-height: 80vh; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <div>
+                    <h2 style="margin: 0;">Scan Report: ${date}</h2>
+                    <p style="margin: 4px 0 0; color: var(--text-secondary); font-size: 0.8rem;">Time: ${new Date(data.timestamp).toLocaleTimeString()}</p>
+                </div>
+                <button onclick="this.closest('.modal-overlay').remove()" style="background: var(--bg-tertiary); border: none; padding: 8px; border-radius: 6px; cursor: pointer;">
+                    <i data-lucide="x" style="width: 20px;"></i>
+                </button>
+            </div>
+
+            <div class="stats-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
+                <div class="card" style="padding: 16px; text-align: center; border: 1px solid var(--border-color);">
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px;">Clean IPs</div>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--success);">${data.summary.total - data.summary.listed}</div>
+                </div>
+                <div class="card" style="padding: 16px; text-align: center; border: 1px solid var(--border-color);">
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px;">Listed IPs</div>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--error);">${data.summary.listed}</div>
+                </div>
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                <thead>
+                    <tr style="text-align: left; border-bottom: 2px solid var(--border-color);">
+                        <th style="padding: 12px;">IP Address</th>
+                        <th style="padding: 12px;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${Object.entries(data.results).map(([safeIp, res]) => `
+                        <tr style="border-bottom: 1px solid var(--border-color);">
+                            <td style="padding: 12px; font-family: monospace;">${safeIp.replace(/_/g, '.')}</td>
+                            <td style="padding: 12px;">
+                                <span class="badge ${res.status === 'listed' ? 'badge-sbl' : 'badge-clean'}">
+                                    ${res.status === 'listed' ? (res.list || 'LISTED') : 'CLEAN'}
+                                </span>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+    document.body.appendChild(overlay);
     if (window.lucide) window.lucide.createIcons();
-    
+};
+
+window.triggerManualSpamhausCheck = async (btn) => {
     try {
         const response = await fetch('/api/check-spamhaus', { method: 'POST' });
-        if (response.ok) {
-            alert('Check started successfully! Results will appear shortly.');
-        } else {
+        if (!response.ok) {
             const err = await response.text();
             alert('Error starting check: ' + err);
         }
     } catch (e) {
         alert('Failed to connect to check API: ' + e.message);
-    } finally {
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-        if (window.lucide) window.lucide.createIcons();
     }
 };
