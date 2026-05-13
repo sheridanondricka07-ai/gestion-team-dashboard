@@ -1,5 +1,5 @@
-// DNS-over-HTTPS approach - bypasses Vercel's DNS restrictions completely
-// Uses Google's DoH API which works via standard HTTPS requests
+// DNS-over-HTTPS with DQS key to avoid rate limiting
+// Uses Cloudflare DoH as primary, Google DoH as fallback
 
 const DB_URL = "https://gestion-team-c-default-rtdb.firebaseio.com";
 
@@ -27,68 +27,73 @@ async function setFirebase(path, data) {
     }
 }
 
+// Small delay helper to avoid rate limits
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function checkIP(ip) {
     const reversedIP = ip.split('.').reverse().join('.');
     
-    // Use DNS-over-HTTPS via Google's public API
-    // This makes a standard HTTPS request — Vercel cannot block this
-    const query = `${reversedIP}.zen.spamhaus.org`;
-    const dohUrl = `https://dns.google/resolve?name=${query}&type=A`;
+    // Use DQS key with the professional zone to avoid rate limiting
+    const dqsKey = 'vizecvum';
+    const query = `${reversedIP}.${dqsKey}.zen.dq.spamhaus.net`;
+    
+    // Try Cloudflare DoH first, then Google DoH as fallback
+    const dohProviders = [
+        `https://cloudflare-dns.com/dns-query?name=${query}&type=A`,
+        `https://dns.google/resolve?name=${query}&type=A`
+    ];
 
-    try {
-        const response = await fetch(dohUrl, {
-            headers: { 'Accept': 'application/json' },
-            signal: AbortSignal.timeout(8000) // 8s timeout
-        });
+    for (const dohUrl of dohProviders) {
+        try {
+            const response = await fetch(dohUrl, {
+                headers: { 'Accept': 'application/dns-json' },
+                signal: AbortSignal.timeout(8000)
+            });
 
-        if (!response.ok) {
-            console.log(`DoH request failed for ${ip}: HTTP ${response.status}`);
-            return { status: 'clean' };
-        }
+            if (!response.ok) continue;
 
-        const data = await response.json();
-        
-        // Log raw response for debugging
-        console.log(`IP ${ip} -> DoH response: Status=${data.Status}, Answers=${JSON.stringify(data.Answer || [])}`);
-
-        // Status 0 = NOERROR (records found), Status 3 = NXDOMAIN (not listed)
-        if (data.Status === 3 || !data.Answer || data.Answer.length === 0) {
-            return { status: 'clean' };
-        }
-
-        // Parse the answers
-        for (const answer of data.Answer) {
-            if (answer.type !== 1) continue; // Only A records
-            const result = answer.data;
-
-            // Skip refusal/error codes
-            if (result === '127.0.0.1' || result.startsWith('127.255.255')) {
-                console.log(`IP ${ip} -> Query refused (${result})`);
-                return { status: 'clean', note: 'query_refused' };
+            const data = await response.json();
+            
+            // NXDOMAIN or no answers = clean
+            if (data.Status === 3 || !data.Answer || data.Answer.length === 0) {
+                return { status: 'clean' };
             }
 
-            // SBL
-            if (result === '127.0.0.2') return { status: 'listed', list: 'SBL' };
-            // CSS  
-            if (result === '127.0.0.3') return { status: 'listed', list: 'CSS' };
-            
-            // Other codes (XBL, PBL) - user only wants SBL/CSS
-            // But still log them
-            console.log(`IP ${ip} -> Listed on other list (${result}), treating as clean per user preference`);
-        }
+            // Parse all A record answers
+            for (const answer of data.Answer) {
+                if (answer.type !== 1) continue; // Only A records
+                const result = answer.data;
 
-        return { status: 'clean' };
-    } catch (error) {
-        console.log(`IP ${ip} -> DoH error: ${error.message}`);
-        return { status: 'clean' };
+                // Refusal codes
+                if (result === '127.0.0.1' || result.startsWith('127.255.255')) {
+                    console.log(`IP ${ip} -> Refused (${result}), trying next provider...`);
+                    break; // Try next DoH provider
+                }
+
+                // SBL
+                if (result === '127.0.0.2') return { status: 'listed', list: 'SBL' };
+                // CSS  
+                if (result === '127.0.0.3') return { status: 'listed', list: 'CSS' };
+                
+                // Other Spamhaus lists - user only wants SBL/CSS
+                console.log(`IP ${ip} -> Other list code: ${result}`);
+                return { status: 'clean' };
+            }
+        } catch (error) {
+            console.log(`IP ${ip} -> DoH error with provider: ${error.message}`);
+            continue; // Try next provider
+        }
     }
+
+    return { status: 'clean' };
 }
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
 
     try {
-        // Fetch state via REST
         const stateRes = await fetch(`${DB_URL}/state.json`);
         const state = await stateRes.json();
         
@@ -106,23 +111,18 @@ export default async function handler(req, res) {
             return res.status(200).json({ success: true, message: 'No IPs to check' });
         }
 
-        // Quick test: check the first known-listed IP to verify the approach works
-        const testResult = await checkIP(uniqueIps[0]);
-        console.log(`Test check on ${uniqueIps[0]}: ${JSON.stringify(testResult)}`);
-
         const results = {};
         const timestamp = new Date().toISOString();
         const dateKey = timestamp.split('T')[0];
 
-        // Start progress
         await setFirebase('spamhausProgress', {
             total: uniqueIps.length,
             current: 0,
             status: 'running'
         });
 
-        // Process in batches of 5
-        const batchSize = 5;
+        // Smaller batches (3) with delays to avoid rate limiting
+        const batchSize = 3;
         let currentCount = 0;
         
         for (let i = 0; i < uniqueIps.length; i += batchSize) {
@@ -141,13 +141,16 @@ export default async function handler(req, res) {
             }));
             
             currentCount += batch.length;
-            // Update progress every 3 batches to reduce flicker
+            
+            // Update progress every 3 batches
             if (i % (batchSize * 3) === 0 || currentCount >= uniqueIps.length) {
                 await updateFirebase('spamhausProgress', { current: currentCount });
             }
+            
+            // Small delay between batches to prevent rate limiting
+            await delay(200);
         }
 
-        // Final updates
         const listedCount = Object.values(results).filter(r => r.status === 'listed').length;
         
         await updateFirebase('spamhaus', results);
@@ -162,7 +165,7 @@ export default async function handler(req, res) {
         });
         await updateFirebase('spamhausProgress', { status: 'idle' });
 
-        console.log(`Scan complete: ${uniqueIps.length} IPs checked, ${listedCount} listed`);
+        console.log(`Scan complete: ${uniqueIps.length} checked, ${listedCount} listed`);
         res.status(200).json({ success: true, checked: uniqueIps.length, listed: listedCount });
     } catch (error) {
         console.error('Critical Handler Error:', error);
