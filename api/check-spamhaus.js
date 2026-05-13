@@ -1,11 +1,11 @@
-// Spamhaus REST API approach - ported from working spamhaus-checker project
-// Uses api.spamhaus.org with token auth - pure HTTPS, works perfectly on Vercel
+// Spamhaus REST API - ported from working spamhaus-checker project
+// Uses api.spamhaus.org with token auth - pure HTTPS
 
 const DB_URL = "https://gestion-team-c-default-rtdb.firebaseio.com";
 
-// Spamhaus credentials
-const SPAMHAUS_USERNAME = "vizecvum@86022311";
-const SPAMHAUS_PASSWORD = "dEB8sG)rqneYo8t3";
+// Credentials from working project (config.json)
+const SPAMHAUS_USERNAME = "ypihcpsh@98907859";
+const SPAMHAUS_PASSWORD = "E1l0&su7d,zVEiP6";
 
 let authToken = null;
 
@@ -49,34 +49,38 @@ async function getAuthToken() {
 
     for (const url of loginUrls) {
         try {
+            console.log(`Attempting login at ${url}...`);
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: payload,
-                signal: AbortSignal.timeout(10000)
+                body: payload
             });
 
+            console.log(`Login response: ${response.status}`);
+            
             if (response.ok) {
                 const data = await response.json();
                 if (data.token) {
                     authToken = data.token;
-                    console.log('Spamhaus auth token obtained successfully');
+                    console.log('Auth token obtained successfully');
                     return authToken;
                 }
+            } else {
+                const errorText = await response.text();
+                console.log(`Login failed: ${errorText}`);
             }
         } catch (e) {
-            console.log(`Login attempt to ${url} failed: ${e.message}`);
+            console.log(`Login error at ${url}: ${e.message}`);
             continue;
         }
     }
 
-    console.error('Could not obtain Spamhaus auth token');
     return null;
 }
 
 async function checkIP(ip, token) {
-    // Check SBL and CSS lists using the API
-    const listsToCheck = ['SBL', 'CSS'];
+    // Check CSS and SBL lists using the exact same endpoint as the working project
+    const listsToCheck = ['CSS', 'SBL'];
     
     for (const listName of listsToCheck) {
         const endpoint = `https://api.spamhaus.org/api/intel/v1/byobject/cidr/${listName}/listed/history/${ip}?limit=1`;
@@ -84,16 +88,15 @@ async function checkIP(ip, token) {
         try {
             const response = await fetch(endpoint, {
                 method: 'GET',
-                headers: { 'Authorization': `Bearer ${token}` },
-                signal: AbortSignal.timeout(8000)
+                headers: { 'Authorization': `Bearer ${token}` }
             });
 
             if (response.ok) {
                 const data = await response.json();
                 
-                // If the API returns a non-empty array, the IP is listed
                 if (Array.isArray(data) && data.length > 0) {
                     const record = data[0];
+                    console.log(`IP ${ip} LISTED on ${listName}: ${JSON.stringify(record)}`);
                     return {
                         status: 'listed',
                         list: listName,
@@ -102,12 +105,9 @@ async function checkIP(ip, token) {
                         reason: record.rule || '-'
                     };
                 }
-            } else if (response.status === 404) {
-                // Not found on this list, continue to next
-                continue;
             } else if (response.status === 401) {
-                // Token expired, force re-auth
                 authToken = null;
+                console.log(`Auth expired checking ${ip}`);
                 return { status: 'clean', note: 'auth_expired' };
             }
         } catch (e) {
@@ -120,16 +120,21 @@ async function checkIP(ip, token) {
 }
 
 export default async function handler(req, res) {
-    if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
+    if (req.method !== 'POST' && !req.headers['x-vercel-cron']) {
+        return res.status(405).send('Method Not Allowed');
+    }
 
     try {
-        // Step 1: Get auth token
+        // Step 1: Authenticate
+        console.log('Starting Spamhaus scan...');
         const token = await getAuthToken();
         if (!token) {
+            console.error('AUTH FAILED - no token obtained');
             return res.status(500).json({ error: 'Failed to authenticate with Spamhaus API' });
         }
+        console.log('Auth successful, fetching state...');
 
-        // Step 2: Fetch state from Firebase
+        // Step 2: Fetch state
         const stateRes = await fetch(`${DB_URL}/state.json`);
         const state = await stateRes.json();
         
@@ -142,6 +147,7 @@ export default async function handler(req, res) {
             if (s.allIps) allIps.push(...s.allIps);
         });
         const uniqueIps = [...new Set(allIps)];
+        console.log(`Found ${uniqueIps.length} unique IPs to check`);
         
         if (uniqueIps.length === 0) {
             return res.status(200).json({ success: true, message: 'No IPs to check' });
@@ -151,16 +157,16 @@ export default async function handler(req, res) {
         const timestamp = new Date().toISOString();
         const dateKey = timestamp.split('T')[0];
 
-        // Start progress
         await setFirebase('spamhausProgress', {
             total: uniqueIps.length,
             current: 0,
             status: 'running'
         });
 
-        // Process in batches of 3 with delays (API rate limiting)
-        const batchSize = 3;
+        // Process in batches of 5
+        const batchSize = 5;
         let currentCount = 0;
+        let listedSoFar = 0;
         
         for (let i = 0; i < uniqueIps.length; i += batchSize) {
             const batch = uniqueIps.slice(i, i + batchSize);
@@ -172,6 +178,7 @@ export default async function handler(req, res) {
                         ...result,
                         timestamp: timestamp
                     };
+                    if (result.status === 'listed') listedSoFar++;
                 } catch (err) {
                     console.error(`Failed to check ${ip}:`, err.message);
                 }
@@ -179,17 +186,16 @@ export default async function handler(req, res) {
             
             currentCount += batch.length;
             
-            // Update progress every 3 batches to reduce UI flicker
+            // Update progress every 3 batches
             if (i % (batchSize * 3) === 0 || currentCount >= uniqueIps.length) {
                 await updateFirebase('spamhausProgress', { current: currentCount });
+                console.log(`Progress: ${currentCount}/${uniqueIps.length} (${listedSoFar} listed)`);
             }
-            
-            // Small delay between batches for API rate limiting
-            await new Promise(r => setTimeout(r, 200));
         }
 
         // Final updates
         const listedCount = Object.values(results).filter(r => r.status === 'listed').length;
+        console.log(`FINAL: ${uniqueIps.length} checked, ${listedCount} listed`);
         
         await updateFirebase('spamhaus', results);
         await setFirebase('spamhausLastUpdate', new Date().toLocaleString());
@@ -203,10 +209,10 @@ export default async function handler(req, res) {
         });
         await updateFirebase('spamhausProgress', { status: 'idle' });
 
-        console.log(`Scan complete: ${uniqueIps.length} checked, ${listedCount} listed`);
         res.status(200).json({ success: true, checked: uniqueIps.length, listed: listedCount });
     } catch (error) {
         console.error('Critical Handler Error:', error);
+        await updateFirebase('spamhausProgress', { status: 'error' });
         res.status(500).send('Critical Error: ' + error.message);
     }
 }
