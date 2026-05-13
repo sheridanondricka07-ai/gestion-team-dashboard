@@ -1510,24 +1510,45 @@ window.viewHistoryDate = (date) => {
 
 window.triggerManualSpamhausCheck = async (btn) => {
     const originalContent = btn.innerHTML;
+    
+    // Immediate feedback
     btn.disabled = true;
     btn.innerHTML = '<i data-lucide="refresh-cw" class="spin" style="width: 14px;"></i> Starting...';
     if (window.lucide) window.lucide.createIcons();
+
+    // Show progress bar at 0% immediately if we have a way to estimate total
+    const allIps = window.app.state.servers.reduce((acc, s) => [...acc, ...(s.allIps || [])], []);
+    const total = [...new Set(allIps)].length;
+    
+    if (total > 0) {
+        // Manually set local progress state to trigger UI
+        window.app.state.spamhausProgress = {
+            total: total,
+            current: 0,
+            status: 'running'
+        };
+        window.app.updateDashboard();
+    } else {
+        alert('No IPs found to check.');
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
+        return;
+    }
 
     try {
         const response = await fetch('/api/check-spamhaus', { method: 'POST' });
         if (!response.ok) {
             const err = await response.text();
             alert('Server Error: ' + err);
-            btn.innerHTML = originalContent;
-            btn.disabled = false;
-            if (window.lucide) window.lucide.createIcons();
+            // Reset progress on error
+            window.app.state.spamhausProgress = { status: 'error' };
+            window.app.updateDashboard();
         }
-        // If successful, we don't need to do anything; 
-        // the Firebase listener in app.js will see the progress 
-        // update and re-render the view automatically.
     } catch (e) {
         alert('Connection Error: ' + e.message);
+        window.app.state.spamhausProgress = { status: 'error' };
+        window.app.updateDashboard();
+    } finally {
         btn.innerHTML = originalContent;
         btn.disabled = false;
         if (window.lucide) window.lucide.createIcons();

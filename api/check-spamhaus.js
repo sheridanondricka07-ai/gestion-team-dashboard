@@ -76,8 +76,8 @@ export default async function handler(req, res) {
             status: 'running'
         });
 
-        // Parallel checking with simple batching (concurrency = 10)
-        const batchSize = 10;
+        // Parallel checking with simple batching (concurrency = 50)
+        const batchSize = 50;
         for (let i = 0; i < uniqueIps.length; i += batchSize) {
             const batch = uniqueIps.slice(i, i + batchSize);
             await Promise.all(batch.map(async (ip) => {
@@ -93,7 +93,7 @@ export default async function handler(req, res) {
                 }
             }));
             
-            // Update progress
+            // Update progress in database
             await db.ref('state/spamhausProgress/current').set(Math.min(i + batchSize, uniqueIps.length));
         }
 
