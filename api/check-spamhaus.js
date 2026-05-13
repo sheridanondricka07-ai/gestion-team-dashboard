@@ -30,9 +30,9 @@ async function setFirebase(path, data) {
 async function checkIP(ip, dqsKey) {
     const reversedIP = ip.split('.').reverse().join('.');
     
-    // Lists to check
+    // Lists to check with high reliability
     const lists = [
-        // 1. Spamhaus DQS (Professional feed)
+        // 1. Spamhaus DQS (Professional feed - MUST use dq.spamhaus.net)
         { domain: (dqsKey || 'vizecvum') + '.zen.dq.spamhaus.net', name: 'Spamhaus' },
         // 2. SpamCop (Reliable fallback)
         { domain: 'bl.spamcop.net', name: 'SpamCop' },
@@ -45,17 +45,20 @@ async function checkIP(ip, dqsKey) {
     for (const list of lists) {
         try {
             const query = `${reversedIP}.${list.domain}`;
-            const addresses = await Promise.race([dns.resolve4(query), timeout(2000)]);
+            // Increase timeout to 5s for better reliability on Vercel
+            const addresses = await Promise.race([dns.resolve4(query), timeout(5000)]);
             
             if (addresses && addresses.length > 0) {
                 const result = addresses[0];
                 
-                // Skip Spamhaus refusal code
-                if (list.name === 'Spamhaus' && (result === '127.0.0.1' || result.startsWith('127.255.255'))) {
-                    continue; 
+                // Handle Spamhaus refusal codes (127.0.0.1 or 127.255.255.x)
+                if (list.name === 'Spamhaus') {
+                    if (result === '127.0.0.1' || result.startsWith('127.255.255')) {
+                        console.log(`Spamhaus refused query for ${ip} (Code: ${result})`);
+                        continue; 
+                    }
                 }
 
-                // If we get any other result, it's listed!
                 let listType = list.name;
                 if (list.name === 'Spamhaus') {
                     if (result === '127.0.0.2') listType = 'SBL';
@@ -66,8 +69,7 @@ async function checkIP(ip, dqsKey) {
                 return { status: 'listed', list: listType };
             }
         } catch (error) {
-            // ENOTFOUND or Timeout means clean on this specific list, continue to next
-            continue;
+            continue; // Move to next list
         }
     }
 
