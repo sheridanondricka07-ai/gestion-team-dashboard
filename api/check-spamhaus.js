@@ -29,39 +29,49 @@ async function setFirebase(path, data) {
 
 async function checkIP(ip, dqsKey) {
     const reversedIP = ip.split('.').reverse().join('.');
-    // Use provided key or the hardcoded default
-    const activeKey = dqsKey || 'vizecvum';
-    const query = `${reversedIP}.${activeKey}.zen.spamhaus.org`;
     
-    const timeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('DNS Timeout')), 2000)
-    );
+    // Lists to check
+    const lists = [
+        // 1. Spamhaus (with DQS)
+        { domain: dqsKey ? `${dqsKey}.zen.spamhaus.org` : 'zen.spamhaus.org', name: 'Spamhaus' },
+        // 2. SpamCop (Reliable fallback)
+        { domain: 'bl.spamcop.net', name: 'SpamCop' },
+        // 3. SORBS
+        { domain: 'dnsbl.sorbs.net', name: 'SORBS' }
+    ];
 
-    try {
-        const addresses = await Promise.race([dns.resolve4(query), timeout]);
-        if (addresses && addresses.length > 0) {
-            const result = addresses[0];
+    const timeout = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms));
+
+    for (const list of lists) {
+        try {
+            const query = `${reversedIP}.${list.domain}`;
+            const addresses = await Promise.race([dns.resolve4(query), timeout(2000)]);
             
-            // ERROR CODES: Treat these as 'clean' but log them
-            // 127.0.0.1 = Query Refused (Public Resolver)
-            // 127.255.255.x = Other Error codes
-            if (result === '127.0.0.1' || result.startsWith('127.255.255')) {
-                return { status: 'clean', error: 'query_refused' };
+            if (addresses && addresses.length > 0) {
+                const result = addresses[0];
+                
+                // Skip Spamhaus refusal code
+                if (list.name === 'Spamhaus' && (result === '127.0.0.1' || result.startsWith('127.255.255'))) {
+                    continue; 
+                }
+
+                // If we get any other result, it's listed!
+                let listType = list.name;
+                if (list.name === 'Spamhaus') {
+                    if (result === '127.0.0.2') listType = 'SBL';
+                    else if (result === '127.0.0.3') listType = 'CSS';
+                    else if (result.startsWith('127.0.0.4')) listType = 'XBL';
+                }
+
+                return { status: 'listed', list: listType };
             }
-
-            // Valid List codes
-            if (result === '127.0.0.2') return { status: 'listed', list: 'SBL' };
-            if (result === '127.0.0.3') return { status: 'listed', list: 'CSS' };
-            if (['127.0.0.4', '127.0.0.5', '127.0.0.6', '127.0.0.7'].includes(result)) return { status: 'listed', list: 'XBL' };
-            if (['127.0.0.10', '127.0.0.11'].includes(result)) return { status: 'listed', list: 'PBL' };
-            
-            return { status: 'listed', list: 'ZEN' };
+        } catch (error) {
+            // ENOTFOUND or Timeout means clean on this specific list, continue to next
+            continue;
         }
-        return { status: 'clean' };
-    } catch (error) {
-        if (error.code === 'ENOTFOUND' || error.message === 'DNS Timeout') return { status: 'clean' };
-        throw error;
     }
+
+    return { status: 'clean' };
 }
 
 export default async function handler(req, res) {
