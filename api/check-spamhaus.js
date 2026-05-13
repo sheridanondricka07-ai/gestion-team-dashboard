@@ -27,10 +27,10 @@ async function setFirebase(path, data) {
     }
 }
 
-async function checkIP(ip) {
+async function checkIP(ip, dqsKey) {
     const reversedIP = ip.split('.').reverse().join('.');
-    // If you have a DQS key, append it here: const query = `${reversedIP}.YOUR_DQS_KEY.zen.spamhaus.org`;
-    const query = `${reversedIP}.zen.spamhaus.org`;
+    // If DQS key is provided, use it. Otherwise use public Zen.
+    const query = dqsKey ? `${reversedIP}.${dqsKey}.zen.spamhaus.org` : `${reversedIP}.zen.spamhaus.org`;
     
     const timeout = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('DNS Timeout')), 2000)
@@ -88,6 +88,7 @@ export default async function handler(req, res) {
         const results = {};
         const timestamp = new Date().toISOString();
         const dateKey = timestamp.split('T')[0];
+        const dqsKey = state.spamhausDqsKey;
 
         // Start progress
         await setFirebase('spamhausProgress', {
@@ -103,7 +104,7 @@ export default async function handler(req, res) {
             const batch = uniqueIps.slice(i, i + batchSize);
             await Promise.all(batch.map(async (ip) => {
                 try {
-                    const result = await checkIP(ip);
+                    const result = await checkIP(ip, dqsKey);
                     const safeIp = ip.replace(/\./g, '_');
                     results[safeIp] = {
                         ...result,

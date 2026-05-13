@@ -1365,6 +1365,13 @@ function renderSpamhaus(app, container) {
                         <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Production IPs are automatically checked daily at 09:00 Moroccan time.</p>
                     </div>
                     <div style="display: flex; gap: 12px; align-items: center;">
+                        <div style="display: flex; gap: 8px; align-items: center; background: var(--bg-tertiary); padding: 4px 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+                            <span style="font-size: 0.75rem; color: var(--text-secondary);">DQS Key:</span>
+                            <input type="password" id="dqs-key-input" value="${app.state.spamhausDqsKey || ''}" 
+                                   placeholder="Paste DQS Key here" 
+                                   style="background: transparent; border: none; color: var(--text-primary); font-size: 0.75rem; width: 150px; outline: none;">
+                            <button onclick="window.saveDqsKey(this)" style="background: var(--accent-primary); border: none; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; cursor: pointer;">Save</button>
+                        </div>
                         <span style="font-size: 0.75rem; color: var(--text-secondary);">Last update: ${app.state.spamhausLastUpdate || 'Never'}</span>
                         <button id="spamhaus-check-btn" onclick="triggerManualSpamhausCheck(this)" ${isRunning ? 'disabled' : ''} style="width: auto; padding: 8px 16px; font-size: 0.8rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 8px; border-radius: 6px;">
                             <i data-lucide="refresh-cw" class="${isRunning ? 'spin' : ''}" style="width: 14px;"></i> 
@@ -1506,6 +1513,29 @@ window.viewHistoryDate = (date) => {
     `;
     document.body.appendChild(overlay);
     if (window.lucide) window.lucide.createIcons();
+};
+
+window.saveDqsKey = async (btn) => {
+    const input = document.getElementById('dqs-key-input');
+    const key = input.value.trim();
+    const originalText = btn.innerText;
+    btn.innerText = 'Saving...';
+    btn.disabled = true;
+    
+    try {
+        await window.db.ref('state/spamhausDqsKey').set(key);
+        btn.innerText = 'Saved!';
+        btn.style.background = 'var(--success)';
+        setTimeout(() => {
+            btn.innerText = originalText;
+            btn.style.background = 'var(--accent-primary)';
+            btn.disabled = false;
+        }, 2000);
+    } catch (e) {
+        alert('Error saving key: ' + e.message);
+        btn.innerText = originalText;
+        btn.disabled = false;
+    }
 };
 
 window.triggerManualSpamhausCheck = async (btn) => {
