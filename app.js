@@ -230,7 +230,8 @@ class TeamApp {
                     const cloudData = snapshot.val();
                     if (cloudData) {
                         const currentUser = this.state.currentUser;
-                        this.state = { ...this.state, ...cloudData, currentUser, dbConnected: true };
+                        const currentView = this.state.currentView; // Preserve local view
+                        this.state = { ...this.state, ...cloudData, currentUser, currentView, dbConnected: true };
                         this.updateDashboard();
                         if (!this.state.currentUser) renderLogin(this);
                     } else {
