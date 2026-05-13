@@ -1,7 +1,13 @@
-// DNS-over-HTTPS with DQS key to avoid rate limiting
-// Uses Cloudflare DoH as primary, Google DoH as fallback
+// Spamhaus REST API approach - ported from working spamhaus-checker project
+// Uses api.spamhaus.org with token auth - pure HTTPS, works perfectly on Vercel
 
 const DB_URL = "https://gestion-team-c-default-rtdb.firebaseio.com";
+
+// Spamhaus credentials
+const SPAMHAUS_USERNAME = "vizecvum@86022311";
+const SPAMHAUS_PASSWORD = "dEB8sG)rqneYo8t3";
+
+let authToken = null;
 
 async function updateFirebase(path, data) {
     try {
@@ -27,63 +33,86 @@ async function setFirebase(path, data) {
     }
 }
 
-// Small delay helper to avoid rate limits
-function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
+async function getAuthToken() {
+    if (authToken) return authToken;
 
-async function checkIP(ip) {
-    const reversedIP = ip.split('.').reverse().join('.');
-    
-    // Use DQS key with the professional zone to avoid rate limiting
-    const dqsKey = 'vizecvum';
-    const query = `${reversedIP}.${dqsKey}.zen.dq.spamhaus.net`;
-    
-    // Try Cloudflare DoH first, then Google DoH as fallback
-    const dohProviders = [
-        `https://cloudflare-dns.com/dns-query?name=${query}&type=A`,
-        `https://dns.google/resolve?name=${query}&type=A`
+    const loginUrls = [
+        "https://api.spamhaus.org/api/v1/login",
+        "https://api.spamhaus.com/api/v1/login"
     ];
 
-    for (const dohUrl of dohProviders) {
+    const payload = JSON.stringify({
+        username: SPAMHAUS_USERNAME,
+        password: SPAMHAUS_PASSWORD,
+        realm: "intel"
+    });
+
+    for (const url of loginUrls) {
         try {
-            const response = await fetch(dohUrl, {
-                headers: { 'Accept': 'application/dns-json' },
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: payload,
+                signal: AbortSignal.timeout(10000)
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.token) {
+                    authToken = data.token;
+                    console.log('Spamhaus auth token obtained successfully');
+                    return authToken;
+                }
+            }
+        } catch (e) {
+            console.log(`Login attempt to ${url} failed: ${e.message}`);
+            continue;
+        }
+    }
+
+    console.error('Could not obtain Spamhaus auth token');
+    return null;
+}
+
+async function checkIP(ip, token) {
+    // Check SBL and CSS lists using the API
+    const listsToCheck = ['SBL', 'CSS'];
+    
+    for (const listName of listsToCheck) {
+        const endpoint = `https://api.spamhaus.org/api/intel/v1/byobject/cidr/${listName}/listed/history/${ip}?limit=1`;
+        
+        try {
+            const response = await fetch(endpoint, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` },
                 signal: AbortSignal.timeout(8000)
             });
 
-            if (!response.ok) continue;
-
-            const data = await response.json();
-            
-            // NXDOMAIN or no answers = clean
-            if (data.Status === 3 || !data.Answer || data.Answer.length === 0) {
-                return { status: 'clean' };
-            }
-
-            // Parse all A record answers
-            for (const answer of data.Answer) {
-                if (answer.type !== 1) continue; // Only A records
-                const result = answer.data;
-
-                // Refusal codes
-                if (result === '127.0.0.1' || result.startsWith('127.255.255')) {
-                    console.log(`IP ${ip} -> Refused (${result}), trying next provider...`);
-                    break; // Try next DoH provider
-                }
-
-                // SBL
-                if (result === '127.0.0.2') return { status: 'listed', list: 'SBL' };
-                // CSS  
-                if (result === '127.0.0.3') return { status: 'listed', list: 'CSS' };
+            if (response.ok) {
+                const data = await response.json();
                 
-                // Other Spamhaus lists - user only wants SBL/CSS
-                console.log(`IP ${ip} -> Other list code: ${result}`);
-                return { status: 'clean' };
+                // If the API returns a non-empty array, the IP is listed
+                if (Array.isArray(data) && data.length > 0) {
+                    const record = data[0];
+                    return {
+                        status: 'listed',
+                        list: listName,
+                        listedDate: record.listed || '-',
+                        expires: record.expires || '-',
+                        reason: record.rule || '-'
+                    };
+                }
+            } else if (response.status === 404) {
+                // Not found on this list, continue to next
+                continue;
+            } else if (response.status === 401) {
+                // Token expired, force re-auth
+                authToken = null;
+                return { status: 'clean', note: 'auth_expired' };
             }
-        } catch (error) {
-            console.log(`IP ${ip} -> DoH error with provider: ${error.message}`);
-            continue; // Try next provider
+        } catch (e) {
+            console.log(`Error checking ${ip} on ${listName}: ${e.message}`);
+            continue;
         }
     }
 
@@ -94,6 +123,13 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
 
     try {
+        // Step 1: Get auth token
+        const token = await getAuthToken();
+        if (!token) {
+            return res.status(500).json({ error: 'Failed to authenticate with Spamhaus API' });
+        }
+
+        // Step 2: Fetch state from Firebase
         const stateRes = await fetch(`${DB_URL}/state.json`);
         const state = await stateRes.json();
         
@@ -115,13 +151,14 @@ export default async function handler(req, res) {
         const timestamp = new Date().toISOString();
         const dateKey = timestamp.split('T')[0];
 
+        // Start progress
         await setFirebase('spamhausProgress', {
             total: uniqueIps.length,
             current: 0,
             status: 'running'
         });
 
-        // Smaller batches (3) with delays to avoid rate limiting
+        // Process in batches of 3 with delays (API rate limiting)
         const batchSize = 3;
         let currentCount = 0;
         
@@ -129,7 +166,7 @@ export default async function handler(req, res) {
             const batch = uniqueIps.slice(i, i + batchSize);
             await Promise.all(batch.map(async (ip) => {
                 try {
-                    const result = await checkIP(ip);
+                    const result = await checkIP(ip, token);
                     const safeIp = ip.replace(/\./g, '_');
                     results[safeIp] = {
                         ...result,
@@ -142,15 +179,16 @@ export default async function handler(req, res) {
             
             currentCount += batch.length;
             
-            // Update progress every 3 batches
+            // Update progress every 3 batches to reduce UI flicker
             if (i % (batchSize * 3) === 0 || currentCount >= uniqueIps.length) {
                 await updateFirebase('spamhausProgress', { current: currentCount });
             }
             
-            // Small delay between batches to prevent rate limiting
-            await delay(200);
+            // Small delay between batches for API rate limiting
+            await new Promise(r => setTimeout(r, 200));
         }
 
+        // Final updates
         const listedCount = Object.values(results).filter(r => r.status === 'listed').length;
         
         await updateFirebase('spamhaus', results);
