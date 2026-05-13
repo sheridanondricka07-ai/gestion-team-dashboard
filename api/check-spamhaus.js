@@ -3,7 +3,7 @@
 
 const DB_URL = "https://gestion-team-c-default-rtdb.firebaseio.com";
 
-// Credentials from working project (config.json)
+// Credentials from working project
 const SPAMHAUS_USERNAME = "ypihcpsh@98907859";
 const SPAMHAUS_PASSWORD = "E1l0&su7d,zVEiP6";
 
@@ -36,50 +36,38 @@ async function setFirebase(path, data) {
 async function getAuthToken() {
     if (authToken) return authToken;
 
-    const loginUrls = [
-        "https://api.spamhaus.org/api/v1/login",
-        "https://api.spamhaus.com/api/v1/login"
-    ];
-
     const payload = JSON.stringify({
         username: SPAMHAUS_USERNAME,
         password: SPAMHAUS_PASSWORD,
         realm: "intel"
     });
 
-    for (const url of loginUrls) {
-        try {
-            console.log(`Attempting login at ${url}...`);
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: payload
-            });
+    try {
+        const response = await fetch("https://api.spamhaus.org/api/v1/login", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: payload
+        });
 
-            console.log(`Login response: ${response.status}`);
-            
-            if (response.ok) {
-                const data = await response.json();
-                if (data.token) {
-                    authToken = data.token;
-                    console.log('Auth token obtained successfully');
-                    return authToken;
-                }
-            } else {
-                const errorText = await response.text();
-                console.log(`Login failed: ${errorText}`);
+        if (response.ok) {
+            const data = await response.json();
+            if (data.token) {
+                authToken = data.token;
+                console.log('Auth token obtained');
+                return authToken;
             }
-        } catch (e) {
-            console.log(`Login error at ${url}: ${e.message}`);
-            continue;
+        } else {
+            console.error('Login failed:', response.status);
         }
+    } catch (e) {
+        console.error('Login error:', e.message);
     }
 
     return null;
 }
 
 async function checkIP(ip, token) {
-    // Check CSS and SBL lists using the exact same endpoint as the working project
+    // Check CSS and SBL lists
     const listsToCheck = ['CSS', 'SBL'];
     
     for (const listName of listsToCheck) {
@@ -94,20 +82,26 @@ async function checkIP(ip, token) {
             if (response.ok) {
                 const data = await response.json();
                 
-                if (Array.isArray(data) && data.length > 0) {
-                    const record = data[0];
-                    console.log(`IP ${ip} LISTED on ${listName}: ${JSON.stringify(record)}`);
+                // API returns: { "code": 200, "results": [...] }
+                // Check for results array inside the response object
+                const results = data.results || data;
+                const records = Array.isArray(results) ? results : [];
+                
+                if (records.length > 0) {
+                    const record = records[0];
                     return {
                         status: 'listed',
                         list: listName,
-                        listedDate: record.listed || '-',
-                        expires: record.expires || '-',
-                        reason: record.rule || '-'
+                        listedDate: record.listed ? new Date(record.listed * 1000).toISOString().split('T')[0] : '-',
+                        expires: record.valid_until ? new Date(record.valid_until * 1000).toISOString().split('T')[0] : '-',
+                        reason: record.heuristic || record.rule || '-'
                     };
                 }
+            } else if (response.status === 404) {
+                // Not found on this list
+                continue;
             } else if (response.status === 401) {
                 authToken = null;
-                console.log(`Auth expired checking ${ip}`);
                 return { status: 'clean', note: 'auth_expired' };
             }
         } catch (e) {
@@ -126,13 +120,10 @@ export default async function handler(req, res) {
 
     try {
         // Step 1: Authenticate
-        console.log('Starting Spamhaus scan...');
         const token = await getAuthToken();
         if (!token) {
-            console.error('AUTH FAILED - no token obtained');
             return res.status(500).json({ error: 'Failed to authenticate with Spamhaus API' });
         }
-        console.log('Auth successful, fetching state...');
 
         // Step 2: Fetch state
         const stateRes = await fetch(`${DB_URL}/state.json`);
@@ -147,7 +138,6 @@ export default async function handler(req, res) {
             if (s.allIps) allIps.push(...s.allIps);
         });
         const uniqueIps = [...new Set(allIps)];
-        console.log(`Found ${uniqueIps.length} unique IPs to check`);
         
         if (uniqueIps.length === 0) {
             return res.status(200).json({ success: true, message: 'No IPs to check' });
@@ -166,7 +156,6 @@ export default async function handler(req, res) {
         // Process in batches of 5
         const batchSize = 5;
         let currentCount = 0;
-        let listedSoFar = 0;
         
         for (let i = 0; i < uniqueIps.length; i += batchSize) {
             const batch = uniqueIps.slice(i, i + batchSize);
@@ -178,7 +167,6 @@ export default async function handler(req, res) {
                         ...result,
                         timestamp: timestamp
                     };
-                    if (result.status === 'listed') listedSoFar++;
                 } catch (err) {
                     console.error(`Failed to check ${ip}:`, err.message);
                 }
@@ -189,13 +177,11 @@ export default async function handler(req, res) {
             // Update progress every 3 batches
             if (i % (batchSize * 3) === 0 || currentCount >= uniqueIps.length) {
                 await updateFirebase('spamhausProgress', { current: currentCount });
-                console.log(`Progress: ${currentCount}/${uniqueIps.length} (${listedSoFar} listed)`);
             }
         }
 
         // Final updates
         const listedCount = Object.values(results).filter(r => r.status === 'listed').length;
-        console.log(`FINAL: ${uniqueIps.length} checked, ${listedCount} listed`);
         
         await updateFirebase('spamhaus', results);
         await setFirebase('spamhausLastUpdate', new Date().toLocaleString());
@@ -209,6 +195,7 @@ export default async function handler(req, res) {
         });
         await updateFirebase('spamhausProgress', { status: 'idle' });
 
+        console.log(`Scan complete: ${uniqueIps.length} checked, ${listedCount} listed`);
         res.status(200).json({ success: true, checked: uniqueIps.length, listed: listedCount });
     } catch (error) {
         console.error('Critical Handler Error:', error);
