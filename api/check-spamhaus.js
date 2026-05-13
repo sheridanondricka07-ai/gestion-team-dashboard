@@ -37,8 +37,19 @@ async function checkIP(ip) {
     );
 
     try {
-        await Promise.race([dns.resolve4(query), timeout]);
-        return { status: 'listed', list: 'ZEN' };
+        const addresses = await Promise.race([dns.resolve4(query), timeout]);
+        if (addresses && addresses.length > 0) {
+            const result = addresses[0];
+            // Identify specific list based on 127.0.0.x return code
+            let listName = 'ZEN';
+            if (result === '127.0.0.2') listName = 'SBL';
+            else if (result === '127.0.0.3') listName = 'CSS';
+            else if (result === '127.0.0.4' || result === '127.0.0.5' || result === '127.0.0.6' || result === '127.0.0.7') listName = 'XBL';
+            else if (result === '127.0.0.10' || result === '127.0.0.11') listName = 'PBL';
+            
+            return { status: 'listed', list: listName };
+        }
+        return { status: 'clean' };
     } catch (error) {
         if (error.code === 'ENOTFOUND' || error.message === 'DNS Timeout') return { status: 'clean' };
         throw error;
