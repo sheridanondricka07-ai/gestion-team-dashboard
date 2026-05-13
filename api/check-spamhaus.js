@@ -29,8 +29,9 @@ async function setFirebase(path, data) {
 
 async function checkIP(ip, dqsKey) {
     const reversedIP = ip.split('.').reverse().join('.');
-    // If DQS key is provided, use it. Otherwise use public Zen.
-    const query = dqsKey ? `${reversedIP}.${dqsKey}.zen.spamhaus.org` : `${reversedIP}.zen.spamhaus.org`;
+    // Use provided key or the hardcoded default
+    const activeKey = dqsKey || 'vizecvum';
+    const query = `${reversedIP}.${activeKey}.zen.spamhaus.org`;
     
     const timeout = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('DNS Timeout')), 2000)
