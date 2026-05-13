@@ -1509,13 +1509,27 @@ window.viewHistoryDate = (date) => {
 };
 
 window.triggerManualSpamhausCheck = async (btn) => {
+    const originalContent = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="refresh-cw" class="spin" style="width: 14px;"></i> Starting...';
+    if (window.lucide) window.lucide.createIcons();
+
     try {
         const response = await fetch('/api/check-spamhaus', { method: 'POST' });
         if (!response.ok) {
             const err = await response.text();
-            alert('Error starting check: ' + err);
+            alert('Server Error: ' + err);
+            btn.innerHTML = originalContent;
+            btn.disabled = false;
+            if (window.lucide) window.lucide.createIcons();
         }
+        // If successful, we don't need to do anything; 
+        // the Firebase listener in app.js will see the progress 
+        // update and re-render the view automatically.
     } catch (e) {
-        alert('Failed to connect to check API: ' + e.message);
+        alert('Connection Error: ' + e.message);
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
+        if (window.lucide) window.lucide.createIcons();
     }
 };
