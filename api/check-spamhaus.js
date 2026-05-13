@@ -51,7 +51,16 @@ export default async function handler(req, res) {
     }
 
     try {
-        console.log('Starting Spamhaus check...');
+        console.log('Starting Spamhaus check debug mode...');
+        
+        // 1. Test DNS lookup first
+        try {
+            await dns.resolve4('2.0.0.127.zen.spamhaus.org');
+            console.log('DNS test passed');
+        } catch (dnsErr) {
+            return res.status(500).send('DNS lookup failed. The server environment might be blocking DNS queries: ' + dnsErr.message);
+        }
+
         const snapshot = await db.ref('state').once('value');
         const state = snapshot.val();
         
@@ -65,18 +74,26 @@ export default async function handler(req, res) {
         });
         const uniqueIps = [...new Set(allIps)];
         
+        if (uniqueIps.length === 0) {
+            return res.status(400).send('No unique IPs found to check');
+        }
+
         const results = {};
         const timestamp = new Date().toISOString();
-        const dateKey = timestamp.split('T')[0]; // YYYY-MM-DD
+        const dateKey = timestamp.split('T')[0];
 
-        // Reset progress
-        await db.ref('state/spamhausProgress').set({
-            total: uniqueIps.length,
-            current: 0,
-            status: 'running'
-        });
+        // 2. Try to update progress, but catch if it fails (permissions?)
+        try {
+            await db.ref('state/spamhausProgress').set({
+                total: uniqueIps.length,
+                current: 0,
+                status: 'running'
+            });
+        } catch (dbErr) {
+            console.error('Firebase Write Error:', dbErr);
+            // If we can't write progress, we can still try to finish the check and return JSON
+        }
 
-        // Parallel checking with small batches (concurrency = 5) to prevent timeouts
         const batchSize = 5;
         let currentCount = 0;
         
@@ -96,31 +113,36 @@ export default async function handler(req, res) {
             }));
             
             currentCount += batch.length;
-            // Update progress in database after every small batch
-            await db.ref('state/spamhausProgress/current').set(currentCount);
+            try {
+                await db.ref('state/spamhausProgress/current').set(currentCount);
+            } catch (e) {}
         }
 
-        // Update current state
-        await db.ref('state/spamhaus').update(results);
-        await db.ref('state/spamhausLastUpdate').set(new Date().toLocaleString());
-        
-        // Save to history
-        await db.ref(`state/spamhausHistory/${dateKey}`).set({
-            timestamp: timestamp,
-            summary: {
-                total: uniqueIps.length,
-                listed: Object.values(results).filter(r => r.status === 'listed').length
-            },
-            results: results
-        });
-
-        // Mark progress as completed
-        await db.ref('state/spamhausProgress/status').set('idle');
+        // Save results
+        try {
+            await db.ref('state/spamhaus').update(results);
+            await db.ref('state/spamhausLastUpdate').set(new Date().toLocaleString());
+            await db.ref(`state/spamhausHistory/${dateKey}`).set({
+                timestamp: timestamp,
+                summary: {
+                    total: uniqueIps.length,
+                    listed: Object.values(results).filter(r => r.status === 'listed').length
+                },
+                results: results
+            });
+            await db.ref('state/spamhausProgress/status').set('idle');
+        } catch (e) {
+            console.error('Final Save Error:', e);
+            return res.status(200).json({ 
+                success: true, 
+                warning: 'Check finished but failed to save to database (Permissions?). Here are the results.',
+                results 
+            });
+        }
 
         res.status(200).json({ success: true, checked: uniqueIps.length });
     } catch (error) {
-        console.error('Spamhaus Check Error:', error);
-        await db.ref('state/spamhausProgress/status').set('error');
-        res.status(500).send(error.message);
+        console.error('Critical Handler Error:', error);
+        res.status(500).send('Critical Error: ' + error.message);
     }
 }
