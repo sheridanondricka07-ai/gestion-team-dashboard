@@ -29,9 +29,9 @@ async function setFirebase(path, data) {
 
 async function checkIP(ip) {
     const reversedIP = ip.split('.').reverse().join('.');
+    // If you have a DQS key, append it here: const query = `${reversedIP}.YOUR_DQS_KEY.zen.spamhaus.org`;
     const query = `${reversedIP}.zen.spamhaus.org`;
     
-    // Add a 2s timeout to DNS lookups
     const timeout = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('DNS Timeout')), 2000)
     );
@@ -40,14 +40,21 @@ async function checkIP(ip) {
         const addresses = await Promise.race([dns.resolve4(query), timeout]);
         if (addresses && addresses.length > 0) {
             const result = addresses[0];
-            // Identify specific list based on 127.0.0.x return code
-            let listName = 'ZEN';
-            if (result === '127.0.0.2') listName = 'SBL';
-            else if (result === '127.0.0.3') listName = 'CSS';
-            else if (result === '127.0.0.4' || result === '127.0.0.5' || result === '127.0.0.6' || result === '127.0.0.7') listName = 'XBL';
-            else if (result === '127.0.0.10' || result === '127.0.0.11') listName = 'PBL';
             
-            return { status: 'listed', list: listName };
+            // ERROR CODES: Treat these as 'clean' but log them
+            // 127.0.0.1 = Query Refused (Public Resolver)
+            // 127.255.255.x = Other Error codes
+            if (result === '127.0.0.1' || result.startsWith('127.255.255')) {
+                return { status: 'clean', error: 'query_refused' };
+            }
+
+            // Valid List codes
+            if (result === '127.0.0.2') return { status: 'listed', list: 'SBL' };
+            if (result === '127.0.0.3') return { status: 'listed', list: 'CSS' };
+            if (['127.0.0.4', '127.0.0.5', '127.0.0.6', '127.0.0.7'].includes(result)) return { status: 'listed', list: 'XBL' };
+            if (['127.0.0.10', '127.0.0.11'].includes(result)) return { status: 'listed', list: 'PBL' };
+            
+            return { status: 'listed', list: 'ZEN' };
         }
         return { status: 'clean' };
     } catch (error) {
