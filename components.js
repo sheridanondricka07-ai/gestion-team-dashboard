@@ -81,6 +81,10 @@ function renderSidebar(app) {
                 <i data-lucide="shield-alert"></i>
                 <span>IP Status</span>
             </div>
+            <div class="nav-item ${view === 'spamhaus' ? 'active' : ''}" onclick="app.setView('spamhaus')">
+                <i data-lucide="search-check"></i>
+                <span>Spamhaus</span>
+            </div>
         </div>
         <div style="margin-top: auto;">
             <div style="padding: 12px; font-size: 0.7rem; color: var(--text-secondary); text-align: center; border-top: 1px solid var(--border-color); margin-bottom: 8px; opacity: 0.5;">
@@ -142,6 +146,8 @@ function renderView(app) {
         renderTools(app, container);
     } else if (view === 'status') {
         renderStatus(app, container);
+    } else if (view === 'spamhaus') {
+        renderSpamhaus(app, container);
     }
 }
 
@@ -1043,7 +1049,20 @@ function renderStatus(app, container) {
                                     return `
                                     <tr style="border-bottom: ${borderBottom};">
                                         ${idx === 0 ? `<td rowspan="${srvIps.length}" style="padding: 12px; font-weight: 700; border-right: 1px solid var(--border-color); position: sticky; left: 0; background: ${rowBg}; z-index: 4; vertical-align: top; border-bottom: 3px solid var(--border-color);">${srv.name}</td>` : ''}
-                                        <td style="padding: 12px; font-family: monospace; border-right: 1px solid var(--border-color); position: sticky; left: 120px; background: ${rowBg}; z-index: 4; border-bottom: ${borderBottom};">${ip}</td>
+                                        <td style="padding: 12px; font-family: monospace; border-right: 1px solid var(--border-color); position: sticky; left: 120px; background: ${rowBg}; z-index: 4; border-bottom: ${borderBottom};">
+                                            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                                                <span>${ip}</span>
+                                                ${(() => {
+                                                    const safeIp = ip.replace(/\./g, '_');
+                                                    const sh = app.state.spamhaus && app.state.spamhaus[safeIp];
+                                                    if (!sh) return '';
+                                                    if (sh.status === 'listed') {
+                                                        return `<span class="badge badge-sbl" style="font-size: 0.55rem; padding: 1px 4px;">${sh.list || 'LISTED'}</span>`;
+                                                    }
+                                                    return `<span class="badge badge-clean" style="font-size: 0.55rem; padding: 1px 4px;">CLEAN</span>`;
+                                                })()}
+                                            </div>
+                                        </td>
                                         ${days.map(date => {
                                             const safeIp = ip.replace(/\./g, '_');
                                             const currentStatusId = (statuses && statuses[safeIp] && statuses[safeIp][date]) || 'none';
@@ -1292,4 +1311,125 @@ window.copyUnassignedServerIps = (el) => {
             if (window.lucide) window.lucide.createIcons();
         }, 2000);
     });
+};
+
+function renderSpamhaus(app, container) {
+    const { servers, spamhaus } = app.state;
+    const allIps = servers.reduce((acc, s) => [...acc, ...(s.allIps || [])], []);
+    const uniqueIps = [...new Set(allIps)];
+    
+    const listedIps = uniqueIps.filter(ip => {
+        const safeIp = ip.replace(/\./g, '_');
+        return spamhaus && spamhaus[safeIp] && spamhaus[safeIp].status === 'listed';
+    });
+
+    container.innerHTML = `
+        <div style="padding: 24px;">
+            <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 24px;">
+                <div class="card stat-card" style="display: flex; align-items: center; gap: 16px; padding: 20px;">
+                    <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1); color: var(--accent-primary); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                        <i data-lucide="shield" style="width: 24px;"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Total IPs Checked</h3>
+                        <p style="font-size: 1.5rem; font-weight: 700; margin: 4px 0 0;">${uniqueIps.length}</p>
+                    </div>
+                </div>
+                <div class="card stat-card" style="display: flex; align-items: center; gap: 16px; padding: 20px;">
+                    <div class="stat-icon" style="background: rgba(239, 68, 68, 0.1); color: var(--error); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                        <i data-lucide="alert-circle" style="width: 24px;"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Listed IPs</h3>
+                        <p style="font-size: 1.5rem; font-weight: 700; margin: 4px 0 0;">${listedIps.length}</p>
+                    </div>
+                </div>
+                <div class="card stat-card" style="display: flex; align-items: center; gap: 16px; padding: 20px;">
+                    <div class="stat-icon" style="background: rgba(34, 197, 94, 0.1); color: var(--success); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                        <i data-lucide="check-circle" style="width: 24px;"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Clean IPs</h3>
+                        <p style="font-size: 1.5rem; font-weight: 700; margin: 4px 0 0;">${uniqueIps.length - listedIps.length}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.1rem;">Automated Spamhaus Status</h3>
+                        <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Production IPs are automatically checked every 12 hours.</p>
+                    </div>
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                        <span style="font-size: 0.75rem; color: var(--text-secondary);">Last update: ${app.state.spamhausLastUpdate || 'Never'}</span>
+                        <button onclick="triggerManualSpamhausCheck(this)" style="width: auto; padding: 8px 16px; font-size: 0.8rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 8px; border-radius: 6px;">
+                            <i data-lucide="refresh-cw" style="width: 14px;"></i> Check Now
+                        </button>
+                    </div>
+                </div>
+
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                        <thead>
+                            <tr style="text-align: left; border-bottom: 2px solid var(--border-color);">
+                                <th style="padding: 12px;">IP Address</th>
+                                <th style="padding: 12px;">Spamhaus Status</th>
+                                <th style="padding: 12px;">Last Checked</th>
+                                <th style="padding: 12px; text-align: right;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${uniqueIps.map(ip => {
+                                const safeIp = ip.replace(/\./g, '_');
+                                const data = spamhaus && spamhaus[safeIp];
+                                const isListed = data && data.status === 'listed';
+                                return `
+                                    <tr style="border-bottom: 1px solid var(--border-color);">
+                                        <td style="padding: 12px; font-family: monospace;">${ip}</td>
+                                        <td style="padding: 12px;">
+                                            <span class="badge ${isListed ? 'badge-sbl' : (data ? 'badge-clean' : 'badge-rp')}">
+                                                ${isListed ? (data.list || 'LISTED') : (data ? 'CLEAN' : 'PENDING')}
+                                            </span>
+                                        </td>
+                                        <td style="padding: 12px; color: var(--text-secondary); font-size: 0.75rem;">
+                                            ${data ? new Date(data.timestamp).toLocaleString() : 'Not checked'}
+                                        </td>
+                                        <td style="padding: 12px; text-align: right;">
+                                            <button onclick="window.open('https://check.spamhaus.org/query/ip/${ip}', '_blank')" style="background: transparent; border: none; color: var(--accent-primary); cursor: pointer; font-size: 0.75rem; text-decoration: underline;">Details</button>
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                            ${uniqueIps.length === 0 ? '<tr><td colspan="4" style="padding: 40px; text-align: center; color: var(--text-secondary);">No IPs found in your servers.</td></tr>' : ''}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+    if (window.lucide) window.lucide.createIcons();
+}
+
+window.triggerManualSpamhausCheck = async (btn) => {
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="refresh-cw" class="spin" style="width: 14px;"></i> Checking...';
+    if (window.lucide) window.lucide.createIcons();
+    
+    try {
+        const response = await fetch('/api/check-spamhaus', { method: 'POST' });
+        if (response.ok) {
+            alert('Check started successfully! Results will appear shortly.');
+        } else {
+            const err = await response.text();
+            alert('Error starting check: ' + err);
+        }
+    } catch (e) {
+        alert('Failed to connect to check API: ' + e.message);
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        if (window.lucide) window.lucide.createIcons();
+    }
 };

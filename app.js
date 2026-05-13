@@ -43,7 +43,8 @@ class TeamApp {
             ],
             servers: [],
             tools: [],
-            statuses: {}
+            statuses: {},
+            spamhaus: {}
         };
         this.expandedServers = new Set();
         this.statusRange = 7;
