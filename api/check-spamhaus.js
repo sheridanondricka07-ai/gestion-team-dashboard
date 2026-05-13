@@ -1,6 +1,21 @@
-const dns = require('dns').promises;
+const dns = require('dns');
 
-// Use REST API for more reliable writes without service accounts
+// Create a custom resolver using Google & Cloudflare DNS
+// This bypasses Vercel's system resolver which Spamhaus blocks
+const resolver = new dns.Resolver();
+resolver.setServers(['8.8.8.8', '1.1.1.1']);
+
+// Promisify the custom resolver's resolve4
+function resolve4(hostname) {
+    return new Promise((resolve, reject) => {
+        resolver.resolve4(hostname, (err, addresses) => {
+            if (err) reject(err);
+            else resolve(addresses);
+        });
+    });
+}
+
+// Firebase REST helpers
 const DB_URL = "https://gestion-team-c-default-rtdb.firebaseio.com";
 
 async function updateFirebase(path, data) {
@@ -29,47 +44,41 @@ async function setFirebase(path, data) {
 
 async function checkIP(ip, dqsKey) {
     const reversedIP = ip.split('.').reverse().join('.');
+    const activeKey = dqsKey || 'vizecvum';
     
-    // Lists to check with high reliability
-    const lists = [
-        // 1. Spamhaus DQS (Professional feed - MUST use dq.spamhaus.net)
-        { domain: (dqsKey || 'vizecvum') + '.zen.dq.spamhaus.net', name: 'Spamhaus' },
-        // 2. SpamCop (Reliable fallback)
-        { domain: 'bl.spamcop.net', name: 'SpamCop' },
-        // 3. SORBS
-        { domain: 'dnsbl.sorbs.net', name: 'SORBS' }
-    ];
-
+    // Use the DQS professional zone
+    const query = `${reversedIP}.${activeKey}.zen.dq.spamhaus.net`;
+    
     const timeout = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms));
 
-    for (const list of lists) {
-        try {
-            const query = `${reversedIP}.${list.domain}`;
-            // Increase timeout to 5s for better reliability on Vercel
-            const addresses = await Promise.race([dns.resolve4(query), timeout(5000)]);
+    try {
+        const addresses = await Promise.race([resolve4(query), timeout(5000)]);
+        
+        if (addresses && addresses.length > 0) {
+            // Log for debugging
+            console.log(`IP ${ip} -> DNS returned: ${addresses.join(', ')}`);
             
-            if (addresses && addresses.length > 0) {
-                const result = addresses[0];
+            // Check ALL returned addresses for SBL/CSS
+            for (const result of addresses) {
+                // Skip refusal/error codes
+                if (result === '127.0.0.1' || result.startsWith('127.255.255')) {
+                    console.log(`IP ${ip} -> Query refused (${result})`);
+                    return { status: 'clean', note: 'query_refused' };
+                }
                 
-                // Handle Spamhaus refusal codes (127.0.0.1 or 127.255.255.x)
-                if (list.name === 'Spamhaus') {
-                    if (result === '127.0.0.1' || result.startsWith('127.255.255')) {
-                        console.log(`Spamhaus refused query for ${ip} (Code: ${result})`);
-                        continue; 
-                    }
-                }
-
-                let listType = list.name;
-                if (list.name === 'Spamhaus') {
-                    if (result === '127.0.0.2') listType = 'SBL';
-                    else if (result === '127.0.0.3') listType = 'CSS';
-                    else if (result.startsWith('127.0.0.4')) listType = 'XBL';
-                }
-
-                return { status: 'listed', list: listType };
+                // SBL
+                if (result === '127.0.0.2') return { status: 'listed', list: 'SBL' };
+                // CSS
+                if (result === '127.0.0.3') return { status: 'listed', list: 'CSS' };
             }
-        } catch (error) {
-            continue; // Move to next list
+            
+            // Got a result but not SBL/CSS (e.g. PBL, XBL) - treat as clean per user request
+            return { status: 'clean' };
+        }
+    } catch (error) {
+        // ENOTFOUND = not listed, Timeout = could not check
+        if (error.code !== 'ENOTFOUND') {
+            console.log(`IP ${ip} -> Error: ${error.message}`);
         }
     }
 
@@ -129,7 +138,10 @@ export default async function handler(req, res) {
             }));
             
             currentCount += batch.length;
-            await updateFirebase('spamhausProgress', { current: currentCount });
+            // Only update progress every 3 batches to reduce flicker
+            if (i % (batchSize * 3) === 0 || currentCount >= uniqueIps.length) {
+                await updateFirebase('spamhausProgress', { current: currentCount });
+            }
         }
 
         // Final updates
@@ -145,7 +157,10 @@ export default async function handler(req, res) {
         });
         await updateFirebase('spamhausProgress', { status: 'idle' });
 
-        res.status(200).json({ success: true, checked: uniqueIps.length });
+        const listedCount = Object.values(results).filter(r => r.status === 'listed').length;
+        console.log(`Scan complete: ${uniqueIps.length} IPs checked, ${listedCount} listed`);
+
+        res.status(200).json({ success: true, checked: uniqueIps.length, listed: listedCount });
     } catch (error) {
         console.error('Critical Handler Error:', error);
         res.status(500).send('Critical Error: ' + error.message);

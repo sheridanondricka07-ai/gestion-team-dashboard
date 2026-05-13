@@ -1377,7 +1377,7 @@ function renderSpamhaus(app, container) {
                     <div class="progress-bar" style="width: ${progressPercent}%"></div>
                     <div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 0.7rem; color: var(--text-secondary);">
                         <span>Checking IPs in progress...</span>
-                        <span>${progressPercent}% (${spamhausProgress?.current || 0}/${spamhausProgress?.total || 0})</span>
+                        <span id="spamhaus-progress-text">${progressPercent}% (${spamhausProgress?.current || 0}/${spamhausProgress?.total || 0})</span>
                     </div>
                 </div>
 

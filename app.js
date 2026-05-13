@@ -231,7 +231,28 @@ class TeamApp {
                     if (cloudData) {
                         const currentUser = this.state.currentUser;
                         const currentView = this.state.currentView; // Preserve local view
+                        
+                        // Check if only spamhausProgress changed — if so, update bar without full re-render
+                        const oldProgress = JSON.stringify(this.state.spamhausProgress || {});
+                        const newProgress = JSON.stringify(cloudData.spamhausProgress || {});
+                        const progressChanged = oldProgress !== newProgress;
+                        
                         this.state = { ...this.state, ...cloudData, currentUser, currentView, dbConnected: true };
+                        
+                        // If scan is running and only progress changed, just update the bar
+                        if (progressChanged && cloudData.spamhausProgress && cloudData.spamhausProgress.status === 'running') {
+                            const bar = document.querySelector('#spamhaus-progress .progress-bar');
+                            const text = document.querySelector('#spamhaus-progress-text');
+                            const container = document.getElementById('spamhaus-progress');
+                            if (bar && cloudData.spamhausProgress.total > 0) {
+                                const pct = Math.round((cloudData.spamhausProgress.current / cloudData.spamhausProgress.total) * 100);
+                                bar.style.width = pct + '%';
+                                if (text) text.textContent = `${pct}% (${cloudData.spamhausProgress.current}/${cloudData.spamhausProgress.total})`;
+                                if (container) container.classList.add('progress-active');
+                                return; // Skip full re-render
+                            }
+                        }
+                        
                         this.updateDashboard();
                         if (!this.state.currentUser) renderLogin(this);
                     } else {
