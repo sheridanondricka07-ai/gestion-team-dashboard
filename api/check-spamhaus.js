@@ -43,26 +43,12 @@ async function checkIP(ip) {
 }
 
 export default async function handler(req, res) {
-    // Security check: only allow cron or manual trigger from app
-    // In Vercel, cron jobs send a specific header
-    const authHeader = req.headers['authorization'];
-    if (req.method !== 'POST' && !authHeader?.includes('Bearer')) {
-        return res.status(401).send('Unauthorized');
-    }
+    if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
 
     try {
-        console.log('Starting Spamhaus check debug mode...');
-        
-        // 1. Test DNS lookup first
-        try {
-            await dns.resolve4('2.0.0.127.zen.spamhaus.org');
-            console.log('DNS test passed');
-        } catch (dnsErr) {
-            return res.status(500).send('DNS lookup failed. The server environment might be blocking DNS queries: ' + dnsErr.message);
-        }
-
-        const snapshot = await db.ref('state').once('value');
-        const state = snapshot.val();
+        // Fetch state via REST
+        const stateRes = await fetch(`${DB_URL}/state.json`);
+        const state = await stateRes.json();
         
         if (!state || !state.servers) {
             return res.status(400).send('No servers found in state');
@@ -75,24 +61,19 @@ export default async function handler(req, res) {
         const uniqueIps = [...new Set(allIps)];
         
         if (uniqueIps.length === 0) {
-            return res.status(400).send('No unique IPs found to check');
+            return res.status(200).json({ success: true, message: 'No IPs to check' });
         }
 
         const results = {};
         const timestamp = new Date().toISOString();
         const dateKey = timestamp.split('T')[0];
 
-        // 2. Try to update progress, but catch if it fails (permissions?)
-        try {
-            await db.ref('state/spamhausProgress').set({
-                total: uniqueIps.length,
-                current: 0,
-                status: 'running'
-            });
-        } catch (dbErr) {
-            console.error('Firebase Write Error:', dbErr);
-            // If we can't write progress, we can still try to finish the check and return JSON
-        }
+        // Start progress
+        await setFirebase('spamhausProgress', {
+            total: uniqueIps.length,
+            current: 0,
+            status: 'running'
+        });
 
         const batchSize = 5;
         let currentCount = 0;
@@ -113,32 +94,21 @@ export default async function handler(req, res) {
             }));
             
             currentCount += batch.length;
-            try {
-                await db.ref('state/spamhausProgress/current').set(currentCount);
-            } catch (e) {}
+            await updateFirebase('spamhausProgress', { current: currentCount });
         }
 
-        // Save results
-        try {
-            await db.ref('state/spamhaus').update(results);
-            await db.ref('state/spamhausLastUpdate').set(new Date().toLocaleString());
-            await db.ref(`state/spamhausHistory/${dateKey}`).set({
-                timestamp: timestamp,
-                summary: {
-                    total: uniqueIps.length,
-                    listed: Object.values(results).filter(r => r.status === 'listed').length
-                },
-                results: results
-            });
-            await db.ref('state/spamhausProgress/status').set('idle');
-        } catch (e) {
-            console.error('Final Save Error:', e);
-            return res.status(200).json({ 
-                success: true, 
-                warning: 'Check finished but failed to save to database (Permissions?). Here are the results.',
-                results 
-            });
-        }
+        // Final updates
+        await updateFirebase('spamhaus', results);
+        await setFirebase('spamhausLastUpdate', new Date().toLocaleString());
+        await setFirebase(`spamhausHistory/${dateKey}`, {
+            timestamp: timestamp,
+            summary: {
+                total: uniqueIps.length,
+                listed: Object.values(results).filter(r => r.status === 'listed').length
+            },
+            results: results
+        });
+        await updateFirebase('spamhausProgress', { status: 'idle' });
 
         res.status(200).json({ success: true, checked: uniqueIps.length });
     } catch (error) {
