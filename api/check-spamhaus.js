@@ -32,8 +32,8 @@ async function checkIP(ip, dqsKey) {
     
     // Lists to check
     const lists = [
-        // 1. Spamhaus (with DQS)
-        { domain: dqsKey ? `${dqsKey}.zen.spamhaus.org` : 'zen.spamhaus.org', name: 'Spamhaus' },
+        // 1. Spamhaus DQS (Professional feed)
+        { domain: (dqsKey || 'vizecvum') + '.zen.dq.spamhaus.net', name: 'Spamhaus' },
         // 2. SpamCop (Reliable fallback)
         { domain: 'bl.spamcop.net', name: 'SpamCop' },
         // 3. SORBS
