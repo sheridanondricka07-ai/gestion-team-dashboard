@@ -1,45 +1,48 @@
 const dns = require('dns').promises;
-const admin = require('firebase-admin');
 
-// Initialize Firebase Admin with the database URL
-if (!admin.apps.length) {
-    admin.initializeApp({
-        databaseURL: "https://gestion-team-c-default-rtdb.firebaseio.com"
-    });
+// Use REST API for more reliable writes without service accounts
+const DB_URL = "https://gestion-team-c-default-rtdb.firebaseio.com";
+
+async function updateFirebase(path, data) {
+    try {
+        await fetch(`${DB_URL}/state/${path}.json`, {
+            method: 'PATCH',
+            body: JSON.stringify(data),
+            headers: { 'Content-Type': 'application/json' }
+        });
+    } catch (e) {
+        console.error('Firebase REST Error:', e);
+    }
 }
 
-const db = admin.database();
-
-// Spamhaus accounts provided by the user
-const accounts = [
-    { name: 'spamhaus1', customerId: '86022311', email: 'mickeyjohn911@gmail.com' },
-    { name: 'spamhaus2', customerId: '81321951', email: 'thenewonetwo123@gmail.com' }
-];
+async function setFirebase(path, data) {
+    try {
+        await fetch(`${DB_URL}/state/${path}.json`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+            headers: { 'Content-Type': 'application/json' }
+        });
+    } catch (e) {
+        console.error('Firebase REST Error:', e);
+    }
+}
 
 async function checkIP(ip) {
     const reversedIP = ip.split('.').reverse().join('.');
-    // zen.spamhaus.org is the combined list (SBL, XBL, PBL)
-    // For free use, Spamhaus blocks public resolvers. 
-    // In a production environment, you should use your DQS key here:
-    // const query = `${reversedIP}.${DQS_KEY}.zen.spamhaus.org`;
     const query = `${reversedIP}.zen.spamhaus.org`;
     
+    // Add a 2s timeout to DNS lookups
+    const timeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('DNS Timeout')), 2000)
+    );
+
     try {
-        const addresses = await dns.resolve4(query);
-        if (addresses.length > 0) {
-            const result = addresses[0];
-            let list = 'LISTED';
-            if (result === '127.0.0.3') list = 'CSS';
-            else if (result === '127.0.0.2') list = 'SBL';
-            return { status: 'listed', list: list };
-        }
-    } catch (err) {
-        if (err.code === 'ENOTFOUND') {
-            return { status: 'clean' };
-        }
-        throw err;
+        await Promise.race([dns.resolve4(query), timeout]);
+        return { status: 'listed', list: 'ZEN' };
+    } catch (error) {
+        if (error.code === 'ENOTFOUND' || error.message === 'DNS Timeout') return { status: 'clean' };
+        throw error;
     }
-    return { status: 'clean' };
 }
 
 export default async function handler(req, res) {
