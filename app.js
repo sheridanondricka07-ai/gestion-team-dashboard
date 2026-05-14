@@ -238,6 +238,9 @@ class TeamApp {
                         const progressChanged = oldProgress !== newProgress;
                         
                         this.state = { ...this.state, ...cloudData, currentUser, currentView, dbConnected: true };
+                        // SAFETY: Firebase may return null for these — always ensure safe defaults
+                        if (!this.state.spamhausProgress) this.state.spamhausProgress = { status: 'idle', current: 0, total: 0 };
+                        if (!this.state.spamhaus) this.state.spamhaus = {};
                         
                         // If scan is running and only progress changed, just update the bar
                         if (progressChanged && cloudData.spamhausProgress && cloudData.spamhausProgress.status === 'running') {
