@@ -77,15 +77,13 @@ async function getAuthToken() {
 }
 
 async function checkIP(ip, token, retryCount = 0) {
-    // The working project (server.py) primarily checks XBL
-    // The user also requested CSS and SBL. 
-    // We will check XBL, SBL, and CSS to be 100% sure.
-    const listsToCheck = ['XBL', 'SBL', 'CSS'];
+    // Switch to 'live' endpoint for real-time status as per official Spamhaus docs
+    // Lists to check: XBL (Exploits), SBL (Spam), CSS (Reputation), PBL (Policy)
+    const listsToCheck = ['XBL', 'SBL', 'CSS', 'PBL'];
     
     for (const listName of listsToCheck) {
-        // Use the exact v1 history endpoint from the working project
-        const pathType = (listName === 'SBL') ? 'ip' : 'cidr';
-        const endpoint = `https://api.spamhaus.org/api/intel/v1/byobject/${pathType}/${listName}/listed/history/${ip}?limit=1`;
+        // Use 'live' for current status. Path is 'ip' for individual IP lookups.
+        const endpoint = `https://api.spamhaus.org/api/intel/v1/byobject/ip/${listName}/listed/live/${ip}`;
         
         try {
             const response = await fetch(endpoint, {
@@ -103,16 +101,18 @@ async function checkIP(ip, token, retryCount = 0) {
 
             if (response.ok) {
                 const data = await response.json();
-                const results = data.results || data;
+                // 'live' endpoint returns results in data.results or the object itself
+                const results = data.results || (data.id ? [data] : []);
                 const records = Array.isArray(results) ? results : [];
                 
                 if (records.length > 0) {
                     const record = records[0];
                     
-                    // The working project (server.py) does NOT check valid_until.
-                    // It simply marks as listed if a record is found.
-                    // Map XBL/SBL to 'SBL' and CSS to 'CSS' as per user UI request.
-                    const displayList = (listName === 'CSS') ? 'CSS' : 'SBL';
+                    // Map lists to UI display names
+                    let displayList = 'SBL'; // Default
+                    if (listName === 'CSS') displayList = 'CSS';
+                    if (listName === 'XBL') displayList = 'XBL';
+                    if (listName === 'PBL') displayList = 'PBL';
                     
                     return {
                         status: 'listed',
@@ -124,6 +124,7 @@ async function checkIP(ip, token, retryCount = 0) {
                 }
             }
         } catch (e) {
+            console.error(`Check error for ${ip} on ${listName}:`, e);
             continue;
         }
     }
