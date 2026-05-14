@@ -9,9 +9,9 @@ const SPAMHAUS_PASSWORD = "E1l0&su7d,zVEiP6";
 
 let authToken = null;
 
-async function updateFirebase(path, data) {
+async function updateFirebaseData(path, data) {
     try {
-        await fetch(`${DB_URL}/state/${path}.json`, {
+        await fetch(`${DB_URL}/${path}.json`, {
             method: 'PATCH',
             body: JSON.stringify(data),
             headers: { 'Content-Type': 'application/json' }
@@ -21,15 +21,25 @@ async function updateFirebase(path, data) {
     }
 }
 
-async function setFirebase(path, data) {
+async function setFirebaseData(path, data) {
     try {
-        await fetch(`${DB_URL}/state/${path}.json`, {
+        await fetch(`${DB_URL}/${path}.json`, {
             method: 'PUT',
             body: JSON.stringify(data),
             headers: { 'Content-Type': 'application/json' }
         });
     } catch (e) {
         console.error('Firebase REST Error:', e);
+    }
+}
+
+async function getFirebaseData(path) {
+    try {
+        const resp = await fetch(`${DB_URL}/${path}.json`);
+        return await resp.json();
+    } catch (e) {
+        console.error('Firebase REST Error:', e);
+        return null;
     }
 }
 
