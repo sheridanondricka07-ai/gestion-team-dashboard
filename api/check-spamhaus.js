@@ -67,8 +67,8 @@ async function getAuthToken() {
 }
 
 async function checkIP(ip, token) {
-    // Check all relevant Spamhaus IP datasets for 100% coverage
-    const listsToCheck = ['SBL', 'CSS', 'XBL', 'PBL'];
+    // Check SBL/XBL/PBL first, then CSS (Prioritize SBL detection)
+    const listsToCheck = ['SBL', 'XBL', 'PBL', 'CSS'];
     
     for (const listName of listsToCheck) {
         const endpoint = `https://api.spamhaus.org/api/intel/v1/byobject/cidr/${listName}/listed/history/${ip}?limit=1`;
@@ -81,9 +81,6 @@ async function checkIP(ip, token) {
 
             if (response.ok) {
                 const data = await response.json();
-                
-                // API returns: { "code": 200, "results": [...] }
-                // Check for results array inside the response object
                 const results = data.results || data;
                 const records = Array.isArray(results) ? results : [];
                 
@@ -92,20 +89,20 @@ async function checkIP(ip, token) {
                     const now = Math.floor(Date.now() / 1000);
                     const validUntil = record.valid_until || 0;
                     
-                    // Only count as listed if the listing is currently active
-                    if (validUntil > now) {
-                        // Map XBL and PBL to 'SBL' as per user request for simplified status
-                        const displayList = (listName === 'XBL' || listName === 'PBL') ? 'SBL' : listName;
+                    // High-sensitivity check:
+                    // 1. If validUntil is in the future
+                    // 2. OR if it expired in the last 24 hours (buffer for sync delays)
+                    if (validUntil > (now - 86400)) {
+                        const displayList = (listName === 'CSS') ? 'CSS' : 'SBL';
                         
                         return {
                             status: 'listed',
                             list: displayList,
                             listedDate: record.listed ? new Date(record.listed * 1000).toISOString().split('T')[0] : '-',
-                            expires: new Date(validUntil * 1000).toISOString().split('T')[0],
+                            expires: record.valid_until ? new Date(record.valid_until * 1000).toISOString().split('T')[0] : '-',
                             reason: record.heuristic || record.rule || '-'
                         };
                     }
-                    // Expired listing — treat as clean
                 }
             } else if (response.status === 404) {
                 // Not found on this list
