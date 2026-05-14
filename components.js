@@ -1436,18 +1436,22 @@ function renderSpamhaus(app, container) {
                             </tr>
                         </thead>
                         <tbody>
-                            ${app.state.spamhausHistory ? Object.entries(app.state.spamhausHistory).reverse().map(([date, data]) => `
+                            ${app.state.spamhausHistory ? Object.entries(app.state.spamhausHistory).reverse().map(([date, data]) => {
+                                const summary = data.summary || {};
+                                const histTotal = summary.total || (data.results ? Object.keys(data.results).length : 0);
+                                const histListed = summary.listed || (data.results ? Object.values(data.results).filter(r => r && r.status === 'listed').length : 0);
+                                return `
                                 <tr style="border-bottom: 1px solid var(--border-color);">
                                     <td style="padding: 12px; font-weight: 500;">${date}</td>
                                     <td style="padding: 12px;">
-                                        <span style="color: var(--text-secondary); margin-right: 12px;">Total: ${data.summary.total}</span>
-                                        <span class="badge ${data.summary.listed > 0 ? 'badge-sbl' : 'badge-clean'}">${data.summary.listed} Listed</span>
+                                        <span style="color: var(--text-secondary); margin-right: 12px;">Total: ${histTotal}</span>
+                                        <span class="badge ${histListed > 0 ? 'badge-sbl' : 'badge-clean'}">${histListed} Listed</span>
                                     </td>
                                     <td style="padding: 12px; text-align: right;">
                                         <button onclick="viewHistoryDate('${date}')" style="background: transparent; border: none; color: var(--accent-primary); cursor: pointer; font-size: 0.75rem; text-decoration: underline;">View Report</button>
                                     </td>
                                 </tr>
-                            `).join('') : '<tr><td colspan="3" style="padding: 20px; text-align: center; color: var(--text-secondary);">No history recorded yet.</td></tr>'}
+                            `}).join('') : '<tr><td colspan="3" style="padding: 20px; text-align: center; color: var(--text-secondary);">No history recorded yet.</td></tr>'
                         </tbody>
                     </table>
                 </div>
@@ -1479,11 +1483,11 @@ window.viewHistoryDate = (date) => {
             <div class="stats-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
                 <div class="card" style="padding: 16px; text-align: center; border: 1px solid var(--border-color);">
                     <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px;">Clean IPs</div>
-                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--success);">${data.summary.total - data.summary.listed}</div>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--success);">${(data.summary ? data.summary.total : Object.keys(data.results || {}).length) - (data.summary ? data.summary.listed : Object.values(data.results || {}).filter(r => r && r.status === 'listed').length)}</div>
                 </div>
                 <div class="card" style="padding: 16px; text-align: center; border: 1px solid var(--border-color);">
                     <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px;">Listed IPs</div>
-                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--error);">${data.summary.listed}</div>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--error);">${data.summary ? data.summary.listed : Object.values(data.results || {}).filter(r => r && r.status === 'listed').length}</div>
                 </div>
             </div>
 
