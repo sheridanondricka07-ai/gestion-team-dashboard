@@ -45,7 +45,7 @@ class TeamApp {
             tools: [],
             statuses: {},
             spamhaus: {},
-            spamhausProgress: null,
+            spamhausProgress: { status: 'idle', current: 0, total: 0 },
             spamhausHistory: null
         };
         this.expandedServers = new Set();
