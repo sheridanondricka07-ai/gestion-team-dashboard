@@ -1314,7 +1314,8 @@ window.copyUnassignedServerIps = (el) => {
 };
 
 function renderSpamhaus(app, container) {
-    const { servers, spamhaus, spamhausProgress } = app.state;
+    const { servers, spamhaus } = app.state;
+    const spamhausProgress = app.state.spamhausProgress || { status: 'idle', current: 0, total: 0 };
     const allIps = servers.reduce((acc, s) => [...acc, ...(s.allIps || [])], []);
     const uniqueIps = [...new Set(allIps)];
     
