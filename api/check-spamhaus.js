@@ -94,9 +94,12 @@ async function checkIP(ip, token) {
                     
                     // Only count as listed if the listing is currently active
                     if (validUntil > now) {
+                        // Map XBL and PBL to 'SBL' as per user request for simplified status
+                        const displayList = (listName === 'XBL' || listName === 'PBL') ? 'SBL' : listName;
+                        
                         return {
                             status: 'listed',
-                            list: listName,
+                            list: displayList,
                             listedDate: record.listed ? new Date(record.listed * 1000).toISOString().split('T')[0] : '-',
                             expires: new Date(validUntil * 1000).toISOString().split('T')[0],
                             reason: record.heuristic || record.rule || '-'
