@@ -1328,7 +1328,7 @@ function renderSpamhaus(app, container) {
                     spamhausProgress.lastUpdate && (Date.now() - spamhausProgress.lastUpdate > 180000);
                     
     const isRunning = spamhausProgress && spamhausProgress.status === 'running' && !isStuck;
-    const progressPercent = isRunning ? Math.round((spamhausProgress.current / spamhausProgress.total) * 100) : 0;
+    const progressPercent = (isRunning && spamhausProgress.total > 0) ? Math.round((spamhausProgress.current / spamhausProgress.total) * 100) : 0;
 
     container.innerHTML = `
         <div style="padding: 24px;">
