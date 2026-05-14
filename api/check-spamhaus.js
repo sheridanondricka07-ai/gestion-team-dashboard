@@ -86,23 +86,18 @@ async function checkIP(ip, token) {
                 
                 if (records.length > 0) {
                     const record = records[0];
-                    const now = Math.floor(Date.now() / 1000);
-                    const validUntil = record.valid_until || 0;
                     
-                    // High-sensitivity check:
-                    // 1. If validUntil is in the future
-                    // 2. OR if it expired in the last 24 hours (buffer for sync delays)
-                    if (validUntil > (now - 86400)) {
-                        const displayList = (listName === 'CSS') ? 'CSS' : 'SBL';
-                        
-                        return {
-                            status: 'listed',
-                            list: displayList,
-                            listedDate: record.listed ? new Date(record.listed * 1000).toISOString().split('T')[0] : '-',
-                            expires: record.valid_until ? new Date(record.valid_until * 1000).toISOString().split('T')[0] : '-',
-                            reason: record.heuristic || record.rule || '-'
-                        };
-                    }
+                    // Exact match to old project logic: 
+                    // Any historical record found = Listed. No expiration filtering.
+                    const displayList = (listName === 'CSS') ? 'CSS' : 'SBL';
+                    
+                    return {
+                        status: 'listed',
+                        list: displayList,
+                        listedDate: record.listed ? new Date(record.listed * 1000).toISOString().split('T')[0] : '-',
+                        expires: record.valid_until ? new Date(record.valid_until * 1000).toISOString().split('T')[0] : '-',
+                        reason: record.heuristic || record.rule || '-'
+                    };
                 }
             } else if (response.status === 404) {
                 // Not found on this list
