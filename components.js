@@ -1323,7 +1323,11 @@ function renderSpamhaus(app, container) {
         return spamhaus && spamhaus[safeIp] && spamhaus[safeIp].status === 'listed';
     });
 
-    const isRunning = spamhausProgress && spamhausProgress.status === 'running';
+    // Self-healing: If status is 'running' but lastUpdate is > 3 minutes ago, treat as idle
+    const isStuck = spamhausProgress && spamhausProgress.status === 'running' && 
+                    spamhausProgress.lastUpdate && (Date.now() - spamhausProgress.lastUpdate > 180000);
+                    
+    const isRunning = spamhausProgress && spamhausProgress.status === 'running' && !isStuck;
     const progressPercent = isRunning ? Math.round((spamhausProgress.current / spamhausProgress.total) * 100) : 0;
 
     container.innerHTML = `

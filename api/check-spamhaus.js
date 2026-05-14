@@ -158,7 +158,8 @@ export default async function handler(req, res) {
         await setFirebase('spamhausProgress', {
             total: uniqueIps.length,
             current: 0,
-            status: 'running'
+            status: 'running',
+            lastUpdate: Date.now()
         });
 
         // High-Speed Processing (Turbo Mode)
@@ -187,7 +188,10 @@ export default async function handler(req, res) {
             currentCount += batch.length;
             
             // Fast progress updates
-            await updateFirebase('spamhausProgress', { current: currentCount });
+            await updateFirebase('spamhausProgress', { 
+                current: currentCount,
+                lastUpdate: Date.now()
+            });
         }
 
         // Final updates
