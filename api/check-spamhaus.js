@@ -102,20 +102,31 @@ async function checkIP(ip, token, retryCount = 0) {
             const records = Array.isArray(results) ? results : [];
             
             if (records.length > 0) {
-                // Find if any record is SBL or CSS
-                const sblRecord = records.find(r => (r.dataset || '').includes('SBL'));
-                const cssRecord = records.find(r => (r.dataset || '').includes('CSS'));
+                // DEEP SEARCH for SBL or CSS in any field
+                let foundRecord = null;
+                let foundType = null;
+
+                for (const r of records) {
+                    const allData = JSON.stringify(r).toUpperCase();
+                    // Prioritize SBL then CSS
+                    if (allData.includes('SBL')) {
+                        foundRecord = r;
+                        foundType = 'SBL';
+                        break; 
+                    }
+                    if (allData.includes('CSS')) {
+                        foundRecord = r;
+                        foundType = 'CSS';
+                    }
+                }
                 
-                if (sblRecord || cssRecord) {
-                    const record = sblRecord || cssRecord;
-                    const displayList = (sblRecord) ? 'SBL' : 'CSS';
-                    
+                if (foundRecord) {
                     return {
                         status: 'listed',
-                        list: displayList,
-                        listedDate: record.listed ? new Date(record.listed * 1000).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-                        expires: record.valid_until ? new Date(record.valid_until * 1000).toISOString().split('T')[0] : '-',
-                        reason: record.rule || record.heuristic || `Listed on ${displayList}`
+                        list: foundType,
+                        listedDate: foundRecord.listed ? new Date(foundRecord.listed * 1000).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                        expires: foundRecord.valid_until ? new Date(foundRecord.valid_until * 1000).toISOString().split('T')[0] : '-',
+                        reason: foundRecord.rule || foundRecord.heuristic || `Listed on ${foundType}`
                     };
                 }
             }
