@@ -67,8 +67,8 @@ async function getAuthToken() {
 }
 
 async function checkIP(ip, token) {
-    // Check CSS and SBL lists
-    const listsToCheck = ['CSS', 'SBL'];
+    // Check all relevant Spamhaus IP datasets for 100% coverage
+    const listsToCheck = ['SBL', 'CSS', 'XBL', 'PBL'];
     
     for (const listName of listsToCheck) {
         const endpoint = `https://api.spamhaus.org/api/intel/v1/byobject/cidr/${listName}/listed/history/${ip}?limit=1`;
