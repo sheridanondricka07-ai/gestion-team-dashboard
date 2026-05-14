@@ -66,7 +66,7 @@ async function getAuthToken() {
     return null;
 }
 
-async function checkIP(ip, token) {
+async function checkIP(ip, token, retryCount = 0) {
     // Only check SBL and CSS datasets as requested
     const listsToCheck = ['SBL', 'CSS'];
     
@@ -80,6 +80,16 @@ async function checkIP(ip, token) {
                 method: 'GET',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
+
+            if (response.status === 429) {
+                // Rate limited! Wait and retry if we haven't tried too many times
+                if (retryCount < 3) {
+                    console.log(`Rate limited on ${ip} (${listName}), retrying in ${1000 * (retryCount + 1)}ms...`);
+                    await new Promise(r => setTimeout(r, 1000 * (retryCount + 1)));
+                    return await checkIP(ip, token, retryCount + 1);
+                }
+                return { status: 'clean', note: 'rate_limited' };
+            }
 
             if (response.ok) {
                 const data = await response.json();
