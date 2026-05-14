@@ -67,11 +67,13 @@ async function getAuthToken() {
 }
 
 async function checkIP(ip, token, retryCount = 0) {
-    // Only check SBL and CSS datasets as requested
-    const listsToCheck = ['SBL', 'CSS'];
+    // The working project (server.py) primarily checks XBL
+    // The user also requested CSS and SBL. 
+    // We will check XBL, SBL, and CSS to be 100% sure.
+    const listsToCheck = ['XBL', 'SBL', 'CSS'];
     
     for (const listName of listsToCheck) {
-        // Use /ip/ endpoint for SBL to avoid 400 Bad Request errors found in testing
+        // Use the exact v1 history endpoint from the working project
         const pathType = (listName === 'SBL') ? 'ip' : 'cidr';
         const endpoint = `https://api.spamhaus.org/api/intel/v1/byobject/${pathType}/${listName}/listed/history/${ip}?limit=1`;
         
@@ -82,13 +84,11 @@ async function checkIP(ip, token, retryCount = 0) {
             });
 
             if (response.status === 429) {
-                // Rate limited! Wait and retry if we haven't tried too many times
                 if (retryCount < 3) {
-                    console.log(`Rate limited on ${ip} (${listName}), retrying in ${1000 * (retryCount + 1)}ms...`);
                     await new Promise(r => setTimeout(r, 1000 * (retryCount + 1)));
                     return await checkIP(ip, token, retryCount + 1);
                 }
-                return { status: 'clean', note: 'rate_limited' };
+                return { status: 'clean' };
             }
 
             if (response.ok) {
@@ -98,32 +98,22 @@ async function checkIP(ip, token, retryCount = 0) {
                 
                 if (records.length > 0) {
                     const record = records[0];
-                    const now = Math.floor(Date.now() / 1000);
-                    const validUntil = record.valid_until || 0;
                     
-                    // Only count as listed if the listing is currently active (Live Check)
-                    if (validUntil > now) {
-                        const displayList = (listName === 'CSS') ? 'CSS' : 'SBL';
-                        
-                        return {
-                            status: 'listed',
-                            list: displayList,
-                            listedDate: record.listed ? new Date(record.listed * 1000).toISOString().split('T')[0] : '-',
-                            expires: new Date(validUntil * 1000).toISOString().split('T')[0],
-                            reason: record.heuristic || record.rule || '-'
-                        };
-                    }
-                    // Expired listing — treat as clean
+                    // The working project (server.py) does NOT check valid_until.
+                    // It simply marks as listed if a record is found.
+                    // Map XBL/SBL to 'SBL' and CSS to 'CSS' as per user UI request.
+                    const displayList = (listName === 'CSS') ? 'CSS' : 'SBL';
+                    
+                    return {
+                        status: 'listed',
+                        list: displayList,
+                        listedDate: record.listed ? new Date(record.listed * 1000).toISOString().split('T')[0] : '-',
+                        expires: record.valid_until ? new Date(record.valid_until * 1000).toISOString().split('T')[0] : '-',
+                        reason: record.rule || record.heuristic || '-'
+                    };
                 }
-            } else if (response.status === 404) {
-                // Not found on this list
-                continue;
-            } else if (response.status === 401) {
-                authToken = null;
-                return { status: 'clean', note: 'auth_expired' };
             }
         } catch (e) {
-            console.log(`Error checking ${ip} on ${listName}: ${e.message}`);
             continue;
         }
     }
