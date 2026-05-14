@@ -171,30 +171,34 @@ export default async function handler(req, res) {
             status: 'running'
         });
 
-        // Process in batches of 5
-        const batchSize = 5;
+        // Process one-by-one (Serial) to avoid hitting tight rate limits
         let currentCount = 0;
+        let listedSoFar = 0;
         
-        for (let i = 0; i < uniqueIps.length; i += batchSize) {
-            const batch = uniqueIps.slice(i, i + batchSize);
-            await Promise.all(batch.map(async (ip) => {
-                try {
-                    const result = await checkIP(ip, token);
-                    const safeIp = ip.replace(/\./g, '_');
-                    results[safeIp] = {
-                        ...result,
-                        timestamp: timestamp
-                    };
-                } catch (err) {
-                    console.error(`Failed to check ${ip}:`, err.message);
+        for (const ip of uniqueIps) {
+            try {
+                // Mandatory delay before every request to respect rate limits
+                await new Promise(r => setTimeout(r, 500));
+                
+                const result = await checkIP(ip, token);
+                const safeIp = ip.replace(/\./g, '_');
+                results[safeIp] = {
+                    ...result,
+                    timestamp: timestamp
+                };
+                
+                if (result.status === 'listed') listedSoFar++;
+                
+                currentCount++;
+                
+                // Update progress every 5 IPs to reduce Firebase writes
+                if (currentCount % 5 === 0 || currentCount >= uniqueIps.length) {
+                    await updateFirebase('spamhausProgress', { current: currentCount });
+                    console.log(`Progress: ${currentCount}/${uniqueIps.length} (${listedSoFar} listed)`);
                 }
-            }));
-            
-            currentCount += batch.length;
-            
-            // Update progress every 3 batches
-            if (i % (batchSize * 3) === 0 || currentCount >= uniqueIps.length) {
-                await updateFirebase('spamhausProgress', { current: currentCount });
+            } catch (err) {
+                console.error(`Failed to check ${ip}:`, err.message);
+                currentCount++;
             }
         }
 
