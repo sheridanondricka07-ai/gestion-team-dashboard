@@ -141,7 +141,8 @@ export default async function handler(req, res) {
             return res.status(400).send('No servers found in state');
         }
 
-        const servers = await getFirebase('state/servers') || [];
+        // 4. Get all IPs to check
+        const servers = await getFirebaseData('state/servers') || [];
         let allIps = [];
         servers.forEach(s => {
             if (s && s.allIps) allIps = allIps.concat(s.allIps);
@@ -160,7 +161,7 @@ export default async function handler(req, res) {
         console.log(`Processing chunk: ${startIndex} to ${endIndex} (${ipsToProcess.length} IPs)`);
 
         if (startIndex === 0) {
-            await setFirebase('state/spamhausProgress', {
+            await setFirebaseData('state/spamhausProgress', {
                 total: uniqueIps.length,
                 current: 0,
                 status: 'running',
@@ -184,23 +185,23 @@ export default async function handler(req, res) {
             }
         }
 
-        const currentProgress = await getFirebase('state/spamhausProgress');
+        const currentProgress = await getFirebaseData('state/spamhausProgress');
         const newCurrent = (currentProgress?.current || 0) + ipsToProcess.length;
         
-        await updateFirebase('state/spamhausProgress', { 
+        await updateFirebaseData('state/spamhausProgress', { 
             current: newCurrent,
             lastUpdate: Date.now()
         });
 
-        await updateFirebase('state/spamhaus', chunkResults);
+        await updateFirebaseData('state/spamhaus', chunkResults);
 
         if (newCurrent >= uniqueIps.length) {
-            await setFirebase('state/spamhausLastUpdate', new Date().toLocaleString());
-            await updateFirebase('state/spamhausProgress', { status: 'idle' });
+            await setFirebaseData('state/spamhausLastUpdate', new Date().toLocaleString());
+            await updateFirebaseData('state/spamhausProgress', { status: 'idle' });
             
             const dateKey = new Date().toISOString().split('T')[0];
-            const finalResults = await getFirebase('state/spamhaus');
-            await setFirebase(`state/spamhausHistory/${dateKey}`, {
+            const finalResults = await getFirebaseData('state/spamhaus');
+            await setFirebaseData(`state/spamhausHistory/${dateKey}`, {
                 timestamp: timestamp,
                 results: finalResults
             });
