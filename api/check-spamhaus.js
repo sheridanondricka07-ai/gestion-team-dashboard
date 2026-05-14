@@ -161,34 +161,38 @@ export default async function handler(req, res) {
             status: 'running'
         });
 
-        // Process one-by-one (Serial) to avoid hitting tight rate limits
+        // Process in batches of 10 to fit within Vercel's 60s timeout
+        const batchSize = 10;
         let currentCount = 0;
         let listedSoFar = 0;
         
-        for (const ip of uniqueIps) {
-            try {
-                // Mandatory delay before every request to respect rate limits
-                await new Promise(r => setTimeout(r, 500));
-                
-                const result = await checkIP(ip, token);
-                const safeIp = ip.replace(/\./g, '_');
-                results[safeIp] = {
-                    ...result,
-                    timestamp: timestamp
-                };
-                
-                if (result.status === 'listed') listedSoFar++;
-                
-                currentCount++;
-                
-                // Update progress every 5 IPs to reduce Firebase writes
-                if (currentCount % 5 === 0 || currentCount >= uniqueIps.length) {
-                    await updateFirebase('spamhausProgress', { current: currentCount });
-                    console.log(`Progress: ${currentCount}/${uniqueIps.length} (${listedSoFar} listed)`);
+        for (let i = 0; i < uniqueIps.length; i += batchSize) {
+            const batch = uniqueIps.slice(i, i + batchSize);
+            
+            await Promise.all(batch.map(async (ip) => {
+                try {
+                    const result = await checkIP(ip, token);
+                    const safeIp = ip.replace(/\./g, '_');
+                    results[safeIp] = {
+                        ...result,
+                        timestamp: timestamp
+                    };
+                    
+                    if (result.status === 'listed') listedSoFar++;
+                } catch (err) {
+                    console.error(`Failed to check ${ip}:`, err.message);
                 }
-            } catch (err) {
-                console.error(`Failed to check ${ip}:`, err.message);
-                currentCount++;
+            }));
+            
+            currentCount += batch.length;
+            
+            // Update progress in Firebase
+            await updateFirebase('spamhausProgress', { current: currentCount });
+            console.log(`Progress: ${currentCount}/${uniqueIps.length} (${listedSoFar} listed)`);
+            
+            // Safety delay between batches to stay under rate limits
+            if (i + batchSize < uniqueIps.length) {
+                await new Promise(r => setTimeout(r, 1500));
             }
         }
 
