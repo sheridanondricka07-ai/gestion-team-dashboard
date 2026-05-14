@@ -67,11 +67,13 @@ async function getAuthToken() {
 }
 
 async function checkIP(ip, token) {
-    // Check SBL/XBL/PBL first, then CSS (Prioritize SBL detection)
-    const listsToCheck = ['SBL', 'XBL', 'PBL', 'CSS'];
+    // Only check SBL and CSS datasets as requested
+    const listsToCheck = ['SBL', 'CSS'];
     
     for (const listName of listsToCheck) {
-        const endpoint = `https://api.spamhaus.org/api/intel/v1/byobject/cidr/${listName}/listed/history/${ip}?limit=1`;
+        // Use /ip/ endpoint for SBL to avoid 400 Bad Request errors found in testing
+        const pathType = (listName === 'SBL') ? 'ip' : 'cidr';
+        const endpoint = `https://api.spamhaus.org/api/intel/v1/byobject/${pathType}/${listName}/listed/history/${ip}?limit=1`;
         
         try {
             const response = await fetch(endpoint, {
