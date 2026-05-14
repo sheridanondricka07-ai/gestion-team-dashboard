@@ -89,13 +89,20 @@ async function checkIP(ip, token) {
                 
                 if (records.length > 0) {
                     const record = records[0];
-                    return {
-                        status: 'listed',
-                        list: listName,
-                        listedDate: record.listed ? new Date(record.listed * 1000).toISOString().split('T')[0] : '-',
-                        expires: record.valid_until ? new Date(record.valid_until * 1000).toISOString().split('T')[0] : '-',
-                        reason: record.heuristic || record.rule || '-'
-                    };
+                    const now = Math.floor(Date.now() / 1000);
+                    const validUntil = record.valid_until || 0;
+                    
+                    // Only count as listed if the listing is currently active
+                    if (validUntil > now) {
+                        return {
+                            status: 'listed',
+                            list: listName,
+                            listedDate: record.listed ? new Date(record.listed * 1000).toISOString().split('T')[0] : '-',
+                            expires: new Date(validUntil * 1000).toISOString().split('T')[0],
+                            reason: record.heuristic || record.rule || '-'
+                        };
+                    }
+                    // Expired listing — treat as clean
                 }
             } else if (response.status === 404) {
                 // Not found on this list
