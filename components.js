@@ -1562,19 +1562,32 @@ window.triggerManualSpamhausCheck = async (btn) => {
         return;
     }
 
-    try {
-        const response = await fetch('/api/check-spamhaus', { method: 'POST' });
-        if (!response.ok) {
-            const err = await response.text();
-            alert('Server Error: ' + err);
-            // Reset progress on error
+    const runChunk = async (startIndex = 0) => {
+        try {
+            const response = await fetch('/api/check-spamhaus', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ startIndex })
+            });
+            
+            if (!response.ok) {
+                const err = await response.text();
+                throw new Error('Server Error: ' + err);
+            }
+            
+            const data = await response.json();
+            if (data.nextIndex !== null) {
+                await runChunk(data.nextIndex);
+            }
+        } catch (e) {
+            alert('Scan interrupted: ' + e.message);
             window.app.state.spamhausProgress = { status: 'error' };
             window.app.updateDashboard();
         }
-    } catch (e) {
-        alert('Connection Error: ' + e.message);
-        window.app.state.spamhausProgress = { status: 'error' };
-        window.app.updateDashboard();
+    };
+
+    try {
+        await runChunk(0);
     } finally {
         btn.innerHTML = originalContent;
         btn.disabled = false;

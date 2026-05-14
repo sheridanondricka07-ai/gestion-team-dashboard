@@ -142,75 +142,76 @@ export default async function handler(req, res) {
         }
 
         const allIps = [];
-        state.servers.forEach(s => {
-            if (s.allIps) allIps.push(...s.allIps);
+        const servers = await getFirebase('servers') || [];
+        let allIps = [];
+        servers.forEach(s => {
+            if (s && s.allIps) allIps = allIps.concat(s.allIps);
         });
+        
         const uniqueIps = [...new Set(allIps)];
-        
-        if (uniqueIps.length === 0) {
-            return res.status(200).json({ success: true, message: 'No IPs to check' });
-        }
-
-        const results = {};
         const timestamp = new Date().toISOString();
-        const dateKey = timestamp.split('T')[0];
-
-        await setFirebase('spamhausProgress', {
-            total: uniqueIps.length,
-            current: 0,
-            status: 'running',
-            lastUpdate: Date.now()
-        });
-
-        // High-Speed Processing (Turbo Mode)
-        const batchSize = 15;
-        let currentCount = 0;
-        let listedSoFar = 0;
         
-        for (let i = 0; i < uniqueIps.length; i += batchSize) {
-            const batch = uniqueIps.slice(i, i + batchSize);
-            
-            await Promise.all(batch.map(async (ip) => {
-                try {
-                    const result = await checkIP(ip, token);
-                    const safeIp = ip.replace(/\./g, '_');
-                    results[safeIp] = {
-                        ...result,
-                        timestamp: timestamp
-                    };
-                    
-                    if (result.status === 'listed') listedSoFar++;
-                } catch (err) {
-                    console.error(`Failed to check ${ip}:`, err.message);
-                }
-            }));
-            
-            currentCount += batch.length;
-            
-            // Fast progress updates
-            await updateFirebase('spamhausProgress', { 
-                current: currentCount,
+        // --- CHUNKED SCAN LOGIC ---
+        const CHUNK_SIZE = 50;
+        const body = req.body || {};
+        const startIndex = body.startIndex || 0;
+        const endIndex = Math.min(startIndex + CHUNK_SIZE, uniqueIps.length);
+        const ipsToProcess = uniqueIps.slice(startIndex, endIndex);
+        
+        console.log(`Processing chunk: ${startIndex} to ${endIndex} (${ipsToProcess.length} IPs)`);
+
+        if (startIndex === 0) {
+            await setFirebase('spamhausProgress', {
+                total: uniqueIps.length,
+                current: 0,
+                status: 'running',
                 lastUpdate: Date.now()
             });
         }
 
-        // Final updates
-        const listedCount = Object.values(results).filter(r => r.status === 'listed').length;
+        const batchSize = 10;
+        let chunkResults = {};
         
-        await updateFirebase('spamhaus', results);
-        await setFirebase('spamhausLastUpdate', new Date().toLocaleString());
-        await setFirebase(`spamhausHistory/${dateKey}`, {
-            timestamp: timestamp,
-            summary: {
-                total: uniqueIps.length,
-                listed: listedCount
-            },
-            results: results
-        });
-        await updateFirebase('spamhausProgress', { status: 'idle' });
+        for (let i = 0; i < ipsToProcess.length; i += batchSize) {
+            const batch = ipsToProcess.slice(i, i + batchSize);
+            await Promise.all(batch.map(async (ip) => {
+                const result = await checkIP(ip, token);
+                const safeIp = ip.replace(/\./g, '_');
+                chunkResults[safeIp] = { ...result, timestamp: timestamp };
+            }));
+            
+            if (i + batchSize < ipsToProcess.length) {
+                await new Promise(r => setTimeout(r, 1000));
+            }
+        }
 
-        console.log(`Scan complete: ${uniqueIps.length} checked, ${listedCount} listed`);
-        res.status(200).json({ success: true, checked: uniqueIps.length, listed: listedCount });
+        const currentProgress = await getFirebase('spamhausProgress');
+        const newCurrent = (currentProgress?.current || 0) + ipsToProcess.length;
+        
+        await updateFirebase('spamhausProgress', { 
+            current: newCurrent,
+            lastUpdate: Date.now()
+        });
+
+        await updateFirebase('spamhaus', chunkResults);
+
+        if (newCurrent >= uniqueIps.length) {
+            await setFirebase('spamhausLastUpdate', new Date().toLocaleString());
+            await updateFirebase('spamhausProgress', { status: 'idle' });
+            
+            const dateKey = new Date().toISOString().split('T')[0];
+            const finalResults = await getFirebase('spamhaus');
+            await setFirebase(`spamhausHistory/${dateKey}`, {
+                timestamp: timestamp,
+                results: finalResults
+            });
+        }
+
+        return res.status(200).json({ 
+            success: true, 
+            processed: ipsToProcess.length,
+            nextIndex: endIndex < uniqueIps.length ? endIndex : null
+        });
     } catch (error) {
         console.error('Critical Handler Error:', error);
         await updateFirebase('spamhausProgress', { status: 'error' });
