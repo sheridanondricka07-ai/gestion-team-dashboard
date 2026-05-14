@@ -161,8 +161,8 @@ export default async function handler(req, res) {
             status: 'running'
         });
 
-        // Process in batches of 10 to fit within Vercel's 60s timeout
-        const batchSize = 10;
+        // High-Speed Processing (Turbo Mode)
+        const batchSize = 15;
         let currentCount = 0;
         let listedSoFar = 0;
         
@@ -186,14 +186,8 @@ export default async function handler(req, res) {
             
             currentCount += batch.length;
             
-            // Update progress in Firebase
+            // Fast progress updates
             await updateFirebase('spamhausProgress', { current: currentCount });
-            console.log(`Progress: ${currentCount}/${uniqueIps.length} (${listedSoFar} listed)`);
-            
-            // Safety delay between batches to stay under rate limits
-            if (i + batchSize < uniqueIps.length) {
-                await new Promise(r => setTimeout(r, 1500));
-            }
         }
 
         // Final updates
