@@ -77,8 +77,7 @@ async function getAuthToken() {
 }
 
 async function checkIP(ip, token, retryCount = 0) {
-    // Using the 'cidr/ALL' endpoint as verified by documentation for comprehensive checking.
-    // Adding a small delay to avoid 429 Too Many Requests on paid accounts.
+    // Using the 'cidr/ALL' endpoint for comprehensive checking.
     await new Promise(r => setTimeout(r, 200)); 
 
     const endpoint = `https://api.spamhaus.org/api/intel/v1/byobject/cidr/ALL/listed/live/${ip}`;
@@ -91,7 +90,6 @@ async function checkIP(ip, token, retryCount = 0) {
 
         if (response.status === 429) {
             if (retryCount < 3) {
-                // Exponential backoff for 429s
                 await new Promise(r => setTimeout(r, 1000 * (retryCount + 1)));
                 return await checkIP(ip, token, retryCount + 1);
             }
@@ -100,34 +98,32 @@ async function checkIP(ip, token, retryCount = 0) {
 
         if (response.ok) {
             const data = await response.json();
-            // SIA v1 'live' returns results in data.results or the object itself
             const results = data.results || (data.id ? [data] : []);
             const records = Array.isArray(results) ? results : [];
             
             if (records.length > 0) {
-                const record = records[0];
+                // Find if any record is SBL or CSS
+                const sblRecord = records.find(r => (r.dataset || '').includes('SBL'));
+                const cssRecord = records.find(r => (r.dataset || '').includes('CSS'));
                 
-                // Extract list name from the result tags or rule
-                let list = 'SBL';
-                const dataset = record.dataset || '';
-                if (dataset.includes('CSS')) list = 'CSS';
-                if (dataset.includes('XBL')) list = 'XBL';
-                if (dataset.includes('PBL')) list = 'PBL';
-                
-                return {
-                    status: 'listed',
-                    list: list,
-                    listedDate: record.listed ? new Date(record.listed * 1000).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-                    expires: record.valid_until ? new Date(record.valid_until * 1000).toISOString().split('T')[0] : '-',
-                    reason: record.rule || record.heuristic || `Listed on ${dataset || 'Spamhaus'}`
-                };
+                if (sblRecord || cssRecord) {
+                    const record = sblRecord || cssRecord;
+                    const displayList = (sblRecord) ? 'SBL' : 'CSS';
+                    
+                    return {
+                        status: 'listed',
+                        list: displayList,
+                        listedDate: record.listed ? new Date(record.listed * 1000).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                        expires: record.valid_until ? new Date(record.valid_until * 1000).toISOString().split('T')[0] : '-',
+                        reason: record.rule || record.heuristic || `Listed on ${displayList}`
+                    };
+                }
             }
         }
     } catch (e) {
         if (retryCount < 2) {
             return await checkIP(ip, token, retryCount + 1);
         }
-        return { status: 'clean' };
     }
 
     return { status: 'clean' };
