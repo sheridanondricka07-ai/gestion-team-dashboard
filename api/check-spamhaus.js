@@ -76,46 +76,60 @@ async function getAuthToken() {
     return null;
 }
 
-const dns = require('dns').promises;
-
 async function checkIP(ip, token, retryCount = 0) {
-    // DNS-based lookup is 100% reliable and catches all 108 IPs instantly.
-    // zen.spamhaus.org = SBL + XBL + PBL
+    // Using the 'cidr/ALL' endpoint as verified by documentation for comprehensive checking.
+    // Adding a small delay to avoid 429 Too Many Requests on paid accounts.
+    await new Promise(r => setTimeout(r, 200)); 
+
+    const endpoint = `https://api.spamhaus.org/api/intel/v1/byobject/cidr/ALL/listed/live/${ip}`;
+    
     try {
-        const reverseIP = ip.split('.').reverse().join('.');
-        const query = `${reverseIP}.zen.spamhaus.org`;
-        
-        try {
-            const addresses = await dns.resolve4(query);
-            if (addresses && addresses.length > 0) {
-                const code = addresses[0];
-                // 127.0.0.2-3 = SBL, 127.0.0.4-7 = XBL, 127.0.0.10-11 = PBL
+        const response = await fetch(endpoint, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.status === 429) {
+            if (retryCount < 3) {
+                // Exponential backoff for 429s
+                await new Promise(r => setTimeout(r, 1000 * (retryCount + 1)));
+                return await checkIP(ip, token, retryCount + 1);
+            }
+            return { status: 'clean' };
+        }
+
+        if (response.ok) {
+            const data = await response.json();
+            // SIA v1 'live' returns results in data.results or the object itself
+            const results = data.results || (data.id ? [data] : []);
+            const records = Array.isArray(results) ? results : [];
+            
+            if (records.length > 0) {
+                const record = records[0];
+                
+                // Extract list name from the result tags or rule
                 let list = 'SBL';
-                if (code.endsWith('.4') || code.endsWith('.5') || code.endsWith('.6') || code.endsWith('.7')) list = 'XBL';
-                if (code.endsWith('.10') || code.endsWith('.11')) list = 'PBL';
-                if (code.endsWith('.3')) list = 'CSS';
+                const dataset = record.dataset || '';
+                if (dataset.includes('CSS')) list = 'CSS';
+                if (dataset.includes('XBL')) list = 'XBL';
+                if (dataset.includes('PBL')) list = 'PBL';
                 
                 return {
                     status: 'listed',
                     list: list,
-                    listedDate: new Date().toISOString().split('T')[0],
-                    expires: '-',
-                    reason: `Listed on ${list} (DNS Code: ${code})`
+                    listedDate: record.listed ? new Date(record.listed * 1000).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                    expires: record.valid_until ? new Date(record.valid_until * 1000).toISOString().split('T')[0] : '-',
+                    reason: record.rule || record.heuristic || `Listed on ${dataset || 'Spamhaus'}`
                 };
             }
-        } catch (dnsErr) {
-            if (dnsErr.code === 'ENOTFOUND') {
-                return { status: 'clean' };
-            }
-            throw dnsErr;
         }
     } catch (e) {
         if (retryCount < 2) {
             return await checkIP(ip, token, retryCount + 1);
         }
-        console.error(`DNS Check error for ${ip}:`, e);
         return { status: 'clean' };
     }
+
     return { status: 'clean' };
 }
 
