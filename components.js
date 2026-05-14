@@ -1451,7 +1451,7 @@ function renderSpamhaus(app, container) {
                                         <button onclick="viewHistoryDate('${date}')" style="background: transparent; border: none; color: var(--accent-primary); cursor: pointer; font-size: 0.75rem; text-decoration: underline;">View Report</button>
                                     </td>
                                 </tr>
-                            `}).join('') : '<tr><td colspan="3" style="padding: 20px; text-align: center; color: var(--text-secondary);">No history recorded yet.</td></tr>'
+                            `}).join('') : '<tr><td colspan="3" style="padding: 20px; text-align: center; color: var(--text-secondary);">No history recorded yet.</td></tr>'}
                         </tbody>
                     </table>
                 </div>
