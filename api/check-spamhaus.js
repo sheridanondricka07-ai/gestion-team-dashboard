@@ -152,7 +152,7 @@ export default async function handler(req, res) {
         const timestamp = new Date().toISOString();
         
         // --- CHUNKED SCAN LOGIC ---
-        const CHUNK_SIZE = 50;
+        const CHUNK_SIZE = 30;
         const body = req.body || {};
         const startIndex = body.startIndex || 0;
         const endIndex = Math.min(startIndex + CHUNK_SIZE, uniqueIps.length);
@@ -214,7 +214,10 @@ export default async function handler(req, res) {
         });
     } catch (error) {
         console.error('Critical Handler Error:', error);
-        await updateFirebase('spamhausProgress', { status: 'error' });
+        await updateFirebaseData('state/spamhausProgress', { 
+            status: 'error',
+            lastError: error.message
+        });
         res.status(500).send('Critical Error: ' + error.message);
     }
 }
