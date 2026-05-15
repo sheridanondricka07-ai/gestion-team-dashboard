@@ -1314,33 +1314,51 @@ window.copyUnassignedServerIps = (el) => {
 };
 
 function renderSpamhaus(app, container) {
-    const { servers, spamhaus } = app.state;
-    const spamhausProgress = app.state.spamhausProgress || { status: 'idle', current: 0, total: 0 };
-    const allIps = servers.reduce((acc, s) => [...acc, ...(s.allIps || [])], []);
-    const uniqueIps = [...new Set(allIps)];
+    const { servers, spamhausHistory } = app.state;
     
-    const listedIps = uniqueIps.filter(ip => {
-        const safeIp = ip.replace(/\./g, '_');
-        return spamhaus && spamhaus[safeIp] && spamhaus[safeIp].status === 'listed';
-    });
+    // Get available dates from history and sort them
+    const historyDates = Object.keys(spamhausHistory || {}).sort().reverse();
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Default to the latest history date or today
+    if (!app.selectedSpamhausDate) {
+        app.selectedSpamhausDate = historyDates[0] || today;
+    }
 
-    // Self-healing: If status is 'running' but lastUpdate is > 3 minutes ago, treat as idle
-    const isStuck = spamhausProgress && spamhausProgress.status === 'running' && 
-                    spamhausProgress.lastUpdate && (Date.now() - spamhausProgress.lastUpdate > 180000);
-                    
-    const isRunning = spamhausProgress && spamhausProgress.status === 'running' && !isStuck;
-    const progressPercent = (isRunning && spamhausProgress.total > 0) ? Math.round((spamhausProgress.current / spamhausProgress.total) * 100) : 0;
-
+    const selectedDate = app.selectedSpamhausDate;
+    const historyData = (spamhausHistory && spamhausHistory[selectedDate]) || { results: {}, summary: { total: 0, listed: 0, clean: 0 } };
+    const results = historyData.results || {};
+    const summary = historyData.summary || { total: 0, listed: 0, clean: 0 };
+    
+    const spamhausProgress = app.state.spamhausProgress || { status: 'idle', current: 0, total: 0 };
+    const isRunning = spamhausProgress && spamhausProgress.status === 'scanning';
+    
     container.innerHTML = `
         <div style="padding: 24px;">
+            <!-- Date Selector Bar -->
+            <div class="date-selector-bar" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 16px; margin-bottom: 24px; scrollbar-width: thin; -ms-overflow-style: none;">
+                ${[today, ...historyDates.filter(d => d !== today)].map(date => {
+                    const isSelected = date === selectedDate;
+                    const [y, m, d] = date.split('-');
+                    const hasHistory = spamhausHistory && spamhausHistory[date];
+                    return `
+                        <div onclick="window.setSpamhausDate('${date}')" style="min-width: 80px; padding: 10px; border-radius: 10px; text-align: center; cursor: pointer; transition: all 0.2s; border: 1px solid ${isSelected ? 'var(--accent-primary)' : 'var(--border-color)'}; background: ${isSelected ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-secondary)'};">
+                            <div style="font-size: 0.65rem; color: var(--text-secondary); margin-bottom: 2px;">${y}</div>
+                            <div style="font-size: 1rem; font-weight: 700; color: ${isSelected ? 'var(--accent-primary)' : 'var(--text-primary)'};">${d}/${m}</div>
+                            ${hasHistory ? `<div style="font-size: 0.55rem; margin-top: 4px; color: var(--success); font-weight: 600;">RECORDED</div>` : `<div style="font-size: 0.55rem; margin-top: 4px; color: var(--text-secondary);">EMPTY</div>`}
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+
             <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 24px;">
                 <div class="card stat-card" style="display: flex; align-items: center; gap: 16px; padding: 20px;">
                     <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1); color: var(--accent-primary); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
                         <i data-lucide="shield" style="width: 24px;"></i>
                     </div>
                     <div class="stat-info">
-                        <h3 style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Total IPs Checked</h3>
-                        <p style="font-size: 1.5rem; font-weight: 700; margin: 4px 0 0;">${uniqueIps.length}</p>
+                        <h3 style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Total Checked (${selectedDate})</h3>
+                        <p style="font-size: 1.5rem; font-weight: 700; margin: 4px 0 0;">${summary.total || 0}</p>
                     </div>
                 </div>
                 <div class="card stat-card" style="display: flex; align-items: center; gap: 16px; padding: 20px;">
@@ -1349,7 +1367,7 @@ function renderSpamhaus(app, container) {
                     </div>
                     <div class="stat-info">
                         <h3 style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Listed IPs</h3>
-                        <p style="font-size: 1.5rem; font-weight: 700; margin: 4px 0 0;">${listedIps.length}</p>
+                        <p style="font-size: 1.5rem; font-weight: 700; margin: 4px 0 0;">${summary.listed || 0}</p>
                     </div>
                 </div>
                 <div class="card stat-card" style="display: flex; align-items: center; gap: 16px; padding: 20px;">
@@ -1358,7 +1376,7 @@ function renderSpamhaus(app, container) {
                     </div>
                     <div class="stat-info">
                         <h3 style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Clean IPs</h3>
-                        <p style="font-size: 1.5rem; font-weight: 700; margin: 4px 0 0;">${uniqueIps.length - listedIps.length}</p>
+                        <p style="font-size: 1.5rem; font-weight: 700; margin: 4px 0 0;">${summary.clean || 0}</p>
                     </div>
                 </div>
             </div>
@@ -1366,23 +1384,15 @@ function renderSpamhaus(app, container) {
             <div class="card" style="margin-bottom: 24px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <div>
-                        <h3 style="margin: 0; font-size: 1.1rem;">Automated Spamhaus Status</h3>
-                        <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Production IPs are automatically checked daily at 09:00 Moroccan time.</p>
+                        <h3 style="margin: 0; font-size: 1.1rem;">Spamhaus Report: ${selectedDate}</h3>
+                        <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Daily automated check at 09:00 Moroccan time.</p>
                     </div>
                     <div style="display: flex; gap: 12px; align-items: center;">
                         <span style="font-size: 0.75rem; color: var(--text-secondary);">Last update: ${app.state.spamhausLastUpdate || 'Never'}</span>
-                        <button id="spamhaus-check-btn" onclick="triggerManualSpamhausCheck(this)" ${isRunning ? 'disabled' : ''} style="width: auto; padding: 8px 16px; font-size: 0.8rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 8px; border-radius: 6px;">
+                        <button id="spamhaus-check-btn" onclick="triggerManualSpamhausCheck(this)" style="width: auto; padding: 8px 16px; font-size: 0.8rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 8px; border-radius: 6px;">
                             <i data-lucide="refresh-cw" class="${isRunning ? 'spin' : ''}" style="width: 14px;"></i> 
-                            ${isRunning ? 'Checking...' : 'Check Now'}
+                            ${isRunning ? 'Scanning...' : 'Check Status'}
                         </button>
-                    </div>
-                </div>
-
-                <div id="spamhaus-progress" class="progress-container ${isRunning ? 'progress-active' : ''}">
-                    <div class="progress-bar" style="width: ${progressPercent}%"></div>
-                    <div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 0.7rem; color: var(--text-secondary);">
-                        <span>Checking IPs in progress...</span>
-                        <span id="spamhaus-progress-text">${progressPercent}% (${spamhausProgress?.current || 0}/${spamhausProgress?.total || 0})</span>
                     </div>
                 </div>
 
@@ -1403,7 +1413,7 @@ function renderSpamhaus(app, container) {
                                 
                                 return sIps.map((ip, idx) => {
                                     const safeIp = ip.replace(/\./g, '_');
-                                    const data = spamhaus && spamhaus[safeIp];
+                                    const data = results[safeIp];
                                     const isListed = data && data.status === 'listed';
                                     
                                     return `
@@ -1425,7 +1435,7 @@ function renderSpamhaus(app, container) {
                                                 </span>
                                             </td>
                                             <td style="padding: 12px; color: var(--text-secondary); font-size: 0.75rem;">
-                                                ${data ? new Date(data.timestamp).toLocaleString() : 'Not checked'}
+                                                ${data ? (data.timestamp ? (typeof data.timestamp === 'string' ? data.timestamp.split('T')[0] : new Date(data.timestamp).toLocaleDateString()) : selectedDate) : 'Not recorded'}
                                             </td>
                                             <td style="padding: 12px; text-align: right;">
                                                 <button onclick="window.open('https://check.spamhaus.org/query/ip/${ip}', '_blank')" style="background: transparent; border: none; color: var(--accent-primary); cursor: pointer; font-size: 0.75rem; text-decoration: underline;">Details</button>
@@ -1439,45 +1449,15 @@ function renderSpamhaus(app, container) {
                     </table>
                 </div>
             </div>
-
-            <div class="card">
-                <h3 style="margin: 0 0 16px 0; font-size: 1.1rem;">Daily Scan History</h3>
-                <div style="overflow-x: auto;">
-                    <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
-                        <thead>
-                            <tr style="text-align: left; border-bottom: 2px solid var(--border-color);">
-                                <th style="padding: 12px;">Date</th>
-                                <th style="padding: 12px;">Summary</th>
-                                <th style="padding: 12px; text-align: right;">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${app.state.spamhausHistory ? Object.entries(app.state.spamhausHistory).reverse().map(([date, data]) => {
-                                const summary = data.summary || {};
-                                const histTotal = summary.total || (data.results ? Object.keys(data.results).length : 0);
-                                const histListed = summary.listed || (data.results ? Object.values(data.results).filter(r => r && r.status === 'listed').length : 0);
-                                return `
-                                <tr style="border-bottom: 1px solid var(--border-color);">
-                                    <td style="padding: 12px; font-weight: 500;">${date}</td>
-                                    <td style="padding: 12px;">
-                                        <span style="color: var(--text-secondary); margin-right: 12px;">Total: ${histTotal}</span>
-                                        <span class="badge ${histListed > 0 ? 'badge-sbl' : 'badge-clean'}">${histListed} Listed</span>
-                                    </td>
-                                    <td style="padding: 12px; text-align: right;">
-                                        <button onclick="viewHistoryDate('${date}')" style="background: transparent; border: none; color: var(--accent-primary); cursor: pointer; font-size: 0.75rem; text-decoration: underline;">View Report</button>
-                                    </td>
-                                </tr>
-                            `}).join('') : '<tr><td colspan="3" style="padding: 20px; text-align: center; color: var(--text-secondary);">No history recorded yet.</td></tr>'}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
         </div>
     `;
     if (window.lucide) window.lucide.createIcons();
 }
 
-window.viewHistoryDate = (date) => {
+window.setSpamhausDate = (date) => {
+    window.app.selectedSpamhausDate = date;
+    window.app.updateDashboard();
+};
     const data = window.app.state.spamhausHistory[date];
     if (!data) return;
 
