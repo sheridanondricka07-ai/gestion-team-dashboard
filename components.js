@@ -1727,11 +1727,12 @@ window.showAddDropModal = () => {
                         </select>
                     </div>
                     <div class="form-group" style="grid-column: span 2;">
-                        <label>Return Path</label>
-                        <input type="text" id="drop-return-path" placeholder="e.g. bounce@domain.com">
+                        <label>Paste Raw Server Stats (Optional)</label>
+                        <textarea id="drop-raw-stats" placeholder="Paste logs here (e.g. s_wmn3_2088 41 40)" style="width: 100%; height: 80px; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; font-family: monospace; font-size: 0.75rem;"></textarea>
+                        <p style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 4px;">App will auto-extract server names and sum 'OUT' values as Real Sent.</p>
                     </div>
                     <div class="form-group">
-                        <label>Number Sent</label>
+                        <label>Number Sent (Real)</label>
                         <input type="number" id="drop-sent" step="1" required>
                     </div>
                     <div class="form-group">
@@ -1753,6 +1754,43 @@ window.showAddDropModal = () => {
     document.body.appendChild(overlay);
     if (window.lucide) window.lucide.createIcons();
 
+    // Reset temp stats
+    window._tempProcessedStats = null;
+
+    const rawStatsArea = document.getElementById('drop-raw-stats');
+    const sentInput = document.getElementById('drop-sent');
+
+    rawStatsArea.oninput = () => {
+        const text = rawStatsArea.value;
+        const lines = text.split('\n');
+        let totalOut = 0;
+        const breakdown = [];
+
+        lines.forEach(line => {
+            // Pattern to match: s_wmn3_2088 41 40 (ServerName IN OUT)
+            // Or handle tabs/spaces
+            const parts = line.trim().split(/\s+/);
+            if (parts.length >= 3) {
+                const srvName = parts[0];
+                const inVal = parseInt(parts[1]);
+                const outVal = parseInt(parts[2]);
+
+                if (!isNaN(outVal)) {
+                    totalOut += outVal;
+                    breakdown.push({ srv: srvName, in: inVal, out: outVal });
+                }
+            }
+        });
+
+        if (totalOut > 0) {
+            sentInput.value = totalOut;
+            window._tempProcessedStats = breakdown;
+            rawStatsArea.style.borderColor = 'var(--success)';
+        } else {
+            rawStatsArea.style.borderColor = 'var(--border-color)';
+        }
+    };
+
     document.getElementById('add-drop-form').onsubmit = async (e) => {
         e.preventDefault();
         const data = {
@@ -1761,10 +1799,10 @@ window.showAddDropModal = () => {
             deployIds: document.getElementById('drop-deploys').value,
             profile: document.getElementById('drop-profile').value,
             testAfter: document.getElementById('drop-test-after').value,
-            returnPath: document.getElementById('drop-return-path').value,
             nbrSent: document.getElementById('drop-sent').value,
             clicks: document.getElementById('drop-clicks').value,
-            rev: document.getElementById('drop-rev').value
+            rev: document.getElementById('drop-rev').value,
+            serverStats: window._tempProcessedStats || null
         };
         await window.app.addDrop(data);
         overlay.remove();
@@ -1796,6 +1834,10 @@ window.showEditDropModal = (dropId) => {
                         <label>Deploy ID(s)</label>
                         <input type="text" id="edit-drop-deploys" value="${drop.deployIds || ''}">
                     </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label>Paste Raw Server Stats (Optional)</label>
+                        <textarea id="edit-drop-raw-stats" placeholder="Paste logs here to update Sent count" style="width: 100%; height: 80px; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; font-family: monospace; font-size: 0.75rem;"></textarea>
+                    </div>
                     <div class="form-group">
                         <label>DATA Profil</label>
                         <input type="text" id="edit-drop-profile" value="${drop.profile || ''}" required>
@@ -1811,7 +1853,7 @@ window.showEditDropModal = (dropId) => {
                         <input type="text" id="edit-drop-return-path" value="${drop.returnPath || ''}">
                     </div>
                     <div class="form-group">
-                        <label>Number Sent</label>
+                        <label>Number Sent (Real)</label>
                         <input type="number" id="edit-drop-sent" value="${drop.nbrSent || 0}">
                     </div>
                     <div class="form-group">
@@ -1833,6 +1875,35 @@ window.showEditDropModal = (dropId) => {
     document.body.appendChild(overlay);
     if (window.lucide) window.lucide.createIcons();
 
+    window._tempProcessedStats = drop.serverStats || null;
+    const rawStatsArea = document.getElementById('edit-drop-raw-stats');
+    const sentInput = document.getElementById('edit-drop-sent');
+
+    rawStatsArea.oninput = () => {
+        const text = rawStatsArea.value;
+        const lines = text.split('\n');
+        let totalOut = 0;
+        const breakdown = [];
+        lines.forEach(line => {
+            const parts = line.trim().split(/\s+/);
+            if (parts.length >= 3) {
+                const srvName = parts[0];
+                const inVal = parseInt(parts[1]);
+                const outVal = parseInt(parts[2]);
+                if (!isNaN(outVal)) {
+                    totalOut += outVal;
+                    breakdown.push({ srv: srvName, in: inVal, out: outVal });
+                }
+            }
+        });
+
+        if (totalOut > 0) {
+            sentInput.value = totalOut;
+            window._tempProcessedStats = breakdown;
+            rawStatsArea.style.borderColor = 'var(--success)';
+        }
+    };
+
     document.getElementById('edit-drop-form').onsubmit = async (e) => {
         e.preventDefault();
         const updates = {
@@ -1844,7 +1915,8 @@ window.showEditDropModal = (dropId) => {
             returnPath: document.getElementById('edit-drop-return-path').value,
             nbrSent: document.getElementById('edit-drop-sent').value,
             clicks: document.getElementById('edit-drop-clicks').value,
-            rev: document.getElementById('edit-drop-rev').value
+            rev: document.getElementById('edit-drop-rev').value,
+            serverStats: window._tempProcessedStats
         };
         await window.app.updateDrop(dropId, updates);
         overlay.remove();

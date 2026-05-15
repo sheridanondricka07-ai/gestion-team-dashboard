@@ -164,6 +164,7 @@ class TeamApp {
             profile: dropData.profile || 'N/A',
             testAfter: dropData.testAfter || '0%',
             returnPath: dropData.returnPath || 'N/A',
+            serverStats: dropData.serverStats || null, // Storing server breakdown
             mailerId: this.state.currentUser.mailer_id || 'N/A',
             mailerName: this.state.currentUser.name,
             nbrSent: nbrSent,
