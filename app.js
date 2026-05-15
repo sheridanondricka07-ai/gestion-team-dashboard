@@ -46,6 +46,7 @@ class TeamApp {
             rps: [],
             tools: [],
             drops: [],
+            historyServers: [],
             statuses: {},
             spamhaus: {},
             spamhausProgress: { status: 'idle', current: 0, total: 0 },
@@ -60,6 +61,75 @@ class TeamApp {
         this.statusSearch = '';
         this.selectedFilterDate = new Date().toISOString().split('T')[0];
         this.init();
+    }
+
+    async init() {
+        console.log("Initializing App...");
+        await this.loadState();
+        
+        // Run Maintenance Check on load
+        await this.checkServerCancellations();
+        
+        this.updateDashboard();
+    }
+
+    async checkServerCancellations() {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const today = new Date(todayStr);
+        let needsSave = false;
+
+        const serversToKeep = [];
+        const historyToAdd = this.state.historyServers || [];
+
+        for (const srv of this.state.servers) {
+            if (!srv.cancelDate || srv.cancelDate === '---') {
+                serversToKeep.push(srv);
+                continue;
+            }
+
+            const cDate = new Date(srv.cancelDate);
+            
+            // Check if date has arrived or passed
+            if (cDate <= today) {
+                if (srv.markedForCancel) {
+                    // ARCHIVE: Move to history
+                    console.log(`Archiving canceled server: ${srv.name}`);
+                    
+                    // Calculate Lifetime Revenue for this server from drops
+                    let totalRev = 0;
+                    this.state.drops.forEach(drop => {
+                        const srvStat = (drop.serverStats || []).find(st => st.srv === srv.name);
+                        if (srvStat) {
+                            totalRev += parseFloat(drop.rev || 0);
+                        }
+                    });
+
+                    historyToAdd.push({
+                        ...srv,
+                        canceledAt: todayStr,
+                        revenue: totalRev.toFixed(2),
+                        originalId: srv.id
+                    });
+                    needsSave = true;
+                } else {
+                    // RENEW: Add +1 month
+                    console.log(`Auto-renewing server date: ${srv.name}`);
+                    const newDate = new Date(cDate);
+                    newDate.setMonth(newDate.getMonth() + 1);
+                    srv.cancelDate = newDate.toISOString().split('T')[0];
+                    serversToKeep.push(srv);
+                    needsSave = true;
+                }
+            } else {
+                serversToKeep.push(srv);
+            }
+        }
+
+        if (needsSave) {
+            this.state.servers = serversToKeep;
+            this.state.historyServers = historyToAdd;
+            await this.saveState();
+        }
     }
 
     async addServer(serverData) {

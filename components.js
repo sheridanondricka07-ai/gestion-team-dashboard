@@ -72,11 +72,15 @@ function renderSidebar(app) {
                     <i data-lucide="users"></i>
                     <span>Team</span>
                 </div>
+                <div class="nav-item ${view === 'inventory' ? 'active' : ''}" onclick="app.setView('inventory')">
+                    <i data-lucide="package"></i>
+                    <span>Server Inventory</span>
+                </div>
+                <div class="nav-item ${view === 'history' ? 'active' : ''}" onclick="app.setView('history')">
+                    <i data-lucide="archive"></i>
+                    <span>Canceled Servers</span>
+                </div>
             ` : ''}
-            <div class="nav-item ${view === 'inventory' ? 'active' : ''}" onclick="app.setView('inventory')">
-                <i data-lucide="database"></i>
-                <span>Server Inventory</span>
-            </div>
             <div class="nav-item ${view === 'tools' ? 'active' : ''}" onclick="app.setView('tools')">
                 <i data-lucide="wrench"></i>
                 <span>Tools</span>
@@ -161,10 +165,72 @@ function renderView(app) {
         renderDropDetails(app, container);
     } else if (view === 'inventory') {
         renderServerInventory(app, container);
+    } else if (view === 'history') {
+        renderCanceledServers(app, container);
     } else if (view === 'spamhaus') {
         renderSpamhaus(app, container);
     }
 }
+
+function renderCanceledServers(app, container) {
+    const { historyServers = [] } = app.state;
+    const sorted = [...historyServers].sort((a, b) => b.canceledAt.localeCompare(a.canceledAt));
+
+    container.innerHTML = `
+        <div style="padding: 24px;">
+            <div class="card" style="padding: 0; overflow: hidden; background: var(--bg-secondary); border: 1px solid var(--border-color);">
+                <div style="padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02);">
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.1rem;">Canceled Servers Archive</h3>
+                        <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Review decommissioned infrastructure and total earnings.</p>
+                    </div>
+                </div>
+                
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.75rem;">
+                        <thead>
+                            <tr style="text-align: left; background: var(--bg-tertiary);">
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Server Name</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Provider</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Entity</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Group</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Revenue</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Entered</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); color: #ef4444;">Canceled Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${sorted.map((s, idx) => {
+                                const rowBg = idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent';
+                                return `
+                                    <tr style="background: ${rowBg}; border-bottom: 1px solid var(--border-color);">
+                                        <td style="padding: 12px; font-weight: 700; color: var(--text-secondary);">${s.name}</td>
+                                        <td style="padding: 12px;">${s.provider || '---'}</td>
+                                        <td style="padding: 12px;">${s.entity || '---'}</td>
+                                        <td style="padding: 12px;">${s.group || '---'}</td>
+                                        <td style="padding: 12px; color: var(--accent-primary); font-weight: 700;">$${s.revenue || '0.00'}</td>
+                                        <td style="padding: 12px;">${s.enteredDate || '---'}</td>
+                                        <td style="padding: 12px; color: #ef4444; font-weight: 700;">${s.canceledAt || '---'}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                            ${historyServers.length === 0 ? '<tr><td colspan="7" style="padding: 60px; text-align: center; color: var(--text-secondary);">No canceled servers in archive.</td></tr>' : ''}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+window.toggleServerCancelMark = async (id) => {
+    const srv = window.app.state.servers.find(s => s.id === id);
+    if (!srv) return;
+    
+    srv.markedForCancel = !srv.markedForCancel;
+    await window.app.saveState();
+    window.app.updateDashboard();
+};
 
 function renderServerInventory(app, container) {
     const { servers } = app.state;
@@ -200,12 +266,14 @@ function renderServerInventory(app, container) {
                                 <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); color: #ef4444;">Cancel Notice</th>
                                 <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Req. At</th>
                                 <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); color: #ef4444; font-weight: 700;">Cancel Date</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); width: 100px;">To Cancel?</th>
                                 <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); width: 40px;"></th>
                             </tr>
                         </thead>
                         <tbody>
                             ${sortedServers.map((s, idx) => {
                                 const rowBg = idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent';
+                                const isMarked = s.markedForCancel === true;
                                 return `
                                     <tr style="background: ${rowBg}; border-bottom: 1px solid var(--border-color); transition: background 0.2s;" onmouseover="this.style.background='rgba(59, 130, 246, 0.05)'" onmouseout="this.style.background='${rowBg}'">
                                         <td style="padding: 12px; font-weight: 700; color: var(--accent-primary); border-right: 1px solid var(--border-color); position: sticky; left: 0; background: inherit; z-index: 5;">${s.name}</td>
@@ -220,6 +288,12 @@ function renderServerInventory(app, container) {
                                         <td style="padding: 12px;">${s.reqAt || '---'}</td>
                                         <td style="padding: 12px; color: #ef4444; font-weight: 700; background: rgba(239, 68, 68, 0.03);">${s.cancelDate || '---'}</td>
                                         <td style="padding: 12px; text-align: center;">
+                                            <button onclick="toggleServerCancelMark('${s.id}')" 
+                                                style="padding: 4px 10px; font-size: 0.65rem; background: ${isMarked ? '#ef4444' : 'var(--bg-tertiary)'}; border: 1px solid ${isMarked ? '#ef4444' : 'var(--border-color)'}; color: ${isMarked ? '#fff' : 'var(--text-secondary)'}; width: auto;">
+                                                ${isMarked ? 'DECLARED' : 'KEEP'}
+                                            </button>
+                                        </td>
+                                        <td style="padding: 12px; text-align: center;">
                                             <span class="action-icon" onclick="refreshServerInfo('${s.id}', this)" title="Refresh IP Info">
                                                 <i data-lucide="refresh-cw" style="width: 12px;"></i>
                                             </span>
@@ -227,7 +301,7 @@ function renderServerInventory(app, container) {
                                     </tr>
                                 `;
                             }).join('')}
-                            ${servers.length === 0 ? '<tr><td colspan="12" style="padding: 60px; text-align: center; color: var(--text-secondary);">No servers in inventory.</td></tr>' : ''}
+                            ${servers.length === 0 ? '<tr><td colspan="13" style="padding: 60px; text-align: center; color: var(--text-secondary);">No servers in inventory.</td></tr>' : ''}
                         </tbody>
                     </table>
                 </div>
