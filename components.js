@@ -1390,35 +1390,51 @@ function renderSpamhaus(app, container) {
                     <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
                         <thead>
                             <tr style="text-align: left; border-bottom: 2px solid var(--border-color);">
-                                <th style="padding: 12px;">IP Address</th>
+                                <th style="padding: 12px; width: 300px;">Server & IPs</th>
                                 <th style="padding: 12px;">Spamhaus Status</th>
                                 <th style="padding: 12px;">Last Checked</th>
                                 <th style="padding: 12px; text-align: right;">Action</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${uniqueIps.map(ip => {
-                                const safeIp = ip.replace(/\./g, '_');
-                                const data = spamhaus && spamhaus[safeIp];
-                                const isListed = data && data.status === 'listed';
-                                return `
-                                    <tr style="border-bottom: 1px solid var(--border-color);">
-                                        <td style="padding: 12px; font-family: monospace;">${ip}</td>
-                                        <td style="padding: 12px;">
-                                            <span class="badge ${isListed ? 'badge-sbl' : (data ? 'badge-clean' : 'badge-rp')}">
-                                                ${isListed ? (data.list || 'LISTED') : (data ? 'CLEAN' : 'PENDING')}
-                                            </span>
-                                        </td>
-                                        <td style="padding: 12px; color: var(--text-secondary); font-size: 0.75rem;">
-                                            ${data ? new Date(data.timestamp).toLocaleString() : 'Not checked'}
-                                        </td>
-                                        <td style="padding: 12px; text-align: right;">
-                                            <button onclick="window.open('https://check.spamhaus.org/query/ip/${ip}', '_blank')" style="background: transparent; border: none; color: var(--accent-primary); cursor: pointer; font-size: 0.75rem; text-decoration: underline;">Details</button>
-                                        </td>
-                                    </tr>
-                                `;
+                            ${servers.map(s => {
+                                const sIps = s.allIps || [];
+                                if (sIps.length === 0) return '';
+                                
+                                return sIps.map((ip, idx) => {
+                                    const safeIp = ip.replace(/\./g, '_');
+                                    const data = spamhaus && spamhaus[safeIp];
+                                    const isListed = data && data.status === 'listed';
+                                    
+                                    return `
+                                        <tr style="border-bottom: 1px solid var(--border-color); ${idx === 0 ? 'border-top: 1px solid var(--border-color);' : ''}">
+                                            ${idx === 0 ? `
+                                                <td rowspan="${sIps.length}" style="padding: 12px; border-right: 1px solid var(--border-color); vertical-align: top; background: rgba(255,255,255,0.02);">
+                                                    <div style="font-weight: 600; color: var(--accent-primary); margin-bottom: 4px;">${s.name}</div>
+                                                    <div style="font-size: 0.7rem; color: var(--text-secondary);">${sIps.length} IPs</div>
+                                                </td>
+                                            ` : ''}
+                                            <td style="padding: 12px; font-family: monospace;">
+                                                <div style="display: flex; align-items: center; gap: 8px;">
+                                                    <span style="color: var(--text-primary);">${ip}</span>
+                                                </div>
+                                            </td>
+                                            <td style="padding: 12px;">
+                                                <span class="badge ${isListed ? 'badge-sbl' : (data ? 'badge-clean' : 'badge-rp')}">
+                                                    ${isListed ? (data.list || 'LISTED') : (data ? 'CLEAN' : 'PENDING')}
+                                                </span>
+                                            </td>
+                                            <td style="padding: 12px; color: var(--text-secondary); font-size: 0.75rem;">
+                                                ${data ? new Date(data.timestamp).toLocaleString() : 'Not checked'}
+                                            </td>
+                                            <td style="padding: 12px; text-align: right;">
+                                                <button onclick="window.open('https://check.spamhaus.org/query/ip/${ip}', '_blank')" style="background: transparent; border: none; color: var(--accent-primary); cursor: pointer; font-size: 0.75rem; text-decoration: underline;">Details</button>
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('');
                             }).join('')}
-                            ${uniqueIps.length === 0 ? '<tr><td colspan="4" style="padding: 40px; text-align: center; color: var(--text-secondary);">No IPs found in your servers.</td></tr>' : ''}
+                            ${servers.length === 0 ? '<tr><td colspan="5" style="padding: 40px; text-align: center; color: var(--text-secondary);">No servers found.</td></tr>' : ''}
                         </tbody>
                     </table>
                 </div>
