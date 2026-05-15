@@ -1658,70 +1658,71 @@ window.renderDropDetails = (app, container) => {
                     <h3 style="margin: 0; font-size: 1.1rem;">Drop History</h3>
                     <div style="font-size: 0.8rem; color: var(--text-secondary);">${myDrops.length} records found</div>
                 </div>
-                <div style="overflow-x: auto;">
-                    <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                <div style="overflow-x: auto; background: var(--bg-secondary);">
+                    <table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.85rem; min-width: 1400px; table-layout: fixed;">
                         <thead>
-                            <tr style="text-align: left; background: var(--bg-tertiary); border-bottom: 2px solid var(--border-color);">
-                                <th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('timestamp')">
+                            <tr style="text-align: left; background: var(--bg-tertiary); position: sticky; top: 0; z-index: 5;">
+                                <th style="padding: 16px 12px; cursor: pointer; width: 140px;" onclick="app.setDropSort('timestamp')">
                                     Date & Time ${key === 'timestamp' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}
                                 </th>
-                                ${isAdmin ? `<th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('mailerName')">Mailer ${key === 'mailerName' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>` : ''}
-                                <th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('offer')">Offer ${key === 'offer' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
-                                <th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('deployIds')">Deploys ${key === 'deployIds' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
-                                <th style="padding: 12px;">Details</th>
-                                <th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('servers')">Server(s) ${key === 'servers' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
-                                <th style="padding: 12px;">IP(s)</th>
-                                <th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('totalOut')">Sent ${key === 'totalOut' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
-                                <th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('clicks')">Clicks ${key === 'clicks' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
-                                <th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('epc')">EPC ${key === 'epc' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
-                                <th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('cpm')">CPM ${key === 'cpm' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
-                                <th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('rev')">Revenue ${key === 'rev' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
-                                <th style="padding: 12px; text-align: right;">Actions</th>
+                                ${isAdmin ? `<th style="padding: 16px 12px; cursor: pointer; width: 160px;" onclick="app.setDropSort('mailerName')">Mailer ${key === 'mailerName' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>` : ''}
+                                <th style="padding: 16px 12px; cursor: pointer; width: 300px;" onclick="app.setDropSort('offer')">Offer ${key === 'offer' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
+                                <th style="padding: 16px 12px; cursor: pointer; width: 120px;" onclick="app.setDropSort('deployIds')">Deploys ${key === 'deployIds' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
+                                <th style="padding: 16px 12px; width: 160px;">Details</th>
+                                <th style="padding: 16px 12px; cursor: pointer; width: 160px;" onclick="app.setDropSort('servers')">Server(s) ${key === 'servers' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
+                                <th style="padding: 16px 12px; width: 150px;">IP(s)</th>
+                                <th style="padding: 16px 12px; cursor: pointer; width: 100px;" onclick="app.setDropSort('totalOut')">Sent ${key === 'totalOut' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
+                                <th style="padding: 16px 12px; cursor: pointer; width: 80px;" onclick="app.setDropSort('clicks')">Clicks ${key === 'clicks' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
+                                <th style="padding: 16px 12px; cursor: pointer; width: 90px;" onclick="app.setDropSort('epc')">EPC ${key === 'epc' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
+                                <th style="padding: 16px 12px; cursor: pointer; width: 90px;" onclick="app.setDropSort('cpm')">CPM ${key === 'cpm' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
+                                <th style="padding: 16px 12px; cursor: pointer; width: 120px;" onclick="app.setDropSort('rev')">Revenue ${key === 'rev' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
+                                <th style="padding: 16px 12px; text-align: right; width: 80px;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${sortedDrops.map(d => `
-                                <tr style="border-bottom: 1px solid var(--border-color); transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
-                                    <td style="padding: 12px; white-space: nowrap;">
-                                        <div style="font-weight: 600;">${d.displayDate ? d.displayDate.split(',')[0] : '---'}</div>
-                                        <div style="font-size: 0.7rem; color: var(--text-secondary);">${d.displayDate ? (d.displayDate.split(',')[1] || '') : ''}</div>
+                            ${sortedDrops.map((d, idx) => `
+                                <tr style="border-bottom: 1px solid var(--border-color); vertical-align: top; background: ${idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent'}; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='${idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent'}'">
+                                    <td style="padding: 16px 12px; white-space: nowrap;">
+                                        <div style="font-weight: 600; color: var(--text-primary);">${d.displayDate ? d.displayDate.split(',')[0] : '---'}</div>
+                                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">${d.displayDate ? (d.displayDate.split(',')[1] || '') : ''}</div>
                                     </td>
                                     ${isAdmin ? `
-                                    <td style="padding: 12px;">
-                                        <span style="color: var(--accent-primary); font-weight: 600;">
-                                            ID: ${ (() => {
+                                    <td style="padding: 16px 12px;">
+                                        <div style="background: rgba(59, 130, 246, 0.1); padding: 8px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2);">
+                                            <div style="color: var(--accent-primary); font-weight: 700; font-size: 0.75rem;">ID: ${ (() => {
                                                 if (d.mailerId && d.mailerId !== 'N/A') return d.mailerId;
                                                 const searchName = (d.mailerName || '').trim().toLowerCase();
                                                 const found = (app.state.mailers || []).find(m => (m.name || '').trim().toLowerCase() === searchName);
                                                 return found ? found.mailer_id : 'N/A';
-                                            })() }
-                                        </span>
-                                        <br>
-                                        <span style="font-size: 0.75rem;">${d.mailerName}</span>
+                                            })() }</div>
+                                            <div style="font-size: 0.8rem; margin-top: 2px; color: var(--text-primary);">${d.mailerName}</div>
+                                        </div>
                                     </td>` : ''}
-                                    <td style="padding: 12px;">
-                                        <div style="font-weight: 600;">${d.offer || '---'}</div>
+                                    <td style="padding: 16px 12px;">
+                                        <div style="font-weight: 600; line-height: 1.4; color: var(--text-primary);">${d.offer || '---'}</div>
                                     </td>
-                                    <td style="padding: 12px;">
-                                        <div style="font-size: 0.8rem; color: var(--text-secondary);">${d.deployIds || '---'}</div>
+                                    <td style="padding: 16px 12px;">
+                                        <div style="font-family: monospace; font-size: 0.75rem; background: var(--bg-tertiary); padding: 4px 8px; border-radius: 4px; display: inline-block;">${d.deployIds || '---'}</div>
                                     </td>
-                                    <td style="padding: 12px;">
-                                        <div style="font-size: 0.8rem;"><span style="color: var(--text-secondary);">DATA Profil:</span> ${d.profile || 'N/A'}</div>
-                                        <div style="font-size: 0.8rem;"><span style="color: var(--text-secondary);">Inbox:</span> <span style="color: ${d.testAfter === '100%' ? 'var(--success)' : 'var(--accent-primary)'}; font-weight: 600;">${d.testAfter || '0%'} INBOX</span></div>
+                                    <td style="padding: 16px 12px;">
+                                        <div style="font-size: 0.75rem; color: var(--text-secondary);">DATA Profil: <span style="color: var(--text-primary);">${d.profile || 'N/A'}</span></div>
+                                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 6px;">Inbox: <span style="color: ${d.testAfter === '100%' ? 'var(--success)' : 'var(--accent-primary)'}; font-weight: 700;">${d.testAfter || '0%'} INBOX</span></div>
                                     </td>
-                                    <td style="padding: 12px;">
-                                        <div style="font-weight: 600; color: var(--accent-primary);">${d.servers || '---'}</div>
+                                    <td style="padding: 16px 12px;">
+                                        <div style="font-weight: 600; color: var(--accent-primary); background: rgba(59, 130, 246, 0.05); padding: 4px 8px; border-radius: 4px; display: inline-block;">${d.servers || '---'}</div>
                                     </td>
-                                    <td style="padding: 12px;"><code style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">${d.ips || '---'}</code></td>
-                                    <td style="padding: 12px;">${(d.totalOut || 0).toLocaleString()}</td>
-                                    <td style="padding: 12px;">${(d.clicks || 0).toLocaleString()}</td>
-                                    <td style="padding: 12px;">$${Number((d.epc || 0).toFixed(2))}</td>
-                                    <td style="padding: 12px;">$${Number((d.cpm || 0).toFixed(2))}</td>
-                                    <td style="padding: 12px; font-weight: 700; color: var(--success);">$${(d.rev || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                                    <td style="padding: 12px; text-align: right;">
-                                        <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                                            <button onclick="showEditDropModal('${d.id}')" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px;"><i data-lucide="edit-3" style="width: 14px;"></i></button>
-                                            <button onclick="app.deleteDrop('${d.id}')" style="background: transparent; border: none; color: var(--error); opacity: 0.6; cursor: pointer; padding: 4px;"><i data-lucide="trash-2" style="width: 14px;"></i></button>
+                                    <td style="padding: 16px 12px;">
+                                        <code style="background: var(--bg-tertiary); padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; color: var(--text-primary); display: block; overflow: hidden; text-overflow: ellipsis;">${d.ips || '---'}</code>
+                                    </td>
+                                    <td style="padding: 16px 12px; font-weight: 600;">${(d.totalOut || 0).toLocaleString()}</td>
+                                    <td style="padding: 16px 12px;">${(d.clicks || 0).toLocaleString()}</td>
+                                    <td style="padding: 16px 12px;">$${Number((d.epc || 0).toFixed(2))}</td>
+                                    <td style="padding: 16px 12px;">$${Number((d.cpm || 0).toFixed(2))}</td>
+                                    <td style="padding: 16px 12px; font-weight: 800; color: var(--success); font-size: 0.9rem;">$${(d.rev || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                                    <td style="padding: 16px 12px; text-align: right;">
+                                        <div style="display: flex; gap: 4px; justify-content: flex-end;">
+                                            <button onclick="showEditDropModal('${d.id}')" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-secondary); cursor: pointer; padding: 6px; border-radius: 6px; width: auto;"><i data-lucide="edit-3" style="width: 14px;"></i></button>
+                                            <button onclick="app.deleteDrop('${d.id}')" style="background: rgba(218, 54, 51, 0.1); border: 1px solid rgba(218, 54, 51, 0.2); color: var(--error); cursor: pointer; padding: 6px; border-radius: 6px; width: auto;"><i data-lucide="trash-2" style="width: 14px;"></i></button>
                                         </div>
                                     </td>
                                 </tr>
