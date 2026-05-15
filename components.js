@@ -73,6 +73,10 @@ function renderSidebar(app) {
                     <span>Team</span>
                 </div>
             ` : ''}
+            <div class="nav-item ${view === 'inventory' ? 'active' : ''}" onclick="app.setView('inventory')">
+                <i data-lucide="database"></i>
+                <span>Server Inventory</span>
+            </div>
             <div class="nav-item ${view === 'tools' ? 'active' : ''}" onclick="app.setView('tools')">
                 <i data-lucide="wrench"></i>
                 <span>Tools</span>
@@ -155,9 +159,70 @@ function renderView(app) {
         renderStatus(app, container);
     } else if (view === 'drops') {
         renderDropDetails(app, container);
+    } else if (view === 'inventory') {
+        renderServerInventory(app, container);
     } else if (view === 'spamhaus') {
         renderSpamhaus(app, container);
     }
+}
+
+function renderServerInventory(app, container) {
+    const { servers } = app.state;
+    const sortedServers = [...servers].sort((a, b) => a.name.localeCompare(b.name));
+
+    container.innerHTML = `
+        <div style="padding: 24px;">
+            <div class="card" style="padding: 0; overflow: hidden; background: var(--bg-secondary); border: 1px solid var(--border-color);">
+                <div style="padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02);">
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.1rem;">Server Inventory</h3>
+                        <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Manage administrative details and cancellation schedules.</p>
+                    </div>
+                </div>
+                
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.75rem;">
+                        <thead>
+                            <tr style="text-align: left; background: var(--bg-tertiary);">
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); position: sticky; left: 0; background: var(--bg-tertiary); z-index: 10;">Server Name</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Class (IP Ranges)</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Main IP</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Entered</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Entity</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Group</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">IP Provider</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">ASN</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); color: #ef4444;">Cancel Notice</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Req. At</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); color: #ef4444; font-weight: 700;">Cancel Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${sortedServers.map((s, idx) => {
+                                const rowBg = idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent';
+                                return `
+                                    <tr style="background: ${rowBg}; border-bottom: 1px solid var(--border-color); transition: background 0.2s;" onmouseover="this.style.background='rgba(59, 130, 246, 0.05)'" onmouseout="this.style.background='${rowBg}'">
+                                        <td style="padding: 12px; font-weight: 700; color: var(--accent-primary); border-right: 1px solid var(--border-color); position: sticky; left: 0; background: inherit; z-index: 5;">${s.name}</td>
+                                        <td style="padding: 12px; color: var(--text-secondary); max-width: 250px; line-height: 1.4;">${s.ipClass || '---'}</td>
+                                        <td style="padding: 12px; font-family: monospace;">${s.mainIp || s.ip || '---'}</td>
+                                        <td style="padding: 12px;">${s.enteredDate || '---'}</td>
+                                        <td style="padding: 12px;"><span class="badge" style="background: rgba(59, 130, 246, 0.1); color: var(--accent-primary); border: none;">${s.entity || '---'}</span></td>
+                                        <td style="padding: 12px;">${s.group || '---'}</td>
+                                        <td style="padding: 12px; font-weight: 600;">${s.provider || '---'}</td>
+                                        <td style="padding: 12px; color: var(--text-secondary); font-size: 0.7rem;">${s.asn || '---'}</td>
+                                        <td style="padding: 12px; color: #f87171;">${s.cancelNoticeDate || '---'}</td>
+                                        <td style="padding: 12px;">${s.reqAt || '---'}</td>
+                                        <td style="padding: 12px; color: #ef4444; font-weight: 700; background: rgba(239, 68, 68, 0.03);">${s.cancelDate || '---'}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                            ${servers.length === 0 ? '<tr><td colspan="11" style="padding: 60px; text-align: center; color: var(--text-secondary);">No servers in inventory.</td></tr>' : ''}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
 }
 
 function renderTools(app, container) {
@@ -746,35 +811,124 @@ window.deleteMailer = async (id) => {
 window.showAddServerModal = () => {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
+    const today = new Date().toISOString().split('T')[0];
+    
     overlay.innerHTML = `
-        <div class="modal">
-            <h2 style="margin-bottom: 16px;">Add New Server</h2>
-            <div class="form-group">
-                <label>Server Name</label>
-                <input type="text" id="srv-name" placeholder="SRV-NYC-01" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
+        <div class="modal" style="width: 800px; max-width: 95vw; max-height: 90vh; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h2 style="margin: 0;">Add New Server to Inventory</h2>
+                <button onclick="this.closest('.modal-overlay').remove()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">&times;</button>
             </div>
-            <div class="form-group">
-                <label>Server IPs (One per line)</label>
-                <textarea id="srv-ips" placeholder="173.44.157.34 waaunq.feth.pw&#10;173.44.157.35 tznh.yfivpi.com" style="width:100%; height:120px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px; padding:12px; font-family:monospace;"></textarea>
-                <p style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 4px;">Format: <code>IP [Optional VMTA Hostname]</code></p>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                <!-- Left Column: Core Info -->
+                <div style="display: flex; flex-direction: column; gap: 16px;">
+                    <div class="form-group">
+                        <label>Server Name</label>
+                        <input type="text" id="srv-name" placeholder="s_wmn3_2235" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Main IP</label>
+                        <input type="text" id="srv-main-ip" placeholder="51.255.198.64" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Class (IP Ranges)</label>
+                        <input type="text" id="srv-class" placeholder="51.255.198.64/32 54.36.95.28/30" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div class="form-group">
+                            <label>Entity</label>
+                            <input type="text" id="srv-entity" placeholder="WMN3" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Group</label>
+                            <input type="text" id="srv-group" placeholder="WMN" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Production IPs (One per line for PTR/VMTA check)</label>
+                        <textarea id="srv-ips" placeholder="173.44.157.34 vmta1.com&#10;173.44.157.35 vmta2.com" style="width:100%; height:120px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px; padding:12px; font-family:monospace;"></textarea>
+                    </div>
+                </div>
+
+                <!-- Right Column: Provider & Lifecycle -->
+                <div style="display: flex; flex-direction: column; gap: 16px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div class="form-group">
+                            <label>Entered Date</label>
+                            <input type="date" id="srv-entered" value="${today}" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
+                        </div>
+                        <div class="form-group">
+                            <label>IP Provider</label>
+                            <input type="text" id="srv-provider" placeholder="OVH" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>ASN</label>
+                        <input type="text" id="srv-asn" placeholder="* OVH SAS" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
+                    </div>
+
+                    <div style="padding: 16px; background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 12px; display: flex; flex-direction: column; gap: 12px;">
+                        <h4 style="margin: 0; font-size: 0.9rem; color: #ef4444; display: flex; align-items: center; gap: 8px;">
+                            <i data-lucide="calendar-x" style="width: 16px;"></i> Cancellation Tracking
+                        </h4>
+                        
+                        <div class="form-group">
+                            <label style="color: var(--text-secondary);">Cancellation Notice Date</label>
+                            <input type="date" id="srv-cancel-notice" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
+                        </div>
+
+                        <div class="form-group">
+                            <label style="color: var(--text-secondary);">Requested At</label>
+                            <input type="date" id="srv-req-at" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
+                        </div>
+
+                        <div class="form-group">
+                            <label style="color: var(--text-secondary);">Final Cancellation Date</label>
+                            <input type="date" id="srv-cancel-date" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div style="display: flex; gap: 12px;">
-                <button onclick="saveServer(this)" style="flex: 1;">Create Server</button>
-                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary); color: var(--text-primary);">Cancel</button>
+
+            <div style="margin-top: 32px; display: flex; gap: 12px; border-top: 1px solid var(--border-color); padding-top: 24px;">
+                <button onclick="saveServer(this)" style="flex: 2; height: 48px; font-size: 1rem;">Create Server & Add to Inventory</button>
+                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; height: 48px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 1rem;">Cancel</button>
             </div>
         </div>
     `;
     document.body.appendChild(overlay);
+    if (window.lucide) window.lucide.createIcons();
 };
 
 window.saveServer = async (btn) => {
-    const name = document.getElementById('srv-name').value;
-    const ips = document.getElementById('srv-ips').value;
-    if (name && ips) {
+    const data = {
+        name: document.getElementById('srv-name').value.trim(),
+        mainIp: document.getElementById('srv-main-ip').value.trim(),
+        ipClass: document.getElementById('srv-class').value.trim(),
+        entity: document.getElementById('srv-entity').value.trim(),
+        group: document.getElementById('srv-group').value.trim(),
+        ips: document.getElementById('srv-ips').value.trim(),
+        enteredDate: document.getElementById('srv-entered').value,
+        provider: document.getElementById('srv-provider').value.trim(),
+        asn: document.getElementById('srv-asn').value.trim(),
+        cancelNoticeDate: document.getElementById('srv-cancel-notice').value,
+        reqAt: document.getElementById('srv-req-at').value,
+        cancelDate: document.getElementById('srv-cancel-date').value
+    };
+
+    if (data.name && (data.ips || data.mainIp)) {
         btn.innerText = 'Saving...';
         btn.disabled = true;
-        await window.app.addServer({ name, ips });
+        await window.app.addServer(data);
         btn.closest('.modal-overlay').remove();
+    } else {
+        alert('Server Name and at least one IP (Main or List) are required.');
     }
 };
 

@@ -90,34 +90,52 @@ class TeamApp {
             const currentVmtaMap = existingServer.vmtaMap || {};
             
             ips.forEach(ip => {
-                if (!currentIps.includes(ip)) {
-                    currentIps.push(ip);
-                }
-                if (vmtaMap[ip]) {
-                    const safeIp = ip.replace(/\./g, '_');
-                    currentVmtaMap[safeIp] = vmtaMap[ip];
-                }
+                if (!currentIps.includes(ip)) currentIps.push(ip);
+                const safeIp = ip.replace(/\./g, '_');
+                if (vmtaMap[safeIp]) currentVmtaMap[safeIp] = vmtaMap[safeIp];
             });
 
+            // Update existing server fields
             existingServer.allIps = currentIps;
             existingServer.vmtaMap = currentVmtaMap;
+            
+            // Update inventory fields if provided
+            if (serverData.mainIp) existingServer.mainIp = serverData.mainIp;
+            if (serverData.ipClass) existingServer.ipClass = serverData.ipClass;
+            if (serverData.entity) existingServer.entity = serverData.entity;
+            if (serverData.group) existingServer.group = serverData.group;
+            if (serverData.enteredDate) existingServer.enteredDate = serverData.enteredDate;
+            if (serverData.provider) existingServer.provider = serverData.provider;
+            if (serverData.asn) existingServer.asn = serverData.asn;
+            if (serverData.cancelNoticeDate) existingServer.cancelNoticeDate = serverData.cancelNoticeDate;
+            if (serverData.reqAt) existingServer.reqAt = serverData.reqAt;
+            if (serverData.cancelDate) existingServer.cancelDate = serverData.cancelDate;
 
-            // If existing server had no valid IP, update it with the first new one
-            if ((!existingServer.ip || existingServer.ip === '0.0.0.0') && ips[0]) {
-                existingServer.ip = ips[0];
+            if ((!existingServer.ip || existingServer.ip === '0.0.0.0') && (serverData.mainIp || ips[0])) {
+                existingServer.ip = serverData.mainIp || ips[0];
             }
             await this.saveState();
         } else {
             // Create new server
-            const mainIp = ips[0] || '0.0.0.0';
             const newServer = {
-                id: 's' + Date.now(),
+                id: 'srv_' + Date.now(),
                 name: serverName,
-                ip: mainIp,
+                ip: serverData.mainIp || (ips[0] || '0.0.0.0'),
                 allIps: ips,
                 vmtaMap: vmtaMap,
                 mailerId: null,
-                status: 'stock'
+                status: 'stock',
+                // Inventory Fields
+                mainIp: serverData.mainIp || '',
+                ipClass: serverData.ipClass || '',
+                entity: serverData.entity || '',
+                group: serverData.group || '',
+                enteredDate: serverData.enteredDate || '',
+                provider: serverData.provider || '',
+                asn: serverData.asn || '',
+                cancelNoticeDate: serverData.cancelNoticeDate || '',
+                reqAt: serverData.reqAt || '',
+                cancelDate: serverData.cancelDate || ''
             };
             this.state.servers.push(newServer);
             await this.saveState();
