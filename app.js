@@ -67,7 +67,10 @@ class TeamApp {
         console.log("Initializing App...");
         await this.loadState();
         
-        // Run Maintenance Check on load
+        // 1. Run Alerts FIRST (so we notify before archiving/renewing)
+        await this.checkUpcomingCancellations();
+
+        // 2. Run Maintenance (Archive/Renew)
         await this.checkServerCancellations();
         
         this.updateDashboard();
