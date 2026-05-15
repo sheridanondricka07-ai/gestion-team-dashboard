@@ -1556,62 +1556,27 @@ window.saveDqsKey = async (btn) => {
     }
 };
 
-window.triggerManualSpamhausCheck = async (btn) => {
-    const originalContent = btn.innerHTML;
-    
-    // Immediate feedback
-    btn.disabled = true;
-    btn.innerHTML = '<i data-lucide="refresh-cw" class="spin" style="width: 14px;"></i> Starting...';
+window.triggerManualSpamhausCheck = (btn) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.zIndex = '10000';
+    overlay.innerHTML = `
+        <div class="modal" style="max-width: 500px; text-align: center; padding: 32px;">
+            <div style="background: rgba(59, 130, 246, 0.1); color: var(--accent-primary); width: 64px; height: 64px; border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px;">
+                <i data-lucide="info" style="width: 32px;"></i>
+            </div>
+            <h2 style="margin: 0 0 12px 0;">Automated Scanning Active</h2>
+            <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 24px;">
+                Your Spamhaus scanner is now fully automated. It runs every day at <strong>09:00 AM (Moroccan Time)</strong> for 100% accuracy.
+            </p>
+            <div style="background: var(--bg-tertiary); padding: 16px; border-radius: 8px; margin-bottom: 24px; text-align: left; font-size: 0.85rem;">
+                <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Need an instant refresh?</div>
+                <div style="color: var(--text-secondary); font-family: monospace; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px;">python check_spamhaus_local.py</div>
+                <p style="margin: 8px 0 0; font-size: 0.75rem;">Run this command in your project folder to update the dashboard immediately.</p>
+            </div>
+            <button onclick="this.closest('.modal-overlay').remove()" class="btn-primary" style="width: 100%;">Got it!</button>
+        </div>
+    `;
+    document.body.appendChild(overlay);
     if (window.lucide) window.lucide.createIcons();
-
-    // Show progress bar at 0% immediately if we have a way to estimate total
-    const allIps = window.app.state.servers.reduce((acc, s) => [...acc, ...(s.allIps || [])], []);
-    const total = [...new Set(allIps)].length;
-    
-    if (total > 0) {
-        // Manually set local progress state to trigger UI
-        window.app.state.spamhausProgress = {
-            total: total,
-            current: 0,
-            status: 'running'
-        };
-        window.app.updateDashboard();
-    } else {
-        alert('No IPs found to check.');
-        btn.innerHTML = originalContent;
-        btn.disabled = false;
-        return;
-    }
-
-    const runChunk = async (startIndex = 0) => {
-        try {
-            const response = await fetch('/api/check-spamhaus', { 
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ startIndex })
-            });
-            
-            if (!response.ok) {
-                const err = await response.text();
-                throw new Error('Server Error: ' + err);
-            }
-            
-            const data = await response.json();
-            if (data.nextIndex !== null) {
-                await runChunk(data.nextIndex);
-            }
-        } catch (e) {
-            alert('Scan interrupted: ' + e.message);
-            window.app.state.spamhausProgress = { status: 'error' };
-            window.app.updateDashboard();
-        }
-    };
-
-    try {
-        await runChunk(0);
-    } finally {
-        btn.innerHTML = originalContent;
-        btn.disabled = false;
-        if (window.lucide) window.lucide.createIcons();
-    }
 };
