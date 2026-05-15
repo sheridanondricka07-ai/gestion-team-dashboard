@@ -2300,5 +2300,6 @@ window.triggerVMTACheck = async (btn) => {
         app.updateDashboard();
         btn.innerHTML = originalText;
         btn.disabled = false;
+        alert('VMTA Check complete! Report has been sent to Telegram.');
     }
 };
