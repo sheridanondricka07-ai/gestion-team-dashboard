@@ -241,6 +241,9 @@ function renderServerInventory(app, container) {
                         <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Manage administrative details and cancellation schedules.</p>
                     </div>
                     <div style="display: flex; gap: 8px;">
+                        <button onclick="testTelegramBot(this)" style="padding: 8px 16px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px; width: auto; background: var(--bg-tertiary); border: 1px solid var(--accent-primary); color: var(--accent-primary);">
+                            <i data-lucide="send" style="width: 14px;"></i> Test Telegram Bot
+                        </button>
                         <button onclick="showBulkDeclareCancelModal()" style="padding: 8px 16px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px; width: auto; background: var(--bg-tertiary); border: 1px solid #ef444455; color: #f87171;">
                             <i data-lucide="trash-2" style="width: 14px;"></i> Bulk Declare Cancel
                         </button>
@@ -539,6 +542,25 @@ window.bulkDeclareCancel = async (btn) => {
         btn.innerText = 'Declare for Cancellation';
         btn.disabled = false;
         alert('No matching server names found.');
+    }
+};
+
+window.testTelegramBot = async (btn) => {
+    const originalText = btn.innerHTML;
+    btn.innerHTML = 'Sending...';
+    btn.disabled = true;
+
+    try {
+        await window.app.sendTelegramNotification("🛠️ *GestiQ Bot Test*\nYour Telegram integration is working perfectly! ✅");
+        btn.innerHTML = 'Success!';
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }, 2000);
+    } catch (err) {
+        alert('Test failed. Check console for errors.');
+        btn.innerHTML = originalText;
+        btn.disabled = false;
     }
 };
 
