@@ -1549,8 +1549,100 @@ function renderSpamhaus(app, container) {
             </div>
 
             ${app.state.spamhausTab === 'grid' ? `
-                <!-- Historical Blacklist Section (Existing) -->
-                <!-- ... existing code stays the same ... -->
+                <div class="date-selector-bar" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 16px; margin-bottom: 24px; scrollbar-width: thin; -ms-overflow-style: none;">
+                    ${[today, ...historyDates.filter(d => d !== today)].map(date => {
+                        const isSelected = date === selectedDate;
+                        const [y, m, d] = date.split('-');
+                        const hasHistory = spamhausHistory && spamhausHistory[date];
+                        return `
+                            <div onclick="window.setSpamhausDate('${date}')" style="min-width: 80px; padding: 10px; border-radius: 10px; text-align: center; cursor: pointer; transition: all 0.2s; border: 1px solid ${isSelected ? 'var(--accent-primary)' : 'var(--border-color)'}; background: ${isSelected ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-secondary)'};">
+                                <div style="font-size: 0.65rem; color: var(--text-secondary); margin-bottom: 2px;">${y}</div>
+                                <div style="font-size: 1rem; font-weight: 700; color: ${isSelected ? 'var(--accent-primary)' : 'var(--text-primary)'};">${d}/${m}</div>
+                                ${hasHistory ? `<div style="font-size: 0.55rem; margin-top: 4px; color: var(--success); font-weight: 600;">RECORDED</div>` : `<div style="font-size: 0.55rem; margin-top: 4px; color: var(--text-secondary);">EMPTY</div>`}
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+
+                <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 24px;">
+                    <div class="card stat-card" style="display: flex; align-items: center; gap: 16px; padding: 20px;">
+                        <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1); color: var(--accent-primary); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                            <i data-lucide="shield" style="width: 24px;"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Total Checked</h3>
+                            <p style="font-size: 1.5rem; font-weight: 700; margin: 4px 0 0;">${summary.total || 0}</p>
+                        </div>
+                    </div>
+                    <div class="card stat-card" style="display: flex; align-items: center; gap: 16px; padding: 20px;">
+                        <div class="stat-icon" style="background: rgba(239, 68, 68, 0.1); color: var(--error); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                            <i data-lucide="alert-circle" style="width: 24px;"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Listed IPs</h3>
+                            <p style="font-size: 1.5rem; font-weight: 700; margin: 4px 0 0;">${summary.listed || 0}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" style="padding: 0; overflow: hidden;">
+                    <div style="padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02);">
+                        <div>
+                            <h3 style="margin: 0; font-size: 1.1rem;">Spamhaus History</h3>
+                            <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Detailed results for all active production IPs.</p>
+                        </div>
+                        <button id="spamhaus-check-btn" onclick="triggerManualSpamhausCheck(this)" class="btn-primary" style="width: auto; padding: 8px 16px; font-size: 0.85rem; display: flex; align-items: center; gap: 8px;">
+                            <i data-lucide="refresh-cw" class="${isRunning ? 'spin' : ''}" style="width: 14px;"></i> 
+                            ${isRunning ? 'Scanning...' : 'Run Manual Scan'}
+                        </button>
+                    </div>
+                    <div style="overflow-x: auto; background: var(--bg-secondary);">
+                        <table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.85rem;">
+                            <thead>
+                                <tr style="text-align: left; background: var(--bg-tertiary);">
+                                    <th style="padding: 16px 12px; width: 180px;">Server</th>
+                                    <th style="padding: 16px 12px; width: 150px;">IP Address</th>
+                                    <th style="padding: 16px 12px;">Status (${selectedDate})</th>
+                                    <th style="padding: 16px 12px; text-align: right;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${servers.map((s, sIdx) => {
+                                    const sIps = s.allIps || [];
+                                    return sIps.map((ip, ipIdx) => {
+                                        const safeIp = ip.replace(/\./g, '_');
+                                        const data = results[safeIp];
+                                        const isFirstInServer = ipIdx === 0 && sIdx !== 0;
+                                        const thickBorder = isFirstInServer ? 'border-top: 3px solid rgba(255,255,255,0.15);' : '';
+                                        
+                                        let statusHtml = '<span style="color: var(--text-secondary); opacity: 0.3;">---</span>';
+                                        if (data) {
+                                            const color = data.status === 'listed' ? 'var(--error)' : 'var(--success)';
+                                            const label = data.status === 'listed' ? (data.list || 'LISTED') : 'CLEAN';
+                                            statusHtml = `<span style="background: ${color}20; color: ${color}; padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; border: 1px solid ${color}30;">${label}</span>`;
+                                        }
+
+                                        return `
+                                            <tr style="border-bottom: 1px solid var(--border-color); vertical-align: middle;">
+                                                ${ipIdx === 0 ? `
+                                                    <td rowspan="${sIps.length}" style="padding: 16px 12px; border-right: 1px solid var(--border-color); background: rgba(255,255,255,0.01); font-weight: 700; color: var(--accent-primary); border-bottom: 1px solid var(--border-color); ${thickBorder}">
+                                                        ${s.name}
+                                                    </td>
+                                                ` : ''}
+                                                <td style="padding: 12px; font-family: monospace; border-right: 1px solid var(--border-color); ${thickBorder}">${ip}</td>
+                                                <td style="padding: 12px; ${thickBorder}">${statusHtml}</td>
+                                                <td style="padding: 12px; text-align: right; ${thickBorder}">
+                                                    <button onclick="window.open('https://check.spamhaus.org/query/ip/${ip}', '_blank')" style="background: rgba(59, 130, 246, 0.1); border: none; color: var(--accent-primary); cursor: pointer; padding: 6px 12px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">Lookup</button>
+                                                </td>
+                                            </tr>
+                                        `;
+                                    }).join('');
+                                }).join('')}
+                                ${servers.length === 0 ? '<tr><td colspan="4" style="padding: 40px; text-align: center; color: var(--text-secondary);">No servers found.</td></tr>' : ''}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             ` : ''}
 
             ${app.state.spamhausTab === 'unified' ? `
