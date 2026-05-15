@@ -51,7 +51,9 @@ class TeamApp {
             spamhausProgress: { status: 'idle', current: 0, total: 0 },
             spamhausHistory: null,
             dropSort: { key: 'timestamp', order: 'desc' },
-            dropSearch: ''
+            dropSearch: '',
+            spamhausTab: 'grid',
+            vmtaResults: {}
         };
         this.expandedServers = new Set();
         this.statusRange = 7;

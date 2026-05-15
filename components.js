@@ -1532,7 +1532,18 @@ function renderSpamhaus(app, container) {
     
     container.innerHTML = `
         <div style="padding: 24px;">
-            <!-- Date Selector Bar -->
+            <!-- Tab Selector -->
+            <div style="display: flex; gap: 4px; background: var(--bg-tertiary); padding: 4px; border-radius: 12px; margin-bottom: 24px; width: fit-content; border: 1px solid var(--border-color);">
+                <button onclick="app.state.spamhausTab = 'grid'; app.updateDashboard();" style="padding: 8px 20px; border-radius: 8px; font-size: 0.85rem; border: none; background: ${app.state.spamhausTab === 'grid' ? 'var(--accent-primary)' : 'transparent'}; color: ${app.state.spamhausTab === 'grid' ? '#fff' : 'var(--text-secondary)'}; cursor: pointer; transition: all 0.2s;">
+                    Historical Blacklist
+                </button>
+                <button onclick="app.state.spamhausTab = 'vmta'; app.updateDashboard();" style="padding: 8px 20px; border-radius: 8px; font-size: 0.85rem; border: none; background: ${app.state.spamhausTab === 'vmta' ? 'var(--accent-primary)' : 'transparent'}; color: ${app.state.spamhausTab === 'vmta' ? '#fff' : 'var(--text-secondary)'}; cursor: pointer; transition: all 0.2s;">
+                    VMTA Check
+                </button>
+            </div>
+
+            ${app.state.spamhausTab === 'grid' ? `
+                <!-- Date Selector Bar -->
             <div class="date-selector-bar" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 16px; margin-bottom: 24px; scrollbar-width: thin; -ms-overflow-style: none;">
                 ${[today, ...historyDates.filter(d => d !== today)].map(date => {
                     const isSelected = date === selectedDate;
@@ -1679,6 +1690,62 @@ function renderSpamhaus(app, container) {
                     </table>
                 </div>
             </div>
+            ` : `
+                <!-- VMTA Check Section -->
+                <div class="card" style="padding: 0; overflow: hidden;">
+                    <div style="padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02);">
+                        <div>
+                            <h3 style="margin: 0; font-size: 1.1rem;">VMTA Status Check</h3>
+                            <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Verify PTR records and SMTP banners for all server IPs.</p>
+                        </div>
+                        <button id="vmta-check-btn" onclick="triggerVMTACheck(this)" class="btn-primary" style="width: auto; padding: 8px 16px; font-size: 0.85rem; display: flex; align-items: center; gap: 8px;">
+                            <i data-lucide="activity" style="width: 14px;"></i> Check VMTAs
+                        </button>
+                    </div>
+                    <div style="overflow-x: auto; background: var(--bg-secondary);">
+                        <table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.85rem;">
+                            <thead>
+                                <tr style="text-align: left; background: var(--bg-tertiary);">
+                                    <th style="padding: 16px 12px; width: 200px;">Server</th>
+                                    <th style="padding: 16px 12px; width: 180px;">IP Address</th>
+                                    <th style="padding: 16px 12px;">Reverse DNS (PTR)</th>
+                                    <th style="padding: 16px 12px; width: 120px;">Status</th>
+                                    <th style="padding: 16px 12px; width: 150px; text-align: right;">Last Checked</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${servers.map((s, sIdx) => {
+                                    const sIps = s.allIps || [];
+                                    return sIps.map((ip, ipIdx) => {
+                                        const safeIp = ip.replace(/\./g, '_');
+                                        const data = app.state.vmtaResults[safeIp] || { ptr: '---', status: 'PENDING', timestamp: 'Never' };
+                                        const isFirstInServer = ipIdx === 0 && sIdx !== 0;
+                                        const thickBorder = isFirstInServer ? 'border-top: 3px solid rgba(255,255,255,0.15);' : '';
+                                        
+                                        return `
+                                            <tr style="border-bottom: 1px solid var(--border-color); vertical-align: middle;">
+                                                ${ipIdx === 0 ? `
+                                                    <td rowspan="${sIps.length}" style="padding: 16px 12px; border-right: 1px solid var(--border-color); background: rgba(255,255,255,0.01); font-weight: 700; color: var(--accent-primary); border-bottom: 1px solid var(--border-color); ${thickBorder}">
+                                                        ${s.name}
+                                                    </td>
+                                                ` : ''}
+                                                <td style="padding: 12px; font-family: monospace; border-right: 1px solid var(--border-color); ${thickBorder}">${ip}</td>
+                                                <td style="padding: 12px; font-family: monospace; color: var(--text-secondary); ${thickBorder}">${data.ptr}</td>
+                                                <td style="padding: 12px; ${thickBorder}">
+                                                    <span style="padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; background: ${data.status === 'OK' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)'}; color: ${data.status === 'OK' ? 'var(--success)' : 'var(--error)'}; border: 1px solid ${data.status === 'OK' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'};">
+                                                        ${data.status}
+                                                    </span>
+                                                </td>
+                                                <td style="padding: 12px; text-align: right; color: var(--text-secondary); font-size: 0.75rem; ${thickBorder}">${data.timestamp}</td>
+                                            </tr>
+                                        `;
+                                    }).join('');
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `}
         </div>
     `;
     if (window.lucide) window.lucide.createIcons();
@@ -2195,4 +2262,30 @@ window.copySpamhausIps = (type) => {
     navigator.clipboard.writeText(ips.join('\n')).then(() => {
         alert(`${ips.length} ${type} IPs copied to clipboard!`);
     });
+};
+
+window.triggerVMTACheck = async (btn) => {
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i data-lucide="refresh-cw" class="spin" style="width: 14px;"></i> Checking...';
+    btn.disabled = true;
+    
+    // Mock check for now - will be replaced with real API call
+    const app = window.app;
+    const ips = [];
+    app.state.servers.forEach(s => (s.allIps || []).forEach(ip => ips.push(ip)));
+    
+    for (const ip of ips) {
+        const safeIp = ip.replace(/\./g, '_');
+        app.state.vmtaResults[safeIp] = {
+            ptr: `vmta-${safeIp.replace(/_/g, '-')}.prod.server.com`,
+            status: Math.random() > 0.1 ? 'OK' : 'ERROR',
+            timestamp: new Date().toLocaleString()
+        };
+        // Update UI every few IPs for progress feel
+        if (ips.indexOf(ip) % 5 === 0) app.updateDashboard();
+    }
+    
+    app.updateDashboard();
+    btn.innerHTML = originalText;
+    btn.disabled = false;
 };
