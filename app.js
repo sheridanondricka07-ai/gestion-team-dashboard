@@ -63,24 +63,46 @@ class TeamApp {
     }
 
     async addServer(serverData) {
-        const ips = serverData.ips.split('\n').map(ip => ip.trim()).filter(ip => ip !== '');
+        const lines = serverData.ips.split('\n').map(l => l.trim()).filter(l => l !== '');
         const serverName = serverData.name.trim();
         
+        const ips = [];
+        const vmtaMap = {};
+
+        lines.forEach(line => {
+            const parts = line.split(/\s+/);
+            const ip = parts[0];
+            const hostname = parts[1] || '';
+            if (ip) {
+                ips.push(ip);
+                if (hostname) vmtaMap[ip] = hostname;
+            }
+        });
+
         const existingServer = this.state.servers.find(s => s.name === serverName);
         
         if (existingServer) {
-            // Server exists, merge new IPs only
+            // Server exists, merge new IPs and mappings
             const currentIps = existingServer.allIps || [];
-            const newUniqueIps = ips.filter(ip => !currentIps.includes(ip));
+            const currentVmtaMap = existingServer.vmtaMap || {};
             
-            if (newUniqueIps.length > 0) {
-                existingServer.allIps = [...currentIps, ...newUniqueIps];
-                // If existing server had no valid IP, update it with the first new one
-                if ((!existingServer.ip || existingServer.ip === '0.0.0.0') && newUniqueIps[0]) {
-                    existingServer.ip = newUniqueIps[0];
+            ips.forEach(ip => {
+                if (!currentIps.includes(ip)) {
+                    currentIps.push(ip);
                 }
-                await this.saveState();
+                if (vmtaMap[ip]) {
+                    currentVmtaMap[ip] = vmtaMap[ip];
+                }
+            });
+
+            existingServer.allIps = currentIps;
+            existingServer.vmtaMap = currentVmtaMap;
+
+            // If existing server had no valid IP, update it with the first new one
+            if ((!existingServer.ip || existingServer.ip === '0.0.0.0') && ips[0]) {
+                existingServer.ip = ips[0];
             }
+            await this.saveState();
         } else {
             // Create new server
             const mainIp = ips[0] || '0.0.0.0';
@@ -89,6 +111,7 @@ class TeamApp {
                 name: serverName,
                 ip: mainIp,
                 allIps: ips,
+                vmtaMap: vmtaMap,
                 mailerId: null,
                 status: 'stock'
             };

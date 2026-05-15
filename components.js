@@ -746,11 +746,12 @@ window.showAddServerModal = () => {
             <h2 style="margin-bottom: 16px;">Add New Server</h2>
             <div class="form-group">
                 <label>Server Name</label>
-                <input type="text" id="srv-name" placeholder="SRV-NYC-01">
+                <input type="text" id="srv-name" placeholder="SRV-NYC-01" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
             </div>
             <div class="form-group">
-                <label>IP Addresses (One per line)</label>
-                <textarea id="srv-ips" placeholder="192.168.1.1\n192.168.1.2" style="width:100%; height:100px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px; padding:12px; font-family:monospace;"></textarea>
+                <label>Server IPs (One per line)</label>
+                <textarea id="srv-ips" placeholder="173.44.157.34 waaunq.feth.pw&#10;173.44.157.35 tznh.yfivpi.com" style="width:100%; height:120px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px; padding:12px; font-family:monospace;"></textarea>
+                <p style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 4px;">Format: <code>IP [Optional VMTA Hostname]</code></p>
             </div>
             <div style="display: flex; gap: 12px;">
                 <button onclick="saveServer(this)" style="flex: 1;">Create Server</button>
@@ -1537,6 +1538,9 @@ function renderSpamhaus(app, container) {
                 <button onclick="app.state.spamhausTab = 'grid'; app.updateDashboard();" style="padding: 8px 20px; border-radius: 8px; font-size: 0.85rem; border: none; background: ${app.state.spamhausTab === 'grid' ? 'var(--accent-primary)' : 'transparent'}; color: ${app.state.spamhausTab === 'grid' ? '#fff' : 'var(--text-secondary)'}; cursor: pointer; transition: all 0.2s;">
                     Historical Blacklist
                 </button>
+                <button onclick="app.state.spamhausTab = 'rdns'; app.updateDashboard();" style="padding: 8px 20px; border-radius: 8px; font-size: 0.85rem; border: none; background: ${app.state.spamhausTab === 'rdns' ? 'var(--accent-primary)' : 'transparent'}; color: ${app.state.spamhausTab === 'rdns' ? '#fff' : 'var(--text-secondary)'}; cursor: pointer; transition: all 0.2s;">
+                    RDNS Check
+                </button>
                 <button onclick="app.state.spamhausTab = 'vmta'; app.updateDashboard();" style="padding: 8px 20px; border-radius: 8px; font-size: 0.85rem; border: none; background: ${app.state.spamhausTab === 'vmta' ? 'var(--accent-primary)' : 'transparent'}; color: ${app.state.spamhausTab === 'vmta' ? '#fff' : 'var(--text-secondary)'}; cursor: pointer; transition: all 0.2s;">
                     VMTA Check
                 </button>
@@ -1690,16 +1694,18 @@ function renderSpamhaus(app, container) {
                     </table>
                 </div>
             </div>
-            ` : `
-                <!-- VMTA Check Section -->
+            ` : ''}
+
+            ${app.state.spamhausTab === 'rdns' ? `
+                <!-- RDNS Check Section (Renamed from VMTA Check) -->
                 <div class="card" style="padding: 0; overflow: hidden;">
                     <div style="padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02);">
                         <div>
-                            <h3 style="margin: 0; font-size: 1.1rem;">VMTA Status Check</h3>
-                            <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Verify PTR records and SMTP banners for all server IPs.</p>
+                            <h3 style="margin: 0; font-size: 1.1rem;">RDNS Status Check</h3>
+                            <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Verify current PTR records for all server IPs.</p>
                         </div>
                         <button id="vmta-check-btn" onclick="triggerVMTACheck(this)" class="btn-primary" style="width: auto; padding: 8px 16px; font-size: 0.85rem; display: flex; align-items: center; gap: 8px;">
-                            <i data-lucide="activity" style="width: 14px;"></i> Check VMTAs
+                            <i data-lucide="activity" style="width: 14px;"></i> Check RDNS
                         </button>
                     </div>
                     <div style="overflow-x: auto; background: var(--bg-secondary);">
@@ -1745,7 +1751,74 @@ function renderSpamhaus(app, container) {
                         </table>
                     </div>
                 </div>
-            `}
+            ` : ''}
+
+            ${app.state.spamhausTab === 'vmta' ? `
+                <!-- NEW VMTA Check Section (Hostname Match) -->
+                <div class="card" style="padding: 0; overflow: hidden;">
+                    <div style="padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02);">
+                        <div>
+                            <h3 style="margin: 0; font-size: 1.1rem;">VMTA Consistency Check</h3>
+                            <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Match current RDNS against your expected virtual names.</p>
+                        </div>
+                        <button onclick="triggerVMTACheck(this)" class="btn-primary" style="width: auto; padding: 8px 16px; font-size: 0.85rem; display: flex; align-items: center; gap: 8px;">
+                            <i data-lucide="check-square" style="width: 14px;"></i> Verify Mappings
+                        </button>
+                    </div>
+                    <div style="overflow-x: auto; background: var(--bg-secondary);">
+                        <table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.85rem;">
+                            <thead>
+                                <tr style="text-align: left; background: var(--bg-tertiary);">
+                                    <th style="padding: 16px 12px; width: 180px;">Server</th>
+                                    <th style="padding: 16px 12px; width: 150px;">IP Address</th>
+                                    <th style="padding: 16px 12px;">Expected VMTA (Virtual Name)</th>
+                                    <th style="padding: 16px 12px;">Actual RDNS (PTR)</th>
+                                    <th style="padding: 16px 12px; width: 100px;">Match</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${servers.map((s, sIdx) => {
+                                    const sIps = s.allIps || [];
+                                    const vmtaMap = s.vmtaMap || {};
+                                    return sIps.map((ip, ipIdx) => {
+                                        const expected = vmtaMap[ip] || '---';
+                                        const safeIp = ip.replace(/\./g, '_');
+                                        const data = app.state.vmtaResults[safeIp] || { ptr: '---' };
+                                        const actual = data.ptr || '---';
+                                        const isMatch = expected !== '---' && actual.toLowerCase().replace(/\.$/, '') === expected.toLowerCase().replace(/\.$/, '');
+                                        
+                                        const isFirstInServer = ipIdx === 0 && sIdx !== 0;
+                                        const thickBorder = isFirstInServer ? 'border-top: 3px solid rgba(255,255,255,0.15);' : '';
+                                        
+                                        return `
+                                            <tr style="border-bottom: 1px solid var(--border-color); vertical-align: middle;">
+                                                ${ipIdx === 0 ? `
+                                                    <td rowspan="${sIps.length}" style="padding: 16px 12px; border-right: 1px solid var(--border-color); background: rgba(255,255,255,0.01); font-weight: 700; color: var(--accent-primary); border-bottom: 1px solid var(--border-color); ${thickBorder}">
+                                                        ${s.name}
+                                                    </td>
+                                                ` : ''}
+                                                <td style="padding: 12px; font-family: monospace; border-right: 1px solid var(--border-color); ${thickBorder}">${ip}</td>
+                                                <td style="padding: 12px; font-family: monospace; color: var(--accent-primary); ${thickBorder}">${expected}</td>
+                                                <td style="padding: 12px; font-family: monospace; color: var(--text-secondary); ${thickBorder}">${actual}</td>
+                                                <td style="padding: 12px; ${thickBorder}">
+                                                    ${expected === '---' ? `
+                                                        <span style="color: var(--text-secondary); font-size: 0.65rem; opacity: 0.5;">NO MAPPING</span>
+                                                    ` : `
+                                                        <span style="padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; background: ${isMatch ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)'}; color: ${isMatch ? 'var(--success)' : 'var(--error)'}; border: 1px solid ${isMatch ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'};">
+                                                            ${isMatch ? 'MATCH' : 'MISMATCH'}
+                                                        </span>
+                                                    `}
+                                                </td>
+                                            </tr>
+                                        `;
+                                    }).join('');
+                                }).join('')}
+                                ${servers.length === 0 ? '<tr><td colspan="5" style="padding: 40px; text-align: center; color: var(--text-secondary);">No servers mapped yet.</td></tr>' : ''}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            ` : ''}
         </div>
     `;
     if (window.lucide) window.lucide.createIcons();
