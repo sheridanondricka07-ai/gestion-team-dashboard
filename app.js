@@ -150,18 +150,21 @@ class TeamApp {
             // Initialize notification tracking if not present
             if (!srv.notified) srv.notified = {};
 
-            // Check milestones: 3, 2, 1, 0 days
-            if (diffDays <= 3 && diffDays >= 0) {
-                const milestone = `${diffDays}d`;
+            // Check milestones: 3 days or less (including overdue/negative days)
+            if (diffDays <= 3) {
+                // Determine milestone label: 'late' for negative, or 'Xd' for positive/zero
+                const milestone = diffDays < 0 ? 'late' : `${diffDays}d`;
                 console.log(`Checking milestone ${milestone} for ${srv.name}. Already notified: ${srv.notified[milestone]}`);
                 
                 if (!srv.notified[milestone]) {
                     const status = srv.markedForCancel ? "🔴 DECLARED TO CANCEL" : "⚠️ NOT DECLARED (Will Auto-Renew)";
+                    const timeLabel = diffDays < 0 ? `LATE BY ${Math.abs(diffDays)} DAY(S) 🚨` : `${diffDays} Day(s)`;
+                    
                     const message = `🔔 *Server Cancellation Alert*\n\n` +
                                     `🖥 *Server:* ${srv.name}\n` +
-                                    `⏳ *Time Left:* ${diffDays} Day(s)\n` +
+                                    `⏳ *Status:* ${timeLabel}\n` +
                                     `📅 *Date:* ${srv.cancelDate}\n` +
-                                    `📝 *Status:* ${status}`;
+                                    `📝 *Action:* ${status}`;
                     
                     await this.sendTelegramNotification(message);
                     srv.notified[milestone] = true;
