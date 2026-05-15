@@ -178,9 +178,11 @@ function renderServerInventory(app, container) {
                         <h3 style="margin: 0; font-size: 1.1rem;">Server Inventory</h3>
                         <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Manage administrative details and cancellation schedules.</p>
                     </div>
-                    <button onclick="bulkFetchServerInfo(this)" style="padding: 8px 16px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px; width: auto; background: var(--accent-primary);">
-                        <i data-lucide="refresh-cw" style="width: 14px;"></i> Fetch Missing Info
-                    </button>
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="showBulkImportInventoryModal()" style="padding: 8px 16px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color);">
+                            <i data-lucide="file-text" style="width: 14px;"></i> Bulk Import Details
+                        </button>
+                    </div>
                 </div>
                 
                 <div style="overflow-x: auto;">
@@ -273,76 +275,75 @@ window.autoFetchIpInfo = async (ip) => {
     }
 };
 
-window.refreshServerInfo = async (id, btn, skipRender) => {
-    const srv = window.app.state.servers.find(s => s.id === id);
-    if (!srv) { console.warn('Server not found:', id); return; }
-    
-    const ip = srv.mainIp || srv.ip || (srv.allIps && srv.allIps[0]);
-    if (!ip || ip === '0.0.0.0') { console.warn('No valid IP for:', srv.name); return; }
+window.showBulkImportInventoryModal = () => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+        <div class="modal" style="width: 700px;">
+            <h2 style="margin-bottom: 8px;">Bulk Import Server Details</h2>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 20px;">
+                Paste your list from Excel. Format: <br>
+                <code>ServerName | Class | MainIP | Entered | Entity | Group | Provider | ASN | Notice | ReqAt | CancelDate</code>
+            </p>
+            
+            <textarea id="import-data" placeholder="s_wmn3_2232	134.119.206.176/29	134.119.206.178	2026-05-14	WMN3	WMN	velia	* velia.net..." 
+                style="width: 100%; height: 300px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; padding: 12px; font-family: monospace; font-size: 0.75rem; margin-bottom: 20px;"></textarea>
 
-    if (btn) btn.classList.add('rotating');
-
-    try {
-        console.log(`Fetching info for ${srv.name} (${ip})...`);
-        const response = await fetch('/api/get-ip-info', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ip })
-        });
-        
-        if (!response.ok) {
-            const errText = await response.text();
-            console.error(`API error for ${ip}:`, response.status, errText);
-            return;
-        }
-        
-        const data = await response.json();
-        console.log(`Result for ${ip}:`, data);
-        
-        if (data.provider && data.provider !== 'Unknown') srv.provider = data.provider;
-        if (data.asn && data.asn !== 'Unknown') srv.asn = data.asn;
-        
-        if (!skipRender) {
-            await window.app.saveState();
-            window.app.updateDashboard();
-        }
-    } catch (err) {
-        console.error('Refresh failed for', srv.name, ':', err);
-    } finally {
-        if (btn) btn.classList.remove('rotating');
-    }
+            <div style="display: flex; gap: 12px;">
+                <button onclick="importInventoryData(this)" style="flex: 2;">Import & Apply to Inventory</button>
+                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary); color: var(--text-primary);">Cancel</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
 };
 
-window.bulkFetchServerInfo = async (btn) => {
-    const allServers = window.app.state.servers;
-    const toFetch = allServers.filter(s => !s.provider || s.provider === '---' || s.provider === 'Unknown');
-    
-    if (toFetch.length === 0) {
-        alert('All servers already have provider info!');
-        return;
-    }
+window.importInventoryData = async (btn) => {
+    const text = document.getElementById('import-data').value;
+    if (!text.trim()) return;
 
-    const originalHtml = btn.innerHTML;
+    btn.innerText = 'Parsing...';
     btn.disabled = true;
-    btn.innerHTML = `<i class="rotating" data-lucide="refresh-cw" style="width:14px;"></i> 0/${toFetch.length}`;
-    if (window.lucide) window.lucide.createIcons();
 
-    let successCount = 0;
-    for (let i = 0; i < toFetch.length; i++) {
-        const srv = toFetch[i];
-        await window.refreshServerInfo(srv.id, null, true); // skipRender = true
-        if (srv.provider && srv.provider !== '---') successCount++;
-        btn.innerHTML = `<i class="rotating" data-lucide="refresh-cw" style="width:14px;"></i> ${i + 1}/${toFetch.length}`;
-        if (window.lucide) window.lucide.createIcons();
-        // Delay between requests to respect rate limits
-        await new Promise(r => setTimeout(r, 1200));
+    const lines = text.split('\n').filter(l => l.trim() !== '');
+    const servers = window.app.state.servers;
+    let updateCount = 0;
+
+    for (const line of lines) {
+        // Handle both tab and multiple space separation
+        const parts = line.split(/\t/).map(p => p.trim());
+        if (parts.length < 2) continue;
+
+        const name = parts[0];
+        const srv = servers.find(s => s.name === name);
+
+        if (srv) {
+            // Mapping based on the user's columns
+            if (parts[1]) srv.ipClass = parts[1];
+            if (parts[2]) srv.mainIp = parts[2];
+            if (parts[3]) srv.enteredDate = parts[3];
+            if (parts[4]) srv.entity = parts[4];
+            if (parts[5]) srv.group = parts[5];
+            if (parts[6]) srv.provider = parts[6];
+            if (parts[7]) srv.asn = parts[7];
+            if (parts[8]) srv.cancelNoticeDate = parts[8];
+            if (parts[9]) srv.reqAt = parts[9];
+            if (parts[10]) srv.cancelDate = parts[10];
+            
+            updateCount++;
+        }
     }
 
-    // Save once and re-render once at the end
-    await window.app.saveState();
-    window.app.updateDashboard();
-    
-    alert(`Done! Updated ${successCount} of ${toFetch.length} servers.`);
+    if (updateCount > 0) {
+        await window.app.saveState();
+        window.app.updateDashboard();
+        btn.closest('.modal-overlay').remove();
+        alert(`Successfully updated ${updateCount} servers in inventory!`);
+    } else {
+        btn.innerText = 'Import & Apply to Inventory';
+        btn.disabled = false;
+        alert('No matching server names found. Please check your data.');
+    }
 };
 
 function renderTools(app, container) {
