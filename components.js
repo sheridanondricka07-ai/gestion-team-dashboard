@@ -1694,7 +1694,7 @@ window.showAddDropModal = () => {
     overlay.className = 'modal-overlay';
     overlay.style.zIndex = '10000';
     overlay.innerHTML = `
-        <div class="modal" style="max-width: 500px;">
+        <div class="modal" style="max-width: 550px;">
             <h2 style="margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
                 <i data-lucide="plus-circle" style="color: var(--success);"></i>
                 Add New Drop Record
@@ -1714,8 +1714,13 @@ window.showAddDropModal = () => {
                         <input type="text" id="drop-deploys" placeholder="e.g. 1024, 1025" required>
                     </div>
                     <div class="form-group" style="grid-column: span 2;">
-                        <label>IP(s)</label>
-                        <input type="text" id="drop-ips" placeholder="e.g. 1.1.1.1, 2.2.2.2" required>
+                        <label>IP(s) (One per line)</label>
+                        <textarea id="drop-ips" placeholder="Paste IPs here..." style="width: 100%; height: 60px; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; font-family: monospace; font-size: 0.75rem;"></textarea>
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label>Paste Raw Server Stats (Calculates Sent)</label>
+                        <textarea id="drop-raw-stats" placeholder="Paste logs here..." style="width: 100%; height: 80px; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; font-family: monospace; font-size: 0.75rem;"></textarea>
+                        <p style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 4px;">App will auto-calculate SENT (IN) and SENT (OUT).</p>
                     </div>
                     <div class="form-group">
                         <label>DATA Profil</label>
@@ -1756,7 +1761,6 @@ window.showAddDropModal = () => {
     if (window.lucide) window.lucide.createIcons();
 
     window._tempProcessedStats = null;
-
     const rawStatsArea = document.getElementById('drop-raw-stats');
 
     rawStatsArea.oninput = () => {
@@ -1765,31 +1769,20 @@ window.showAddDropModal = () => {
         let totalIn = 0;
         let totalOut = 0;
         const breakdown = [];
-
         lines.forEach(line => {
             const trimmed = line.trim();
             if (trimmed.includes('(IN)') || trimmed.includes('(OUT)')) return; 
-
             const parts = trimmed.split(/\s+/);
             if (parts.length >= 3) {
                 const srvName = parts[0];
                 const inVal = parseInt(parts[1]);
                 const outVal = parseInt(parts[2]);
-
                 if (!isNaN(inVal)) totalIn += inVal;
                 if (!isNaN(outVal)) totalOut += outVal;
-                
-                if (!isNaN(outVal)) {
-                    breakdown.push({ srv: srvName, in: inVal, out: outVal });
-                }
+                if (!isNaN(outVal)) breakdown.push({ srv: srvName, in: inVal, out: outVal });
             }
         });
-
-        window._tempProcessedStats = {
-            breakdown,
-            totalIn,
-            totalOut
-        };
+        window._tempProcessedStats = { breakdown, totalIn, totalOut };
         rawStatsArea.style.borderColor = totalOut > 0 ? 'var(--success)' : 'var(--border-color)';
     };
 
@@ -1802,6 +1795,7 @@ window.showAddDropModal = () => {
             ips: document.getElementById('drop-ips').value,
             profile: document.getElementById('drop-profile').value,
             testAfter: document.getElementById('drop-test-after').value,
+            returnPath: document.getElementById('drop-return-path').value,
             totalIn: window._tempProcessedStats ? window._tempProcessedStats.totalIn : 0,
             totalOut: window._tempProcessedStats ? window._tempProcessedStats.totalOut : 0,
             clicks: document.getElementById('drop-clicks').value,
@@ -1822,7 +1816,7 @@ window.showEditDropModal = (dropId) => {
     overlay.className = 'modal-overlay';
     overlay.style.zIndex = '10000';
     overlay.innerHTML = `
-        <div class="modal" style="max-width: 500px;">
+        <div class="modal" style="max-width: 550px;">
             <h2 style="margin-bottom: 20px;">Edit Drop Record</h2>
             <form id="edit-drop-form">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
@@ -1879,36 +1873,30 @@ window.showEditDropModal = (dropId) => {
     document.body.appendChild(overlay);
     if (window.lucide) window.lucide.createIcons();
 
-    window._tempProcessedStats = drop.serverStats || null;
+    window._tempProcessedStats = { breakdown: drop.serverStats, totalIn: drop.totalIn, totalOut: drop.totalOut };
     const rawStatsArea = document.getElementById('edit-drop-raw-stats');
-    const sentInput = document.getElementById('edit-drop-sent');
 
     rawStatsArea.oninput = () => {
         const text = rawStatsArea.value;
         const lines = text.split('\n');
+        let totalIn = 0;
         let totalOut = 0;
         const breakdown = [];
         lines.forEach(line => {
             const trimmed = line.trim();
             if (trimmed.includes('(IN)') || trimmed.includes('(OUT)')) return;
-
             const parts = trimmed.split(/\s+/);
             if (parts.length >= 3) {
                 const srvName = parts[0];
                 const inVal = parseInt(parts[1]);
                 const outVal = parseInt(parts[2]);
-                if (!isNaN(outVal)) {
-                    totalOut += outVal;
-                    breakdown.push({ srv: srvName, in: inVal, out: outVal });
-                }
+                if (!isNaN(inVal)) totalIn += inVal;
+                if (!isNaN(outVal)) totalOut += outVal;
+                if (!isNaN(outVal)) breakdown.push({ srv: srvName, in: inVal, out: outVal });
             }
         });
-
-        if (totalOut > 0) {
-            sentInput.value = totalOut;
-            window._tempProcessedStats = breakdown;
-            rawStatsArea.style.borderColor = 'var(--success)';
-        }
+        window._tempProcessedStats = { breakdown, totalIn, totalOut };
+        rawStatsArea.style.borderColor = totalOut > 0 ? 'var(--success)' : 'var(--border-color)';
     };
 
     document.getElementById('edit-drop-form').onsubmit = async (e) => {
