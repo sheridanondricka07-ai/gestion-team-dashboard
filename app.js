@@ -470,8 +470,14 @@ class TeamApp {
 
     setDropSort(key) {
         if (this.state.dropSort.key === key) {
-            this.state.dropSort.order = this.state.dropSort.order === 'desc' ? 'asc' : 'desc';
+            if (this.state.dropSort.order === 'desc') {
+                this.state.dropSort.order = 'asc';
+            } else {
+                // Third click - back to default
+                this.state.dropSort = { key: 'timestamp', order: 'desc' };
+            }
         } else {
+            // First click on new column - always Descending (bigger to smaller)
             this.state.dropSort.key = key;
             this.state.dropSort.order = 'desc';
         }
@@ -547,7 +553,12 @@ class TeamApp {
         if (window.lucide) window.lucide.createIcons();
     }
 
-    setView(viewName) { this.state.currentView = viewName; this.updateDashboard(); }
+    setView(viewName) { 
+        this.state.currentView = viewName; 
+        // Reset sorting to default when changing views
+        this.state.dropSort = { key: 'timestamp', order: 'desc' };
+        this.updateDashboard(); 
+    }
 
     async updateIPStatus(ip, date, status) {
         if (!this.state.statuses) this.state.statuses = {};
