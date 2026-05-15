@@ -225,6 +225,45 @@ function renderServerInventory(app, container) {
     `;
 }
 
+window.autoFetchIpInfo = async (ip) => {
+    if (!ip || !ip.includes('.')) return;
+    
+    const providerInput = document.getElementById('srv-provider');
+    const asnInput = document.getElementById('srv-asn');
+    
+    if (!providerInput || !asnInput) return;
+
+    const originalProvider = providerInput.value;
+    const originalAsn = asnInput.value;
+    
+    // Only fetch if fields are empty to avoid overwriting manual entries
+    if (originalProvider && originalAsn) return;
+
+    providerInput.value = 'Fetching...';
+    asnInput.value = 'Fetching...';
+
+    try {
+        const response = await fetch('/api/get-ip-info', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ip })
+        });
+        
+        const data = await response.json();
+        
+        if (data.provider) providerInput.value = data.provider;
+        else providerInput.value = originalProvider;
+        
+        if (data.asn) asnInput.value = data.asn;
+        else asnInput.value = originalAsn;
+
+    } catch (err) {
+        console.warn('IP Auto-fetch failed:', err);
+        providerInput.value = originalProvider;
+        asnInput.value = originalAsn;
+    }
+};
+
 function renderTools(app, container) {
     const { tools } = app.state;
     const role = app.state.currentUser.role;
@@ -830,7 +869,9 @@ window.showAddServerModal = () => {
                     
                     <div class="form-group">
                         <label>Main IP</label>
-                        <input type="text" id="srv-main-ip" placeholder="51.255.198.64" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
+                        <input type="text" id="srv-main-ip" placeholder="51.255.198.64" 
+                               onchange="window.autoFetchIpInfo(this.value)"
+                               style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
                     </div>
 
                     <div class="form-group">
