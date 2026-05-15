@@ -1,8 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/check-spamhaus",
-      "schedule": "0 8 * * *"
+      "path": "/api/cron-master",
+      "schedule": "0 9,15,21 * * *"
     }
   ],
   "functions": {
@@ -10,6 +10,9 @@
       "maxDuration": 60
     },
     "api/check-vmta.js": {
+      "maxDuration": 60
+    },
+    "api/cron-master.js": {
       "maxDuration": 60
     }
   },
