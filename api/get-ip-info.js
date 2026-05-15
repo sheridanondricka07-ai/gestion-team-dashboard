@@ -10,17 +10,17 @@ export default async function handler(req, res) {
     }
 
     try {
-        // Using ip-api.com (Free tier: 45 req/min)
-        const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,message,isp,as,org`);
+        // Switched to ipwho.is which supports HTTPS and is free for basic usage
+        const response = await fetch(`https://ipwho.is/${ip}`);
         const data = await response.json();
 
-        if (data.status === 'fail') {
+        if (!data.success) {
             throw new Error(data.message || 'Lookup failed');
         }
 
         return res.status(200).json({
-            provider: data.isp || data.org || 'Unknown',
-            asn: data.as || 'Unknown'
+            provider: data.connection?.isp || data.org || 'Unknown',
+            asn: data.connection?.asn ? `AS${data.connection.asn} ${data.connection.org || ''}` : 'Unknown'
         });
 
     } catch (err) {

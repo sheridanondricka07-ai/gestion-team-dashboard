@@ -178,6 +178,9 @@ function renderServerInventory(app, container) {
                         <h3 style="margin: 0; font-size: 1.1rem;">Server Inventory</h3>
                         <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Manage administrative details and cancellation schedules.</p>
                     </div>
+                    <button onclick="bulkFetchServerInfo(this)" style="padding: 8px 16px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px; width: auto; background: var(--accent-primary);">
+                        <i data-lucide="refresh-cw" style="width: 14px;"></i> Fetch Missing Info
+                    </button>
                 </div>
                 
                 <div style="overflow-x: auto;">
@@ -195,6 +198,7 @@ function renderServerInventory(app, container) {
                                 <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); color: #ef4444;">Cancel Notice</th>
                                 <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Req. At</th>
                                 <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); color: #ef4444; font-weight: 700;">Cancel Date</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); width: 40px;"></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -213,10 +217,15 @@ function renderServerInventory(app, container) {
                                         <td style="padding: 12px; color: #f87171;">${s.cancelNoticeDate || '---'}</td>
                                         <td style="padding: 12px;">${s.reqAt || '---'}</td>
                                         <td style="padding: 12px; color: #ef4444; font-weight: 700; background: rgba(239, 68, 68, 0.03);">${s.cancelDate || '---'}</td>
+                                        <td style="padding: 12px; text-align: center;">
+                                            <span class="action-icon" onclick="refreshServerInfo('${s.id}', this)" title="Refresh IP Info">
+                                                <i data-lucide="refresh-cw" style="width: 12px;"></i>
+                                            </span>
+                                        </td>
                                     </tr>
                                 `;
                             }).join('')}
-                            ${servers.length === 0 ? '<tr><td colspan="11" style="padding: 60px; text-align: center; color: var(--text-secondary);">No servers in inventory.</td></tr>' : ''}
+                            ${servers.length === 0 ? '<tr><td colspan="12" style="padding: 60px; text-align: center; color: var(--text-secondary);">No servers in inventory.</td></tr>' : ''}
                         </tbody>
                     </table>
                 </div>
@@ -261,6 +270,65 @@ window.autoFetchIpInfo = async (ip) => {
         console.warn('IP Auto-fetch failed:', err);
         providerInput.value = originalProvider;
         asnInput.value = originalAsn;
+    }
+};
+
+window.refreshServerInfo = async (id, btn) => {
+    const srv = window.app.state.servers.find(s => s.id === id);
+    if (!srv) return;
+    
+    const ip = srv.mainIp || srv.ip;
+    if (!ip || ip === '0.0.0.0') return;
+
+    if (btn) btn.classList.add('rotating');
+
+    try {
+        const response = await fetch('/api/get-ip-info', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ip })
+        });
+        const data = await response.json();
+        
+        if (data.provider) srv.provider = data.provider;
+        if (data.asn) srv.asn = data.asn;
+        
+        await window.app.saveState();
+        window.app.updateDashboard();
+    } catch (err) {
+        console.warn('Refresh failed:', err);
+    } finally {
+        if (btn) btn.classList.remove('rotating');
+    }
+};
+
+window.bulkFetchServerInfo = async (btn) => {
+    const servers = window.app.state.servers.filter(s => !s.provider || s.provider === '---' || s.provider === 'Unknown');
+    if (servers.length === 0) {
+        alert('All servers already have info!');
+        return;
+    }
+
+    if (btn) {
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="rotating" data-lucide="refresh-cw" style="width:14px;"></i> Working...';
+        if (window.lucide) window.lucide.createIcons();
+
+        let count = 0;
+        for (const srv of servers) {
+            await window.refreshServerInfo(srv.id);
+            count++;
+            btn.innerHTML = `<i class="rotating" data-lucide="refresh-cw" style="width:14px;"></i> ${count}/${servers.length}`;
+            if (window.lucide) window.lucide.createIcons();
+            // Small delay to respect rate limits (45 req/min = ~1.3s/req)
+            await new Promise(r => setTimeout(r, 1500));
+        }
+
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+        if (window.lucide) window.lucide.createIcons();
+        alert(`Finished updating ${count} servers!`);
     }
 };
 
