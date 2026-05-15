@@ -1585,6 +1585,13 @@ function renderSpamhaus(app, container) {
                         <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Showing last 7 check cycles for all active IPs.</p>
                     </div>
                     <div style="display: flex; gap: 12px; align-items: center;">
+                        <button onclick="copySpamhausIps('clean')" class="btn-secondary" style="width: auto; padding: 8px 16px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px; border-radius: 6px; background: rgba(34, 197, 94, 0.1); color: var(--success); border-color: rgba(34, 197, 94, 0.2);">
+                            <i data-lucide="copy" style="width: 14px;"></i> Copy Clean
+                        </button>
+                        <button onclick="copySpamhausIps('listed')" class="btn-secondary" style="width: auto; padding: 8px 16px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px; border-radius: 6px; background: rgba(239, 68, 68, 0.1); color: var(--error); border-color: rgba(239, 68, 68, 0.2);">
+                            <i data-lucide="copy" style="width: 14px;"></i> Copy Listed
+                        </button>
+                        <div style="width: 1px; height: 24px; background: var(--border-color); margin: 0 4px;"></div>
                         <span style="font-size: 0.75rem; color: var(--text-secondary);">Last scan: ${app.state.spamhausLastUpdate || 'Never'}</span>
                         <button id="spamhaus-check-btn" onclick="triggerManualSpamhausCheck(this)" style="width: auto; padding: 8px 16px; font-size: 0.8rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 8px; border-radius: 6px;">
                             <i data-lucide="refresh-cw" class="${isRunning ? 'spin' : ''}" style="width: 14px;"></i> 
@@ -1631,11 +1638,13 @@ function renderSpamhaus(app, container) {
                                         const safeIp = ip.replace(/\./g, '_');
                                         
                                         return `
-                                            <tr style="border-bottom: 1px solid var(--border-color); vertical-align: middle;">
+                                            <tr style="border-bottom: 1px solid var(--border-color); vertical-align: middle; ${ipIdx === 0 && sIdx !== 0 ? 'border-top: 3px solid rgba(255,255,255,0.1);' : ''}">
                                                 ${ipIdx === 0 ? `
-                                                    <td rowspan="${sIps.length}" style="padding: 16px 12px; border-right: 1px solid var(--border-color); background: rgba(255,255,255,0.01); font-weight: 700; color: var(--accent-primary);">
-                                                        ${s.name}
-                                                        <div style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 400; margin-top: 4px;">${sIps.length} IPs</div>
+                                                    <td rowspan="${sIps.length}" style="padding: 16px 12px; border-right: 1px solid var(--border-color); background: rgba(59, 130, 246, 0.02); font-weight: 700; color: var(--accent-primary); border-bottom: 1px solid var(--border-color);">
+                                                        <div style="position: sticky; top: 60px;">
+                                                            ${s.name}
+                                                            <div style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 400; margin-top: 4px;">${sIps.length} IPs</div>
+                                                        </div>
                                                     </td>
                                                 ` : ''}
                                                 <td style="padding: 12px; font-family: monospace; border-right: 1px solid var(--border-color);">
@@ -2152,4 +2161,36 @@ window.triggerManualSpamhausCheck = (btn) => {
     `;
     document.body.appendChild(overlay);
     if (window.lucide) window.lucide.createIcons();
+};
+
+window.copySpamhausIps = (type) => {
+    const app = window.app;
+    const history = app.state.spamhausHistory || {};
+    const today = new Date().toISOString().split('T')[0];
+    const data = history[today] || { results: {} };
+    const results = data.results || {};
+    
+    const ips = [];
+    app.state.servers.forEach(s => {
+        (s.allIps || []).forEach(ip => {
+            const safeIp = ip.replace(/\./g, '_');
+            const res = results[safeIp];
+            if (type === 'clean') {
+                // If it's CLEAN or we have no record (assume clean/pending if not in listed results)
+                if (res && res.status === 'clean') ips.push(ip);
+                else if (!res) ips.push(ip); 
+            } else {
+                if (res && res.status === 'listed') ips.push(ip);
+            }
+        });
+    });
+
+    if (ips.length === 0) {
+        alert(`No ${type} IPs found for today.`);
+        return;
+    }
+
+    navigator.clipboard.writeText(ips.join('\n')).then(() => {
+        alert(`${ips.length} ${type} IPs copied to clipboard!`);
+    });
 };
