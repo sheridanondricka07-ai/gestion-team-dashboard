@@ -127,14 +127,17 @@ export default async function handler(req, res) {
                 let errorLines = [];
 
                 for (const ip of uniqueIps) {
-                    const data = vmtaResults[ip.replace(/\./g, '_')];
-                    if (data.status === 'OK') {
+                    const safeIp = ip.replace(/\./g, '_');
+                    const data = vmtaResults[safeIp];
+                    
+                    if (data && data.status === 'OK') {
                         okCount++;
                     } else {
                         errorCount++;
                         // Find server name for this IP
                         const server = servers.find(s => s.allIps && s.allIps.includes(ip));
-                        errorLines.push(`• <b>${server ? server.name : 'Unknown'}</b>: ${ip} (${data.ptr})`);
+                        const ptr = data ? data.ptr : 'Lookup Failed';
+                        errorLines.push(`• <b>${server ? server.name : 'Unknown'}</b>: ${ip} (${ptr})`);
                     }
                 }
 
@@ -143,13 +146,17 @@ export default async function handler(req, res) {
                 
                 if (errorLines.length > 0) {
                     report += `<b>❌ Attention Required:</b>\n`;
-                    report += errorLines.join('\n') + `\n\n`;
+                    const displayLines = errorLines.slice(0, 50);
+                    report += displayLines.join('\n');
+                    if (errorLines.length > 50) report += `\n...and ${errorLines.length - 50} more.`;
+                    report += `\n\n`;
                 }
 
                 report += `<b>📊 Summary:</b>\n`;
                 report += `✅ Total OK: ${okCount}\n`;
                 report += `❌ Total ERROR: ${errorCount}\n`;
-                report += `⏰ Time: ${new Date().toLocaleString()}`;
+                report += `⏰ Time: ${new Date().toLocaleString()}\n`;
+                report += `⚙️ Automated Scheduled Check`;
 
                 await sendTelegram(report);
 

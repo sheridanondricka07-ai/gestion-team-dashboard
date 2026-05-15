@@ -83,13 +83,16 @@ export default async function handler(req, res) {
         let errorLines = [];
 
         for (const ip of ips) {
-            const data = results[ip.replace(/\./g, '_')];
-            if (data.status === 'OK') {
+            const safeIp = ip.replace(/\./g, '_');
+            const data = results[safeIp];
+            
+            if (data && data.status === 'OK') {
                 okCount++;
             } else {
                 errorCount++;
                 const server = servers.find(s => s.allIps && s.allIps.includes(ip));
-                errorLines.push(`• <b>${server ? server.name : 'Unknown'}</b>: ${ip} (${data.ptr})`);
+                const ptr = data ? data.ptr : 'Lookup Failed';
+                errorLines.push(`• <b>${server ? server.name : 'Unknown'}</b>: ${ip} (${ptr})`);
             }
         }
 
@@ -98,18 +101,24 @@ export default async function handler(req, res) {
         
         if (errorLines.length > 0) {
             report += `<b>❌ Attention Required:</b>\n`;
-            report += errorLines.join('\n') + `\n\n`;
+            // Limit error lines to avoid hitting Telegram message size limits
+            const displayLines = errorLines.slice(0, 50); 
+            report += displayLines.join('\n');
+            if (errorLines.length > 50) report += `\n...and ${errorLines.length - 50} more.`;
+            report += `\n\n`;
         }
 
         report += `<b>📊 Summary:</b>\n`;
         report += `✅ Total OK: ${okCount}\n`;
-                report += `❌ Total ERROR: ${errorCount}\n`;
+        report += `❌ Total ERROR: ${errorCount}\n`;
         report += `⏰ Time: ${new Date().toLocaleString()}\n`;
         report += `👤 Triggered from Dashboard`;
 
-        await sendTelegram(report);
+        console.log('Sending Telegram report for manual check...');
+        const telRes = await sendTelegram(report);
+        console.log('Telegram response status:', telRes ? 'Sent' : 'Failed');
     } catch (e) {
-        console.error('Telegram Trigger Error:', e);
+        console.error('Telegram Logic Error:', e);
     }
 
     return res.status(200).json({ results });
