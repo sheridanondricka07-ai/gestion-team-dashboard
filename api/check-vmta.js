@@ -2,22 +2,47 @@ const dns = require('dns').promises;
 
 const DB_URL = "https://gestion-team-c-default-rtdb.firebaseio.com";
 
+const https = require('https');
+
 async function sendTelegram(message) {
     const token = "8737550836:AAFK68Ig7xyW3KIvBhI5gpO1bGaPTwUimr0";
     const chatId = "-5252005797";
-    try {
-        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: chatId,
-                text: message,
-                parse_mode: 'HTML'
-            })
+    
+    return new Promise((resolve, reject) => {
+        const data = JSON.stringify({
+            chat_id: chatId,
+            text: message,
+            parse_mode: 'HTML'
         });
-    } catch (e) {
-        console.error('Telegram Error:', e);
-    }
+
+        const options = {
+            hostname: 'api.telegram.org',
+            port: 443,
+            path: `/bot${token}/sendMessage`,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': data.length
+            }
+        };
+
+        const req = https.request(options, (res) => {
+            let body = '';
+            res.on('data', (d) => body += d);
+            res.on('end', () => {
+                console.log('Telegram response:', body);
+                resolve(body);
+            });
+        });
+
+        req.on('error', (e) => {
+            console.error('Telegram error:', e);
+            reject(e);
+        });
+
+        req.write(data);
+        req.end();
+    });
 }
 
 async function getFirebaseData(path) {
