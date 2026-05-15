@@ -589,10 +589,13 @@ function renderTeamManagement(app, container) {
                     const memberRps = rps.filter(r => r.mailerId === member.id);
                     return `
                         <div class="card" style="background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); position: relative;">
-                            <div style="position: absolute; top: 12px; right: 12px;">
+                            <div style="position: absolute; top: 12px; right: 12px; display: flex; gap: 8px;">
+                                <span class="action-icon" onclick="showEditMailerModal('${member.id}')" title="Edit Mailer">
+                                     <i data-lucide="edit-3" style="width: 16px; color: var(--accent-primary);"></i>
+                                 </span>
                                 <span class="action-icon delete" onclick="deleteMailer('${member.id}')" title="Remove Mailer">
-                                    <i data-lucide="user-x" style="width: 16px; color: var(--error);"></i>
-                                </span>
+                                     <i data-lucide="user-x" style="width: 16px; color: var(--error);"></i>
+                                 </span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
                                 <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--accent-primary); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.2rem;">

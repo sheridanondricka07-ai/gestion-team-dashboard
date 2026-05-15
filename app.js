@@ -146,6 +146,14 @@ class TeamApp {
         await this.saveState();
     }
 
+    async updateMailer(id, updates) {
+        const index = this.state.mailers.findIndex(m => m.id === id);
+        if (index !== -1) {
+            this.state.mailers[index] = { ...this.state.mailers[index], ...updates };
+            await this.saveState();
+        }
+    }
+
     detectServers(ipString) {
         if (!ipString || ipString === '---') return 'Unknown Server';
         const dropIps = ipString.split(/[\s,]+/).filter(ip => ip.trim());
