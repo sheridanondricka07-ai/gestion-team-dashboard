@@ -153,6 +153,9 @@ class TeamApp {
             date: now.toISOString(),
             displayDate: now.toLocaleString(),
             deployIds: dropData.deployIds,
+            profile: dropData.profile || 'N/A',
+            testAfter: dropData.testAfter || '0%',
+            returnPath: dropData.returnPath || 'N/A',
             mailerId: this.state.currentUser.mailer_id || 'N/A',
             mailerName: this.state.currentUser.name,
             nbrSent: parseFloat(dropData.nbrSent) || 0,
@@ -163,6 +166,7 @@ class TeamApp {
         };
         this.state.drops.push(drop);
         await this.saveState();
+        await this.sendDropToTelegram(drop, 'NEW DROP');
     }
 
     async updateDrop(dropId, updates) {
@@ -170,6 +174,45 @@ class TeamApp {
         if (index !== -1) {
             this.state.drops[index] = { ...this.state.drops[index], ...updates };
             await this.saveState();
+            await this.sendDropToTelegram(this.state.drops[index], 'EDITED DROP');
+        }
+    }
+
+    async sendDropToTelegram(drop, type) {
+        const token = "8773719558:AAH-VYZZ0E7F092n1ywBsHts3UOWPxlB9Z0";
+        const chatId = "-5184683836";
+        
+        const message = `🚀 <b>${type}</b>\n` +
+            `━━━━━━━━━━━━━━━━━━\n` +
+            `👤 <b>Mailer:</b> ${drop.mailerName} (ID: ${drop.mailerId})\n` +
+            `🏢 <b>Entity:</b> ${drop.entity}\n` +
+            `🏷️ <b>Offer:</b> ${drop.offer}\n` +
+            `🆔 <b>Deploys:</b> ${drop.deployIds}\n\n` +
+            `📑 <b>Details:</b>\n` +
+            `• <b>Profile:</b> ${drop.profile}\n` +
+            `• <b>Test After:</b> ${drop.testAfter}\n` +
+            `• <b>Return Path:</b> ${drop.returnPath}\n\n` +
+            `📊 <b>Performance:</b>\n` +
+            `• <b>Sent:</b> ${drop.nbrSent.toLocaleString()}\n` +
+            `• <b>EPC:</b> $${drop.epc.toFixed(4)}\n` +
+            `• <b>CPM:</b> $${drop.cpm.toFixed(2)}\n` +
+            `• 💰 <b>REV: $${drop.rev.toLocaleString(undefined, {minimumFractionDigits: 2})}</b>\n` +
+            `━━━━━━━━━━━━━━━━━━\n` +
+            `📅 <i>${drop.displayDate}</i>`;
+
+        try {
+            const url = `https://api.telegram.org/bot${token}/sendMessage`;
+            await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: chatId,
+                    text: message,
+                    parse_mode: 'HTML'
+                })
+            });
+        } catch (err) {
+            console.error("Telegram notification failed:", err);
         }
     }
 

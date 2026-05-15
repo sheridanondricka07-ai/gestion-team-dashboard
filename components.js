@@ -1523,10 +1523,9 @@ window.renderDropDetails = (app, container) => {
                                 <th style="padding: 12px;">Date & Time</th>
                                 ${isAdmin ? '<th style="padding: 12px;">Mailer</th>' : ''}
                                 <th style="padding: 12px;">Offer</th>
-                                <th style="padding: 12px;">Deploy IDs</th>
+                                <th style="padding: 12px;">Details</th>
                                 <th style="padding: 12px;">Sent</th>
                                 <th style="padding: 12px;">EPC</th>
-                                <th style="padding: 12px;">CPM</th>
                                 <th style="padding: 12px;">Revenue</th>
                                 <th style="padding: 12px; text-align: right;">Actions</th>
                             </tr>
@@ -1539,11 +1538,16 @@ window.renderDropDetails = (app, container) => {
                                         <div style="font-size: 0.7rem; color: var(--text-secondary);">${d.displayDate ? (d.displayDate.split(',')[1] || '') : ''}</div>
                                     </td>
                                     ${isAdmin ? `<td style="padding: 12px;"><span style="color: var(--accent-primary); font-weight: 600;">ID: ${d.mailerId}</span><br><span style="font-size: 0.75rem;">${d.mailerName}</span></td>` : ''}
-                                    <td style="padding: 12px; font-weight: 600;">${d.offer || '---'}</td>
-                                    <td style="padding: 12px;"><code style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">${d.deployIds || '---'}</code></td>
+                                    <td style="padding: 12px;">
+                                        <div style="font-weight: 600;">${d.offer || '---'}</div>
+                                        <div style="font-size: 0.7rem; color: var(--text-secondary);">Deploys: ${d.deployIds || '---'}</div>
+                                    </td>
+                                    <td style="padding: 12px;">
+                                        <div style="font-size: 0.8rem;"><span style="color: var(--text-secondary);">Profile:</span> ${d.profile || 'N/A'}</div>
+                                        <div style="font-size: 0.8rem;"><span style="color: var(--text-secondary);">Test:</span> <span style="color: ${d.testAfter === '100% INBOX' ? 'var(--success)' : 'var(--accent-primary)'}; font-weight: 600;">${d.testAfter || '0%'}</span></div>
+                                    </td>
                                     <td style="padding: 12px;">${(d.nbrSent || 0).toLocaleString()}</td>
                                     <td style="padding: 12px;">$${(d.epc || 0).toFixed(4)}</td>
-                                    <td style="padding: 12px;">$${(d.cpm || 0).toFixed(2)}</td>
                                     <td style="padding: 12px; font-weight: 700; color: var(--success);">$${(d.rev || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                                     <td style="padding: 12px; text-align: right;">
                                         <div style="display: flex; gap: 8px; justify-content: flex-end;">
@@ -1588,6 +1592,25 @@ window.showAddDropModal = () => {
                         <input type="text" id="drop-deploys" placeholder="e.g. 1024, 1025" required>
                     </div>
                     <div class="form-group">
+                        <label>Profile</label>
+                        <input type="text" id="drop-profile" placeholder="Mailer Profile Name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Test After</label>
+                        <select id="drop-test-after" style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px;">
+                            <option value="0%">0%</option>
+                            <option value="25%">25%</option>
+                            <option value="50%">50%</option>
+                            <option value="75%">75%</option>
+                            <option value="85%">85%</option>
+                            <option value="100% INBOX">100% INBOX</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label>Return Path</label>
+                        <input type="text" id="drop-return-path" placeholder="e.g. bounce@domain.com">
+                    </div>
+                    <div class="form-group">
                         <label>Number Sent</label>
                         <input type="number" id="drop-sent" step="1" required>
                     </div>
@@ -1620,12 +1643,100 @@ window.showAddDropModal = () => {
             entity: document.getElementById('drop-entity').value,
             offer: document.getElementById('drop-offer').value,
             deployIds: document.getElementById('drop-deploys').value,
+            profile: document.getElementById('drop-profile').value,
+            testAfter: document.getElementById('drop-test-after').value,
+            returnPath: document.getElementById('drop-return-path').value,
             nbrSent: parseFloat(document.getElementById('drop-sent').value) || 0,
             rev: parseFloat(document.getElementById('drop-rev').value) || 0,
             epc: parseFloat(document.getElementById('drop-epc').value) || 0,
             cpm: parseFloat(document.getElementById('drop-cpm').value) || 0
         };
         await window.app.addDrop(data);
+        overlay.remove();
+        window.app.updateDashboard();
+    };
+};
+
+window.showEditDropModal = (dropId) => {
+    const drop = window.app.state.drops.find(d => d.id === dropId);
+    if (!drop) return;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.zIndex = '10000';
+    overlay.innerHTML = `
+        <div class="modal" style="max-width: 500px;">
+            <h2 style="margin-bottom: 20px;">Edit Drop Record</h2>
+            <form id="edit-drop-form">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="form-group">
+                        <label>Entity</label>
+                        <input type="text" id="edit-drop-entity" value="${drop.entity || 'WMN3'}">
+                    </div>
+                    <div class="form-group">
+                        <label>Offer Name</label>
+                        <input type="text" id="edit-drop-offer" value="${drop.offer || ''}">
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label>Deploy ID(s)</label>
+                        <input type="text" id="edit-drop-deploys" value="${drop.deployIds || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label>Profile</label>
+                        <input type="text" id="edit-drop-profile" value="${drop.profile || ''}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Test After</label>
+                        <select id="edit-drop-test-after" style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px;">
+                            ${['0%', '25%', '50%', '75%', '85%', '100% INBOX'].map(opt => `<option value="${opt}" ${drop.testAfter === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label>Return Path</label>
+                        <input type="text" id="edit-drop-return-path" value="${drop.returnPath || ''}">
+                    </div>
+                    <div class="form-group">
+                        <label>Number Sent</label>
+                        <input type="number" id="edit-drop-sent" value="${drop.nbrSent || 0}">
+                    </div>
+                    <div class="form-group">
+                        <label>Revenue ($)</label>
+                        <input type="number" id="edit-drop-rev" step="0.01" value="${drop.rev || 0}">
+                    </div>
+                    <div class="form-group">
+                        <label>EPC ($)</label>
+                        <input type="number" id="edit-drop-epc" step="0.0001" value="${drop.epc || 0}">
+                    </div>
+                    <div class="form-group">
+                        <label>CPM ($)</label>
+                        <input type="number" id="edit-drop-cpm" step="0.01" value="${drop.cpm || 0}">
+                    </div>
+                </div>
+                <div style="display: flex; gap: 12px; margin-top: 24px;">
+                    <button type="submit" style="flex: 2; background: var(--accent-primary); border: none;">Update Record</button>
+                    <button type="button" onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary); color: var(--text-primary);">Cancel</button>
+                </div>
+            </form>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    if (window.lucide) window.lucide.createIcons();
+
+    document.getElementById('edit-drop-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const updates = {
+            entity: document.getElementById('edit-drop-entity').value,
+            offer: document.getElementById('edit-drop-offer').value,
+            deployIds: document.getElementById('edit-drop-deploys').value,
+            profile: document.getElementById('edit-drop-profile').value,
+            testAfter: document.getElementById('edit-drop-test-after').value,
+            returnPath: document.getElementById('edit-drop-return-path').value,
+            nbrSent: parseFloat(document.getElementById('edit-drop-sent').value) || 0,
+            rev: parseFloat(document.getElementById('edit-drop-rev').value) || 0,
+            epc: parseFloat(document.getElementById('edit-drop-epc').value) || 0,
+            cpm: parseFloat(document.getElementById('edit-drop-cpm').value) || 0
+        };
+        await window.app.updateDrop(dropId, updates);
         overlay.remove();
         window.app.updateDashboard();
     };
