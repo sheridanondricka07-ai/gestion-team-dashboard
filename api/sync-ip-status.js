@@ -49,25 +49,35 @@ export default async function handler(req, res) {
                     if (msgDate < twoHoursAgo) continue;
 
                     const headers = headerPart.body;
-                    const returnPath = (headers['return-path'] || [])[0] || '';
+                    
+                    // Case-insensitive header access
+                    const headerKeys = Object.keys(headers);
+                    const getHeader = (name) => {
+                        const key = headerKeys.find(k => k.toLowerCase() === name.toLowerCase());
+                        return (headers[key] || [])[0] || '';
+                    };
+
+                    const returnPath = getHeader('return-path').replace(/[<>]/g, '').trim();
                     const receivedHeaders = headers.received || [];
                     const receivedList = Array.isArray(receivedHeaders) ? receivedHeaders : [receivedHeaders];
 
                     for (const rh of receivedList) {
                         if (rh.includes('by mx.google.com')) {
+                            // Enhanced regex to catch both hostname and IP
                             const match = rh.match(/from\s+([^\s\(\)]+)\s+\([^\)]*?\[(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\]\)/i);
                             if (match) {
+                                const headerRdns = match[1].toLowerCase().trim();
                                 const ip = match[2];
                                 
                                 if (targetIps.length === 0 || targetIps.includes(ip)) {
-                                    // Status priority: INBOX data is collected if not already present
-                                    // If same IP found in multiple emails, we keep the one from INBOX if available
-                                    const folder = boxName === 'INBOX' ? 'INBOX' : 'SPAM';
+                                    const folder = boxName.toLowerCase().includes('spam') ? 'SPAM' : 'INBOX';
                                     
+                                    // Logic: Inbox placement overrides Spam placement for the same scan session
                                     if (!results[ip] || (results[ip].folder === 'SPAM' && folder === 'INBOX')) {
                                         results[ip] = {
                                             folder,
-                                            returnPath: returnPath.replace(/[<>]/g, '').trim()
+                                            returnPath: returnPath,
+                                            headerRdns: headerRdns
                                         };
                                     }
                                 }

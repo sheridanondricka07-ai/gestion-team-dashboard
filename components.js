@@ -2604,13 +2604,26 @@ window.runGmailIPStatusSync = async (btn) => {
 
         Object.entries(ipData).forEach(([ip, info]) => {
             const safeIp = ip.replace(/\./g, '_');
-            const ptr = rdnsMap[safeIp] || '';
-            const rp = (info.returnPath || '').toLowerCase().trim();
+            
+            // 1. Get RDNS to compare against (Priority: State > Header Fallback)
+            const stateRdns = (rdnsMap[safeIp] || '').toLowerCase().trim();
+            const headerRdns = (info.headerRdns || '').toLowerCase().trim();
+            const targetRdns = stateRdns || headerRdns;
+            
+            // 2. Clean Return-Path and extract domain
+            const rpFull = (info.returnPath || '').toLowerCase().trim();
+            const rpDomain = rpFull.includes('@') ? rpFull.split('@')[1] : rpFull;
+            
+            // 3. Extract domain from Target RDNS
+            const rdnsDomain = targetRdns.includes('.') ? targetRdns : targetRdns; // Simplified, we compare the whole RDNS usually
+
             const folder = info.folder; // 'INBOX' or 'SPAM'
             
             let newStatusId = 'none';
             if (folder === 'INBOX') {
-                newStatusId = (rp === ptr && ptr !== '') ? 'inbox' : 'rp_test';
+                // MATCH LOGIC: Check if Return-Path matches the RDNS hostname or domain
+                const isMatch = (targetRdns && (rpFull.includes(targetRdns) || targetRdns.includes(rpDomain)));
+                newStatusId = isMatch ? 'inbox' : 'rp_test';
             } else if (folder === 'SPAM') {
                 newStatusId = 'spam';
             }
