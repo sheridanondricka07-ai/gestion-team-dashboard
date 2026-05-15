@@ -130,6 +130,67 @@ class TeamApp {
             this.state.historyServers = historyToAdd;
             await this.saveState();
         }
+
+        // Run Proactive Alerts for upcoming dates
+        await this.checkUpcomingCancellations();
+    }
+
+    async checkUpcomingCancellations() {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const today = new Date(todayStr);
+        let needsSave = false;
+
+        for (const srv of this.state.servers) {
+            if (!srv.cancelDate || srv.cancelDate === '---') continue;
+
+            const cDate = new Date(srv.cancelDate);
+            const diffTime = cDate - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            // Initialize notification tracking if not present
+            if (!srv.notified) srv.notified = {};
+
+            // Check milestones: 3, 2, 1 days
+            if (diffDays <= 3 && diffDays > 0) {
+                const milestone = `${diffDays}d`;
+                if (!srv.notified[milestone]) {
+                    const status = srv.markedForCancel ? "🔴 DECLARED TO CANCEL" : "⚠️ NOT DECLARED (Will Auto-Renew)";
+                    const message = `🔔 *Server Cancellation Alert*\n\n` +
+                                    `🖥 *Server:* ${srv.name}\n` +
+                                    `⏳ *Time Left:* ${diffDays} Day(s)\n` +
+                                    `📅 *Date:* ${srv.cancelDate}\n` +
+                                    `📝 *Status:* ${status}\n\n` +
+                                    `🌐 *Main IP:* ${srv.mainIp || 'N/A'}`;
+                    
+                    await this.sendTelegramNotification(message);
+                    srv.notified[milestone] = true;
+                    needsSave = true;
+                }
+            }
+        }
+
+        if (needsSave) await this.saveState();
+    }
+
+    async sendTelegramNotification(message) {
+        const token = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
+        const chatId = "-4933333573";
+        const url = `https://api.telegram.org/bot${token}/sendMessage`;
+
+        try {
+            await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: chatId,
+                    text: message,
+                    parse_mode: 'Markdown'
+                })
+            });
+            console.log("Telegram notification sent!");
+        } catch (err) {
+            console.error("Failed to send Telegram notification:", err);
+        }
     }
 
     async addServer(serverData) {
