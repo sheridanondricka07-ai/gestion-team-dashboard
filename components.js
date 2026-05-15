@@ -1536,6 +1536,11 @@ function renderSpamhaus(app, container) {
     const spamhausProgress = app.state.spamhausProgress || { status: 'idle', current: 0, total: 0 };
     const isRunning = spamhausProgress && spamhausProgress.status === 'scanning';
     
+    // TAB MIGRATION: Ensure old tab names default to new ones
+    if (!app.state.spamhausTab || app.state.spamhausTab === 'rdns' || app.state.spamhausTab === 'vmta') {
+        app.state.spamhausTab = 'grid'; 
+    }
+    
     container.innerHTML = `
         <div style="padding: 24px;">
             <!-- Tab Selector -->
