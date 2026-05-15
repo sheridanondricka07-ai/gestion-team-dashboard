@@ -1733,19 +1733,14 @@ window.showAddDropModal = () => {
                         </select>
                     </div>
                     <div class="form-group" style="grid-column: span 2;">
-                        <label>Paste Raw Server Stats (Optional)</label>
-                        <textarea id="drop-raw-stats" placeholder="Paste logs here (e.g. s_wmn3_2088 41 40)" style="width: 100%; height: 80px; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; font-family: monospace; font-size: 0.75rem;"></textarea>
-                        <p style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 4px;">App will auto-extract server names and sum 'OUT' values as Real Sent.</p>
-                    </div>
-                    <div class="form-group">
-                        <label>Number Sent (Real)</label>
-                        <input type="number" id="drop-sent" step="1" required>
+                        <label>Return Path</label>
+                        <input type="text" id="drop-return-path" placeholder="e.g. bounce@domain.com">
                     </div>
                     <div class="form-group">
                         <label>Clicks</label>
                         <input type="number" id="drop-clicks" step="1" required>
                     </div>
-                    <div class="form-group" style="grid-column: span 2;">
+                    <div class="form-group">
                         <label>Revenue ($)</label>
                         <input type="number" id="drop-rev" step="0.01" required>
                     </div>
@@ -1760,21 +1755,20 @@ window.showAddDropModal = () => {
     document.body.appendChild(overlay);
     if (window.lucide) window.lucide.createIcons();
 
-    // Reset temp stats
     window._tempProcessedStats = null;
 
     const rawStatsArea = document.getElementById('drop-raw-stats');
-    const sentInput = document.getElementById('drop-sent');
 
     rawStatsArea.oninput = () => {
         const text = rawStatsArea.value;
         const lines = text.split('\n');
+        let totalIn = 0;
         let totalOut = 0;
         const breakdown = [];
 
         lines.forEach(line => {
             const trimmed = line.trim();
-            if (trimmed.includes('(IN)') || trimmed.includes('(OUT)')) return; // Skip header lines
+            if (trimmed.includes('(IN)') || trimmed.includes('(OUT)')) return; 
 
             const parts = trimmed.split(/\s+/);
             if (parts.length >= 3) {
@@ -1782,20 +1776,21 @@ window.showAddDropModal = () => {
                 const inVal = parseInt(parts[1]);
                 const outVal = parseInt(parts[2]);
 
+                if (!isNaN(inVal)) totalIn += inVal;
+                if (!isNaN(outVal)) totalOut += outVal;
+                
                 if (!isNaN(outVal)) {
-                    totalOut += outVal;
                     breakdown.push({ srv: srvName, in: inVal, out: outVal });
                 }
             }
         });
 
-        if (totalOut > 0) {
-            sentInput.value = totalOut;
-            window._tempProcessedStats = breakdown;
-            rawStatsArea.style.borderColor = 'var(--success)';
-        } else {
-            rawStatsArea.style.borderColor = 'var(--border-color)';
-        }
+        window._tempProcessedStats = {
+            breakdown,
+            totalIn,
+            totalOut
+        };
+        rawStatsArea.style.borderColor = totalOut > 0 ? 'var(--success)' : 'var(--border-color)';
     };
 
     document.getElementById('add-drop-form').onsubmit = async (e) => {
@@ -1807,10 +1802,11 @@ window.showAddDropModal = () => {
             ips: document.getElementById('drop-ips').value,
             profile: document.getElementById('drop-profile').value,
             testAfter: document.getElementById('drop-test-after').value,
-            nbrSent: document.getElementById('drop-sent').value,
+            totalIn: window._tempProcessedStats ? window._tempProcessedStats.totalIn : 0,
+            totalOut: window._tempProcessedStats ? window._tempProcessedStats.totalOut : 0,
             clicks: document.getElementById('drop-clicks').value,
             rev: document.getElementById('drop-rev').value,
-            serverStats: window._tempProcessedStats || null
+            serverStats: window._tempProcessedStats ? window._tempProcessedStats.breakdown : null
         };
         await window.app.addDrop(data);
         overlay.remove();
@@ -1843,12 +1839,12 @@ window.showEditDropModal = (dropId) => {
                         <input type="text" id="edit-drop-deploys" value="${drop.deployIds || ''}">
                     </div>
                     <div class="form-group" style="grid-column: span 2;">
-                        <label>IP(s)</label>
-                        <input type="text" id="edit-drop-ips" value="${drop.ips || ''}">
+                        <label>IP(s) (One per line)</label>
+                        <textarea id="edit-drop-ips" style="width: 100%; height: 60px; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; font-family: monospace; font-size: 0.75rem;">${drop.ips || ''}</textarea>
                     </div>
                     <div class="form-group" style="grid-column: span 2;">
-                        <label>Paste Raw Server Stats (Optional)</label>
-                        <textarea id="edit-drop-raw-stats" placeholder="Paste logs here to update Sent count" style="width: 100%; height: 80px; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; font-family: monospace; font-size: 0.75rem;"></textarea>
+                        <label>Paste Raw Server Stats (Calculates Sent)</label>
+                        <textarea id="edit-drop-raw-stats" placeholder="Paste logs here..." style="width: 100%; height: 80px; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; font-family: monospace; font-size: 0.75rem;"></textarea>
                     </div>
                     <div class="form-group">
                         <label>DATA Profil</label>
@@ -1865,14 +1861,10 @@ window.showEditDropModal = (dropId) => {
                         <input type="text" id="edit-drop-return-path" value="${drop.returnPath || ''}">
                     </div>
                     <div class="form-group">
-                        <label>Number Sent (Real)</label>
-                        <input type="number" id="edit-drop-sent" value="${drop.nbrSent || 0}">
-                    </div>
-                    <div class="form-group">
                         <label>Clicks</label>
                         <input type="number" id="edit-drop-clicks" value="${drop.clicks || 0}">
                     </div>
-                    <div class="form-group" style="grid-column: span 2;">
+                    <div class="form-group">
                         <label>Revenue ($)</label>
                         <input type="number" id="edit-drop-rev" step="0.01" value="${drop.rev || 0}">
                     </div>
@@ -1929,10 +1921,11 @@ window.showEditDropModal = (dropId) => {
             profile: document.getElementById('edit-drop-profile').value,
             testAfter: document.getElementById('edit-drop-test-after').value,
             returnPath: document.getElementById('edit-drop-return-path').value,
-            nbrSent: document.getElementById('edit-drop-sent').value,
+            totalIn: window._tempProcessedStats ? window._tempProcessedStats.totalIn : (drop.totalIn || 0),
+            totalOut: window._tempProcessedStats ? window._tempProcessedStats.totalOut : (drop.totalOut || 0),
             clicks: document.getElementById('edit-drop-clicks').value,
             rev: document.getElementById('edit-drop-rev').value,
-            serverStats: window._tempProcessedStats
+            serverStats: window._tempProcessedStats ? window._tempProcessedStats.breakdown : drop.serverStats
         };
         await window.app.updateDrop(dropId, updates);
         overlay.remove();

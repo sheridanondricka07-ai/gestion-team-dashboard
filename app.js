@@ -146,12 +146,11 @@ class TeamApp {
 
     async addDrop(dropData) {
         const now = new Date();
-        const nbrSent = parseFloat(dropData.nbrSent) || 0;
         const rev = parseFloat(dropData.rev) || 0;
         const clicks = parseFloat(dropData.clicks) || 0;
         
         // Automatic Calculations
-        const cpm = nbrSent > 0 ? (rev * 1000) / nbrSent : 0;
+        const cpm = dropData.totalOut > 0 ? (rev * 1000) / dropData.totalOut : 0;
         const epc = clicks > 0 ? rev / clicks : 0;
 
         const drop = {
@@ -165,10 +164,11 @@ class TeamApp {
             profile: dropData.profile || 'N/A',
             testAfter: dropData.testAfter || '0%',
             returnPath: dropData.returnPath || 'N/A',
-            serverStats: dropData.serverStats || null, // Storing server breakdown
+            serverStats: window._tempProcessedStats ? window._tempProcessedStats.breakdown : null, 
+            totalIn: window._tempProcessedStats ? window._tempProcessedStats.totalIn : 0,
+            totalOut: window._tempProcessedStats ? window._tempProcessedStats.totalOut : 0,
             mailerId: this.state.currentUser.mailer_id || 'N/A',
             mailerName: this.state.currentUser.name,
-            nbrSent: nbrSent,
             clicks: clicks,
             epc: epc,
             cpm: cpm,
@@ -184,18 +184,18 @@ class TeamApp {
         const index = this.state.drops.findIndex(d => d.id === dropId);
         if (index !== -1) {
             const current = this.state.drops[index];
-            const nbrSent = parseFloat(updates.nbrSent !== undefined ? updates.nbrSent : current.nbrSent) || 0;
+            const totalOut = updates.totalOut !== undefined ? updates.totalOut : current.totalOut;
             const rev = parseFloat(updates.rev !== undefined ? updates.rev : current.rev) || 0;
             const clicks = parseFloat(updates.clicks !== undefined ? updates.clicks : (current.clicks || 0)) || 0;
             
             // Automatic Calculations
-            const cpm = nbrSent > 0 ? (rev * 1000) / nbrSent : 0;
+            const cpm = totalOut > 0 ? (rev * 1000) / totalOut : 0;
             const epc = clicks > 0 ? rev / clicks : 0;
 
             this.state.drops[index] = { 
                 ...current, 
                 ...updates,
-                nbrSent, rev, clicks, cpm, epc 
+                totalOut, rev, clicks, cpm, epc 
             };
             await this.saveState();
             await this.sendDropToTelegram(this.state.drops[index], 'EDITED DROP');
@@ -218,7 +218,9 @@ class TeamApp {
             `• <b>Inbox Rate:</b> ${drop.testAfter} INBOX\n` +
             `• <b>Return Path:</b> ${drop.returnPath}\n\n` +
             `📊 <b>Performance:</b>\n` +
-            `• <b>Sent:</b> ${drop.nbrSent.toLocaleString()}\n` +
+            `• <b>SENT (IN):</b> ${drop.totalIn.toLocaleString()}\n` +
+            `• <b>SENT (OUT):</b> ${drop.totalOut.toLocaleString()}\n` +
+            `• <b>Clicks:</b> ${drop.clicks.toLocaleString()}\n` +
             `• <b>EPC:</b> $${drop.epc.toFixed(4)}\n` +
             `• <b>CPM:</b> $${drop.cpm.toFixed(2)}\n` +
             `• 💰 <b>REV: $${drop.rev.toLocaleString(undefined, {minimumFractionDigits: 2})}</b>\n` +
