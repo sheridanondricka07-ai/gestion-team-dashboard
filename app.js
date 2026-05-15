@@ -206,9 +206,23 @@ class TeamApp {
         const token = "8773719558:AAH-VYZZ0E7F092n1ywBsHts3UOWPxlB9Z0";
         const chatId = "-5184683836";
         
+        // Auto-detect server name(s) from IPs
+        let detectedServers = [];
+        if (drop.ips && drop.ips !== '---') {
+            const dropIpList = drop.ips.split(/[\n\s,]+/).map(ip => ip.trim()).filter(ip => ip);
+            this.state.servers.forEach(srv => {
+                const srvIps = srv.allIps || [];
+                if (dropIpList.some(ip => srvIps.includes(ip))) {
+                    if (!detectedServers.includes(srv.name)) detectedServers.push(srv.name);
+                }
+            });
+        }
+        const serverDisplay = detectedServers.length > 0 ? detectedServers.join(', ') : 'Unknown Server';
+
         const message = `🚀 <b>${type}</b>\n` +
             `━━━━━━━━━━━━━━━━━━\n` +
             `👤 <b>Mailer:</b> ${drop.mailerName} (ID: ${drop.mailerId})\n` +
+            `🖥️ <b>Server:</b> ${serverDisplay}\n` +
             `🏢 <b>Entity:</b> ${drop.entity}\n` +
             `🏷️ <b>Offer:</b> ${drop.offer}\n` +
             `🆔 <b>Deploys:</b> ${drop.deployIds}\n` +
