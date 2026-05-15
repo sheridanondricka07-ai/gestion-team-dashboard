@@ -146,6 +146,14 @@ class TeamApp {
 
     async addDrop(dropData) {
         const now = new Date();
+        const nbrSent = parseFloat(dropData.nbrSent) || 0;
+        const rev = parseFloat(dropData.rev) || 0;
+        const clicks = parseFloat(dropData.clicks) || 0;
+        
+        // Automatic Calculations
+        const cpm = nbrSent > 0 ? (rev * 1000) / nbrSent : 0;
+        const epc = clicks > 0 ? rev / clicks : 0;
+
         const drop = {
             id: 'drop_' + Date.now(),
             entity: dropData.entity || 'WMN3',
@@ -158,10 +166,11 @@ class TeamApp {
             returnPath: dropData.returnPath || 'N/A',
             mailerId: this.state.currentUser.mailer_id || 'N/A',
             mailerName: this.state.currentUser.name,
-            nbrSent: parseFloat(dropData.nbrSent) || 0,
-            epc: parseFloat(dropData.epc) || 0,
-            cpm: parseFloat(dropData.cpm) || 0,
-            rev: parseFloat(dropData.rev) || 0,
+            nbrSent: nbrSent,
+            clicks: clicks,
+            epc: epc,
+            cpm: cpm,
+            rev: rev,
             timestamp: now.getTime()
         };
         this.state.drops.push(drop);
@@ -172,7 +181,20 @@ class TeamApp {
     async updateDrop(dropId, updates) {
         const index = this.state.drops.findIndex(d => d.id === dropId);
         if (index !== -1) {
-            this.state.drops[index] = { ...this.state.drops[index], ...updates };
+            const current = this.state.drops[index];
+            const nbrSent = parseFloat(updates.nbrSent !== undefined ? updates.nbrSent : current.nbrSent) || 0;
+            const rev = parseFloat(updates.rev !== undefined ? updates.rev : current.rev) || 0;
+            const clicks = parseFloat(updates.clicks !== undefined ? updates.clicks : (current.clicks || 0)) || 0;
+            
+            // Automatic Calculations
+            const cpm = nbrSent > 0 ? (rev * 1000) / nbrSent : 0;
+            const epc = clicks > 0 ? rev / clicks : 0;
+
+            this.state.drops[index] = { 
+                ...current, 
+                ...updates,
+                nbrSent, rev, clicks, cpm, epc 
+            };
             await this.saveState();
             await this.sendDropToTelegram(this.state.drops[index], 'EDITED DROP');
         }

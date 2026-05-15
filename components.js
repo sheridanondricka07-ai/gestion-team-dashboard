@@ -1525,7 +1525,9 @@ window.renderDropDetails = (app, container) => {
                                 <th style="padding: 12px;">Offer</th>
                                 <th style="padding: 12px;">Details</th>
                                 <th style="padding: 12px;">Sent</th>
+                                <th style="padding: 12px;">Clicks</th>
                                 <th style="padding: 12px;">EPC</th>
+                                <th style="padding: 12px;">CPM</th>
                                 <th style="padding: 12px;">Revenue</th>
                                 <th style="padding: 12px; text-align: right;">Actions</th>
                             </tr>
@@ -1547,7 +1549,9 @@ window.renderDropDetails = (app, container) => {
                                         <div style="font-size: 0.8rem;"><span style="color: var(--text-secondary);">Test:</span> <span style="color: ${d.testAfter === '100% INBOX' ? 'var(--success)' : 'var(--accent-primary)'}; font-weight: 600;">${d.testAfter || '0%'}</span></div>
                                     </td>
                                     <td style="padding: 12px;">${(d.nbrSent || 0).toLocaleString()}</td>
+                                    <td style="padding: 12px;">${(d.clicks || 0).toLocaleString()}</td>
                                     <td style="padding: 12px;">$${(d.epc || 0).toFixed(4)}</td>
+                                    <td style="padding: 12px;">$${(d.cpm || 0).toFixed(2)}</td>
                                     <td style="padding: 12px; font-weight: 700; color: var(--success);">$${(d.rev || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                                     <td style="padding: 12px; text-align: right;">
                                         <div style="display: flex; gap: 8px; justify-content: flex-end;">
@@ -1615,16 +1619,12 @@ window.showAddDropModal = () => {
                         <input type="number" id="drop-sent" step="1" required>
                     </div>
                     <div class="form-group">
+                        <label>Clicks</label>
+                        <input type="number" id="drop-clicks" step="1" required>
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
                         <label>Revenue ($)</label>
                         <input type="number" id="drop-rev" step="0.01" required>
-                    </div>
-                    <div class="form-group">
-                        <label>EPC ($)</label>
-                        <input type="number" id="drop-epc" step="0.0001" placeholder="0.0000">
-                    </div>
-                    <div class="form-group">
-                        <label>CPM ($)</label>
-                        <input type="number" id="drop-cpm" step="0.01" placeholder="0.00">
                     </div>
                 </div>
                 <div style="display: flex; gap: 12px; margin-top: 24px;">
@@ -1646,10 +1646,9 @@ window.showAddDropModal = () => {
             profile: document.getElementById('drop-profile').value,
             testAfter: document.getElementById('drop-test-after').value,
             returnPath: document.getElementById('drop-return-path').value,
-            nbrSent: parseFloat(document.getElementById('drop-sent').value) || 0,
-            rev: parseFloat(document.getElementById('drop-rev').value) || 0,
-            epc: parseFloat(document.getElementById('drop-epc').value) || 0,
-            cpm: parseFloat(document.getElementById('drop-cpm').value) || 0
+            nbrSent: document.getElementById('drop-sent').value,
+            clicks: document.getElementById('drop-clicks').value,
+            rev: document.getElementById('drop-rev').value
         };
         await window.app.addDrop(data);
         overlay.remove();
@@ -1700,16 +1699,12 @@ window.showEditDropModal = (dropId) => {
                         <input type="number" id="edit-drop-sent" value="${drop.nbrSent || 0}">
                     </div>
                     <div class="form-group">
+                        <label>Clicks</label>
+                        <input type="number" id="edit-drop-clicks" value="${drop.clicks || 0}">
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
                         <label>Revenue ($)</label>
                         <input type="number" id="edit-drop-rev" step="0.01" value="${drop.rev || 0}">
-                    </div>
-                    <div class="form-group">
-                        <label>EPC ($)</label>
-                        <input type="number" id="edit-drop-epc" step="0.0001" value="${drop.epc || 0}">
-                    </div>
-                    <div class="form-group">
-                        <label>CPM ($)</label>
-                        <input type="number" id="edit-drop-cpm" step="0.01" value="${drop.cpm || 0}">
                     </div>
                 </div>
                 <div style="display: flex; gap: 12px; margin-top: 24px;">
@@ -1731,10 +1726,9 @@ window.showEditDropModal = (dropId) => {
             profile: document.getElementById('edit-drop-profile').value,
             testAfter: document.getElementById('edit-drop-test-after').value,
             returnPath: document.getElementById('edit-drop-return-path').value,
-            nbrSent: parseFloat(document.getElementById('edit-drop-sent').value) || 0,
-            rev: parseFloat(document.getElementById('edit-drop-rev').value) || 0,
-            epc: parseFloat(document.getElementById('edit-drop-epc').value) || 0,
-            cpm: parseFloat(document.getElementById('edit-drop-cpm').value) || 0
+            nbrSent: document.getElementById('edit-drop-sent').value,
+            clicks: document.getElementById('edit-drop-clicks').value,
+            rev: document.getElementById('edit-drop-rev').value
         };
         await window.app.updateDrop(dropId, updates);
         overlay.remove();
