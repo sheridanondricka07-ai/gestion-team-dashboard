@@ -36,13 +36,16 @@ class TeamApp {
             currentView: 'overview',
             dbConnected: false,
             mailers: [
-                { id: 'admin', name: 'Team Leader', email: 'admin@admin.com', password: 'admin', role: 'admin' },
-                { id: '1', name: 'Moussa ADEMOU', email: 'moussa@test.com', password: 'password', role: 'mailer' },
-                { id: '2', name: 'Jaefar LAAKEL HEMDANOU', email: 'jaefar@test.com', password: 'password', role: 'mailer' },
-                { id: '3', name: 'Zaka LABRI LIKER', email: 'zaka@test.com', password: 'password', role: 'mailer' }
+                { id: 'admin', name: 'Team Leader', email: 'admin@admin.com', password: 'admin', role: 'admin', mailer_id: 'ADMIN' },
+                { id: 'm1', name: 'Jaefar LAAKEL HEMDANOU', email: 'jaefar@test.com', password: 'password', role: 'mailer', mailer_id: '3134' },
+                { id: 'm2', name: 'Salma EL KARTIT', email: 'salma@test.com', password: 'password', role: 'mailer', mailer_id: '3329' },
+                { id: 'm3', name: 'Ayoub GHAILAN', email: 'ayoub@test.com', password: 'password', role: 'mailer', mailer_id: '3335' },
+                { id: 'm4', name: 'Inssaf EL HAOUASS', email: 'inssaf@test.com', password: 'password', role: 'mailer', mailer_id: '2310' }
             ],
             servers: [],
+            rps: [],
             tools: [],
+            drops: [],
             statuses: {},
             spamhaus: {},
             spamhausProgress: { status: 'idle', current: 0, total: 0 },
@@ -139,6 +142,42 @@ class TeamApp {
         const rp = this.state.rps.find(r => r.id === rpId);
         if (rp) rp.assignedIps = ips;
         await this.saveState();
+    }
+
+    async addDrop(dropData) {
+        const now = new Date();
+        const drop = {
+            id: 'drop_' + Date.now(),
+            entity: dropData.entity || 'WMN3',
+            offer: dropData.offer,
+            date: now.toISOString(),
+            displayDate: now.toLocaleString(),
+            deployIds: dropData.deployIds,
+            mailerId: this.state.currentUser.mailer_id || 'N/A',
+            mailerName: this.state.currentUser.name,
+            nbrSent: parseFloat(dropData.nbrSent) || 0,
+            epc: parseFloat(dropData.epc) || 0,
+            cpm: parseFloat(dropData.cpm) || 0,
+            rev: parseFloat(dropData.rev) || 0,
+            timestamp: now.getTime()
+        };
+        this.state.drops.push(drop);
+        await this.saveState();
+    }
+
+    async updateDrop(dropId, updates) {
+        const index = this.state.drops.findIndex(d => d.id === dropId);
+        if (index !== -1) {
+            this.state.drops[index] = { ...this.state.drops[index], ...updates };
+            await this.saveState();
+        }
+    }
+
+    async deleteDrop(dropId) {
+        this.showConfirm("Permanently delete this drop record?", async () => {
+            this.state.drops = this.state.drops.filter(d => d.id !== dropId);
+            await this.saveState();
+        });
     }
 
     async assignResource(type, resourceId, mailerId) {

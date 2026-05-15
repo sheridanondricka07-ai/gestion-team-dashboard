@@ -81,6 +81,10 @@ function renderSidebar(app) {
                 <i data-lucide="shield-alert"></i>
                 <span>IP Status</span>
             </div>
+            <div class="nav-item ${view === 'drops' ? 'active' : ''}" onclick="app.setView('drops')">
+                <i data-lucide="line-chart"></i>
+                <span>Drop Details</span>
+            </div>
             <div class="nav-item ${view === 'spamhaus' ? 'active' : ''}" onclick="app.setView('spamhaus')">
                 <i data-lucide="search-check"></i>
                 <span>Spamhaus</span>
@@ -107,7 +111,7 @@ function renderTopBar(app) {
     const container = document.getElementById('top-bar');
     container.innerHTML = `
         <div style="display: flex; align-items: center; gap: var(--spacing-md);">
-            <h2 style="font-size: 1.1rem; font-weight: 600;">${app.state.currentView.charAt(0).toUpperCase() + app.state.currentView.slice(1)}</h2>
+            <h2 style="font-size: 1.1rem; font-weight: 600;">${app.state.currentView === 'drops' ? 'Drop Details' : (app.state.currentView.charAt(0).toUpperCase() + app.state.currentView.slice(1))}</h2>
         </div>
         <div style="display: flex; align-items: center; gap: var(--spacing-md);">
             ${app.state.currentUser.role === 'admin' && app.state.currentView === 'management' ? `
@@ -119,6 +123,9 @@ function renderTopBar(app) {
             ` : ''}
             ${app.state.currentUser.role === 'admin' && app.state.currentView === 'tools' ? `
                 <button onclick="showAddToolModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto;">+ Tool</button>
+            ` : ''}
+            ${app.state.currentView === 'drops' ? `
+                <button onclick="showAddDropModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--success); border: none;">+ New Drop</button>
             ` : ''}
             <div style="text-align: right; cursor: pointer; padding: 4px 8px; border-radius: 8px; transition: background 0.2s;" onclick="showProfileModal()" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
                 <div style="font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 6px;">
@@ -146,6 +153,8 @@ function renderView(app) {
         renderTools(app, container);
     } else if (view === 'status') {
         renderStatus(app, container);
+    } else if (view === 'drops') {
+        renderDropDetails(app, container);
     } else if (view === 'spamhaus') {
         renderSpamhaus(app, container);
     }
@@ -1458,59 +1467,168 @@ window.setSpamhausDate = (date) => {
     window.app.selectedSpamhausDate = date;
     window.app.updateDashboard();
 };
-    const data = window.app.state.spamhausHistory[date];
-    if (!data) return;
 
+window.renderDropDetails = (app, container) => {
+    const { drops, currentUser } = app.state;
+    const isAdmin = currentUser.role === 'admin';
+    
+    // Filter drops if not admin
+    const myDrops = isAdmin ? (drops || []) : (drops || []).filter(d => d.mailerName === currentUser.name);
+    
+    // Sort by date descending
+    const sortedDrops = [...myDrops].sort((a, b) => b.timestamp - a.timestamp);
+
+    // Analytics calculations
+    const stats = myDrops.reduce((acc, d) => {
+        acc.rev += d.rev || 0;
+        acc.sent += d.nbrSent || 0;
+        acc.epc += d.epc || 0;
+        acc.cpm += d.cpm || 0;
+        return acc;
+    }, { rev: 0, sent: 0, epc: 0, cpm: 0 });
+
+    const avgEpc = myDrops.length > 0 ? (stats.epc / myDrops.length).toFixed(4) : '0.0000';
+    const avgCpm = myDrops.length > 0 ? (stats.cpm / myDrops.length).toFixed(2) : '0.00';
+
+    container.innerHTML = `
+        <div style="padding: 24px;">
+            <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 24px;">
+                <div class="card stat-card" style="padding: 20px; border-left: 4px solid var(--success);">
+                    <h3 style="font-size: 0.75rem; color: var(--text-secondary); margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">Total Revenue</h3>
+                    <p style="font-size: 1.5rem; font-weight: 700; margin: 8px 0 0; color: var(--success);">$${stats.rev.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
+                </div>
+                <div class="card stat-card" style="padding: 20px; border-left: 4px solid var(--accent-primary);">
+                    <h3 style="font-size: 0.75rem; color: var(--text-secondary); margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">Total Sent</h3>
+                    <p style="font-size: 1.5rem; font-weight: 700; margin: 8px 0 0;">${stats.sent.toLocaleString()}</p>
+                </div>
+                <div class="card stat-card" style="padding: 20px; border-left: 4px solid #f59e0b;">
+                    <h3 style="font-size: 0.75rem; color: var(--text-secondary); margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">Average EPC</h3>
+                    <p style="font-size: 1.5rem; font-weight: 700; margin: 8px 0 0;">$${avgEpc}</p>
+                </div>
+                <div class="card stat-card" style="padding: 20px; border-left: 4px solid #8b5cf6;">
+                    <h3 style="font-size: 0.75rem; color: var(--text-secondary); margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">Average CPM</h3>
+                    <p style="font-size: 1.5rem; font-weight: 700; margin: 8px 0 0;">$${avgCpm}</p>
+                </div>
+            </div>
+
+            <div class="card" style="padding: 0; overflow: hidden;">
+                <div style="padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02);">
+                    <h3 style="margin: 0; font-size: 1.1rem;">Drop History</h3>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary);">${myDrops.length} records found</div>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                        <thead>
+                            <tr style="text-align: left; background: var(--bg-tertiary); border-bottom: 2px solid var(--border-color);">
+                                <th style="padding: 12px;">Date & Time</th>
+                                ${isAdmin ? '<th style="padding: 12px;">Mailer</th>' : ''}
+                                <th style="padding: 12px;">Offer</th>
+                                <th style="padding: 12px;">Deploy IDs</th>
+                                <th style="padding: 12px;">Sent</th>
+                                <th style="padding: 12px;">EPC</th>
+                                <th style="padding: 12px;">CPM</th>
+                                <th style="padding: 12px;">Revenue</th>
+                                <th style="padding: 12px; text-align: right;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${sortedDrops.map(d => `
+                                <tr style="border-bottom: 1px solid var(--border-color); transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+                                    <td style="padding: 12px; white-space: nowrap;">
+                                        <div style="font-weight: 600;">${d.displayDate ? d.displayDate.split(',')[0] : '---'}</div>
+                                        <div style="font-size: 0.7rem; color: var(--text-secondary);">${d.displayDate ? (d.displayDate.split(',')[1] || '') : ''}</div>
+                                    </td>
+                                    ${isAdmin ? `<td style="padding: 12px;"><span style="color: var(--accent-primary); font-weight: 600;">ID: ${d.mailerId}</span><br><span style="font-size: 0.75rem;">${d.mailerName}</span></td>` : ''}
+                                    <td style="padding: 12px; font-weight: 600;">${d.offer || '---'}</td>
+                                    <td style="padding: 12px;"><code style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">${d.deployIds || '---'}</code></td>
+                                    <td style="padding: 12px;">${(d.nbrSent || 0).toLocaleString()}</td>
+                                    <td style="padding: 12px;">$${(d.epc || 0).toFixed(4)}</td>
+                                    <td style="padding: 12px;">$${(d.cpm || 0).toFixed(2)}</td>
+                                    <td style="padding: 12px; font-weight: 700; color: var(--success);">$${(d.rev || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                                    <td style="padding: 12px; text-align: right;">
+                                        <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                                            <button onclick="showEditDropModal('${d.id}')" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px;"><i data-lucide="edit-3" style="width: 14px;"></i></button>
+                                            <button onclick="app.deleteDrop('${d.id}')" style="background: transparent; border: none; color: var(--error); opacity: 0.6; cursor: pointer; padding: 4px;"><i data-lucide="trash-2" style="width: 14px;"></i></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                            ${sortedDrops.length === 0 ? `<tr><td colspan="${isAdmin ? 9 : 8}" style="padding: 60px; text-align: center; color: var(--text-secondary);">No drop records yet. Click "+ New Drop" to begin tracking.</td></tr>` : ''}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+    if (window.lucide) window.lucide.createIcons();
+};
+
+window.showAddDropModal = () => {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.style.zIndex = '10000';
     overlay.innerHTML = `
-        <div class="modal" style="max-width: 800px; max-height: 80vh; overflow-y: auto;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-                <div>
-                    <h2 style="margin: 0;">Scan Report: ${date}</h2>
-                    <p style="margin: 4px 0 0; color: var(--text-secondary); font-size: 0.8rem;">Time: ${new Date(data.timestamp).toLocaleTimeString()}</p>
+        <div class="modal" style="max-width: 500px;">
+            <h2 style="margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
+                <i data-lucide="plus-circle" style="color: var(--success);"></i>
+                Add New Drop Record
+            </h2>
+            <form id="add-drop-form">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="form-group">
+                        <label>Entity</label>
+                        <input type="text" id="drop-entity" value="WMN3" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Offer Name</label>
+                        <input type="text" id="drop-offer" placeholder="e.g. Finance_Offer" required>
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label>Deploy ID(s)</label>
+                        <input type="text" id="drop-deploys" placeholder="e.g. 1024, 1025" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Number Sent</label>
+                        <input type="number" id="drop-sent" step="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Revenue ($)</label>
+                        <input type="number" id="drop-rev" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label>EPC ($)</label>
+                        <input type="number" id="drop-epc" step="0.0001" placeholder="0.0000">
+                    </div>
+                    <div class="form-group">
+                        <label>CPM ($)</label>
+                        <input type="number" id="drop-cpm" step="0.01" placeholder="0.00">
+                    </div>
                 </div>
-                <button onclick="this.closest('.modal-overlay').remove()" style="background: var(--bg-tertiary); border: none; padding: 8px; border-radius: 6px; cursor: pointer;">
-                    <i data-lucide="x" style="width: 20px;"></i>
-                </button>
-            </div>
-
-            <div class="stats-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
-                <div class="card" style="padding: 16px; text-align: center; border: 1px solid var(--border-color);">
-                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px;">Clean IPs</div>
-                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--success);">${(data.summary ? data.summary.total : Object.keys(data.results || {}).length) - (data.summary ? data.summary.listed : Object.values(data.results || {}).filter(r => r && r.status === 'listed').length)}</div>
+                <div style="display: flex; gap: 12px; margin-top: 24px;">
+                    <button type="submit" style="flex: 2; background: var(--success); border: none;">Save Drop Details</button>
+                    <button type="button" onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary); color: var(--text-primary);">Cancel</button>
                 </div>
-                <div class="card" style="padding: 16px; text-align: center; border: 1px solid var(--border-color);">
-                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px;">Listed IPs</div>
-                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--error);">${data.summary ? data.summary.listed : Object.values(data.results || {}).filter(r => r && r.status === 'listed').length}</div>
-                </div>
-            </div>
-
-            <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
-                <thead>
-                    <tr style="text-align: left; border-bottom: 2px solid var(--border-color);">
-                        <th style="padding: 12px;">IP Address</th>
-                        <th style="padding: 12px;">Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${Object.entries(data.results).map(([safeIp, res]) => `
-                        <tr style="border-bottom: 1px solid var(--border-color);">
-                            <td style="padding: 12px; font-family: monospace;">${safeIp.replace(/_/g, '.')}</td>
-                            <td style="padding: 12px;">
-                                <span class="badge ${res.status === 'listed' ? 'badge-sbl' : 'badge-clean'}">
-                                    ${res.status === 'listed' ? (res.list || 'LISTED') : 'CLEAN'}
-                                </span>
-                            </td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
+            </form>
         </div>
     `;
     document.body.appendChild(overlay);
     if (window.lucide) window.lucide.createIcons();
+
+    document.getElementById('add-drop-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const data = {
+            entity: document.getElementById('drop-entity').value,
+            offer: document.getElementById('drop-offer').value,
+            deployIds: document.getElementById('drop-deploys').value,
+            nbrSent: parseFloat(document.getElementById('drop-sent').value) || 0,
+            rev: parseFloat(document.getElementById('drop-rev').value) || 0,
+            epc: parseFloat(document.getElementById('drop-epc').value) || 0,
+            cpm: parseFloat(document.getElementById('drop-cpm').value) || 0
+        };
+        await window.app.addDrop(data);
+        overlay.remove();
+        window.app.updateDashboard();
+    };
 };
 
 window.saveDqsKey = async (btn) => {
