@@ -1667,6 +1667,7 @@ window.renderDropDetails = (app, container) => {
                                 </th>
                                 ${isAdmin ? `<th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('mailerName')">Mailer ${key === 'mailerName' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>` : ''}
                                 <th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('offer')">Offer ${key === 'offer' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
+                                <th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('deployIds')">Deploys ${key === 'deployIds' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
                                 <th style="padding: 12px;">Details</th>
                                 <th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('servers')">Server(s) ${key === 'servers' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
                                 <th style="padding: 12px;">IP(s)</th>
@@ -1700,7 +1701,9 @@ window.renderDropDetails = (app, container) => {
                                     </td>` : ''}
                                     <td style="padding: 12px;">
                                         <div style="font-weight: 600;">${d.offer || '---'}</div>
-                                        <div style="font-size: 0.7rem; color: var(--text-secondary);">Deploys: ${d.deployIds || '---'}</div>
+                                    </td>
+                                    <td style="padding: 12px;">
+                                        <div style="font-size: 0.8rem; color: var(--text-secondary);">${d.deployIds || '---'}</div>
                                     </td>
                                     <td style="padding: 12px;">
                                         <div style="font-size: 0.8rem;"><span style="color: var(--text-secondary);">DATA Profil:</span> ${d.profile || 'N/A'}</div>
@@ -1723,7 +1726,7 @@ window.renderDropDetails = (app, container) => {
                                     </td>
                                 </tr>
                             `).join('')}
-                            ${sortedDrops.length === 0 ? `<tr><td colspan="${isAdmin ? 10 : 9}" style="padding: 60px; text-align: center; color: var(--text-secondary);">No drop records yet. Click "+ New Drop" to begin tracking.</td></tr>` : ''}
+                            ${sortedDrops.length === 0 ? `<tr><td colspan="${isAdmin ? 11 : 10}" style="padding: 60px; text-align: center; color: var(--text-secondary);">No drop records yet. Click "+ New Drop" to begin tracking.</td></tr>` : ''}
                         </tbody>
                     </table>
                 </div>
