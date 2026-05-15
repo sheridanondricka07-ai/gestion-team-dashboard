@@ -161,6 +161,7 @@ class TeamApp {
             date: now.toISOString(),
             displayDate: now.toLocaleString(),
             deployIds: dropData.deployIds,
+            ips: dropData.ips || '---',
             profile: dropData.profile || 'N/A',
             testAfter: dropData.testAfter || '0%',
             returnPath: dropData.returnPath || 'N/A',
@@ -210,7 +211,8 @@ class TeamApp {
             `👤 <b>Mailer:</b> ${drop.mailerName} (ID: ${drop.mailerId})\n` +
             `🏢 <b>Entity:</b> ${drop.entity}\n` +
             `🏷️ <b>Offer:</b> ${drop.offer}\n` +
-            `🆔 <b>Deploys:</b> ${drop.deployIds}\n\n` +
+            `🆔 <b>Deploys:</b> ${drop.deployIds}\n` +
+            `🌐 <b>IP(s):</b> ${drop.ips}\n\n` +
             `📑 <b>Details:</b>\n` +
             `• <b>DATA Profil:</b> ${drop.profile}\n` +
             `• <b>Inbox Rate:</b> ${drop.testAfter} INBOX\n` +

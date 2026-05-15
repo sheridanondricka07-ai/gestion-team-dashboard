@@ -1640,6 +1640,7 @@ window.renderDropDetails = (app, container) => {
                                 ${isAdmin ? '<th style="padding: 12px;">Mailer</th>' : ''}
                                 <th style="padding: 12px;">Offer</th>
                                 <th style="padding: 12px;">Details</th>
+                                <th style="padding: 12px;">IP(s)</th>
                                 <th style="padding: 12px;">Sent</th>
                                 <th style="padding: 12px;">Clicks</th>
                                 <th style="padding: 12px;">EPC</th>
@@ -1664,6 +1665,7 @@ window.renderDropDetails = (app, container) => {
                                         <div style="font-size: 0.8rem;"><span style="color: var(--text-secondary);">DATA Profil:</span> ${d.profile || 'N/A'}</div>
                                         <div style="font-size: 0.8rem;"><span style="color: var(--text-secondary);">Inbox:</span> <span style="color: ${d.testAfter === '100%' ? 'var(--success)' : 'var(--accent-primary)'}; font-weight: 600;">${d.testAfter || '0%'} INBOX</span></div>
                                     </td>
+                                    <td style="padding: 12px;"><code style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">${d.ips || '---'}</code></td>
                                     <td style="padding: 12px;">${(d.nbrSent || 0).toLocaleString()}</td>
                                     <td style="padding: 12px;">${(d.clicks || 0).toLocaleString()}</td>
                                     <td style="padding: 12px;">$${(d.epc || 0).toFixed(4)}</td>
@@ -1710,6 +1712,10 @@ window.showAddDropModal = () => {
                     <div class="form-group" style="grid-column: span 2;">
                         <label>Deploy ID(s)</label>
                         <input type="text" id="drop-deploys" placeholder="e.g. 1024, 1025" required>
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label>IP(s)</label>
+                        <input type="text" id="drop-ips" placeholder="e.g. 1.1.1.1, 2.2.2.2" required>
                     </div>
                     <div class="form-group">
                         <label>DATA Profil</label>
@@ -1797,6 +1803,7 @@ window.showAddDropModal = () => {
             entity: document.getElementById('drop-entity').value,
             offer: document.getElementById('drop-offer').value,
             deployIds: document.getElementById('drop-deploys').value,
+            ips: document.getElementById('drop-ips').value,
             profile: document.getElementById('drop-profile').value,
             testAfter: document.getElementById('drop-test-after').value,
             nbrSent: document.getElementById('drop-sent').value,
@@ -1833,6 +1840,10 @@ window.showEditDropModal = (dropId) => {
                     <div class="form-group" style="grid-column: span 2;">
                         <label>Deploy ID(s)</label>
                         <input type="text" id="edit-drop-deploys" value="${drop.deployIds || ''}">
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label>IP(s)</label>
+                        <input type="text" id="edit-drop-ips" value="${drop.ips || ''}">
                     </div>
                     <div class="form-group" style="grid-column: span 2;">
                         <label>Paste Raw Server Stats (Optional)</label>
@@ -1910,6 +1921,7 @@ window.showEditDropModal = (dropId) => {
             entity: document.getElementById('edit-drop-entity').value,
             offer: document.getElementById('edit-drop-offer').value,
             deployIds: document.getElementById('edit-drop-deploys').value,
+            ips: document.getElementById('edit-drop-ips').value,
             profile: document.getElementById('edit-drop-profile').value,
             testAfter: document.getElementById('edit-drop-test-after').value,
             returnPath: document.getElementById('edit-drop-return-path').value,
