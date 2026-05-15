@@ -1035,6 +1035,7 @@ window.copyAllLinkedRps = (btn) => {
 
 const STATUS_TYPES = [
     { id: 'none', label: 'None', color: 'transparent' },
+    { id: 'inbox', label: 'INBOX', color: '#10b981' },
     { id: 'rp_test', label: 'RP TEST', color: '#22c55e' },
     { id: 'spam', label: 'SPAM', color: '#ef4444' },
     { id: 'paused', label: 'PAUSED', color: '#3b82f6' },
@@ -1172,10 +1173,16 @@ function renderStatus(app, container) {
                                style="background: transparent; border: none; color: var(--text-primary); font-size: 0.8rem; font-family: inherit; outline: none; cursor: pointer;">
                     </div>
                 </div>
-                <button onclick="showBulkUpdateModal()" style="width: auto; padding: 8px 16px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px; background: var(--accent-primary); border-radius: 6px;">
-                    <i data-lucide="list-checks" style="width: 16px;"></i>
-                    Bulk Update Status
-                </button>
+                <div style="display: flex; gap: 12px;">
+                    <button onclick="showGmailIPStatusModal()" class="btn-primary" style="width: auto; padding: 8px 16px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px; background: #EA4335; border: none;">
+                        <i data-lucide="mail" style="width: 16px;"></i>
+                        Sync from Gmail
+                    </button>
+                    <button onclick="showBulkUpdateModal()" style="width: auto; padding: 8px 16px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px; background: var(--accent-primary); border-radius: 6px;">
+                        <i data-lucide="list-checks" style="width: 16px;"></i>
+                        Bulk Update Status
+                    </button>
+                </div>
             </div>
 
             <div class="status-legend card" style="margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-color); align-items: center;">
@@ -2464,4 +2471,196 @@ window.runGmailSync = async (btn) => {
     }
 };
 
-// Remove old applyGmailMappings as it's now integrated
+window.showGmailIPStatusModal = () => {
+    const gmail = window.app.state.gmail_status || { email: '', password: '' };
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal" style="width: 450px;">
+            <div class="modal-header">
+                <h3>Sync IP Status from Gmail</h3>
+                <button onclick="this.closest('.modal-overlay').remove()" class="close-btn">&times;</button>
+            </div>
+            <div style="padding: 20px;">
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 20px;">
+                    Enter your test Gmail credentials to extract delivery statuses (INBOX/SPAM) from recent emails.
+                </p>
+                
+                <div class="form-group">
+                    <label>Gmail Address</label>
+                    <input type="email" id="sync-gmail-email-status" value="${gmail.email}" placeholder="test-inbox@gmail.com">
+                </div>
+                
+                <div class="form-group">
+                    <label>App Password</label>
+                    <input type="password" id="sync-gmail-password-status" value="${gmail.password}" placeholder="xxxx xxxx xxxx xxxx">
+                    <small style="display: block; margin-top: 4px; color: var(--text-secondary); font-size: 0.7rem;">
+                        Use a Google App Password, NOT your regular password.
+                    </small>
+                </div>
+
+                <div id="sync-progress-status" style="display: none; margin-top: 20px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 8px;">
+                        <span id="sync-status-text-status">Connecting to Gmail...</span>
+                        <span id="sync-percent-status">0%</span>
+                    </div>
+                    <div style="height: 6px; background: var(--bg-tertiary); border-radius: 3px; overflow: hidden;">
+                        <div id="sync-bar-status" style="width: 0%; height: 100%; background: #EA4335; transition: width 0.3s ease;"></div>
+                    </div>
+                </div>
+
+                <div id="sync-results-status" style="display: none; margin-top: 20px; max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-tertiary);">
+                    <div style="padding: 8px 12px; border-bottom: 1px solid var(--border-color); font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); position: sticky; top: 0; background: var(--bg-tertiary);">
+                        IP STATUS UPDATES
+                    </div>
+                    <div id="status-updates-list" style="padding: 8px;"></div>
+                </div>
+
+                <div style="margin-top: 24px; display: flex; gap: 12px;">
+                    <button onclick="runGmailIPStatusSync(this)" class="btn-primary" style="flex: 1; background: #EA4335; border: none;">Start Sync</button>
+                    <button onclick="this.closest('.modal-overlay').remove()" class="btn-secondary" style="flex: 1;">Cancel</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+};
+
+window.runGmailIPStatusSync = async (btn) => {
+    const email = document.getElementById('sync-gmail-email-status').value.trim();
+    const password = document.getElementById('sync-gmail-password-status').value.trim();
+    
+    if (!email || !password) return alert('Please enter both email and password.');
+
+    const originalText = btn.innerText;
+    btn.innerText = 'Syncing...';
+    btn.disabled = true;
+
+    const progressDiv = document.getElementById('sync-progress-status');
+    const bar = document.getElementById('sync-bar-status');
+    const statusText = document.getElementById('sync-status-text-status');
+    const percentText = document.getElementById('sync-percent-status');
+    
+    progressDiv.style.display = 'block';
+
+    const setProgress = (p, text) => {
+        bar.style.width = `${p}%`;
+        percentText.innerText = `${p}%`;
+        if (text) statusText.innerText = text;
+    };
+
+    try {
+        let p = 0;
+        const interval = setInterval(() => {
+            if (p < 90) {
+                p += Math.random() * 5;
+                setProgress(Math.round(p));
+            }
+        }, 1000);
+
+        // Prepare all production IPs to filter in backend
+        const targetIps = window.app.state.servers.flatMap(s => s.allIps || []);
+        
+        const response = await fetch('/api/sync-ip-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password, targetIps })
+        });
+
+        const data = await response.json();
+        clearInterval(interval);
+        
+        if (data.error) throw new Error(data.error);
+
+        setProgress(100, 'Scan Complete!');
+
+        const ipData = data.results || {};
+        const count = Object.keys(ipData).length;
+
+        if (count === 0) {
+            alert('No IP delivery data found in recent emails.');
+            btn.innerText = originalText;
+            btn.disabled = false;
+            return;
+        }
+
+        // Show results preview
+        const resultsDiv = document.getElementById('sync-results-status');
+        const listDiv = document.getElementById('status-updates-list');
+        resultsDiv.style.display = 'block';
+        listDiv.innerHTML = '';
+        
+        btn.innerText = 'Applying...';
+        
+        let updateCount = 0;
+        const today = new Date().toISOString().split('T')[0];
+        const statuses = window.app.state.statuses || {};
+        const rdnsMap = {};
+        
+        // Build RDNS map from vmtaResults
+        Object.entries(window.app.state.vmtaResults || {}).forEach(([safeIp, data]) => {
+            rdnsMap[safeIp] = (data.ptr || '').toLowerCase().trim();
+        });
+
+        Object.entries(ipData).forEach(([ip, info]) => {
+            const safeIp = ip.replace(/\./g, '_');
+            const ptr = rdnsMap[safeIp] || '';
+            const rp = (info.returnPath || '').toLowerCase().trim();
+            const folder = info.folder; // 'INBOX' or 'SPAM'
+            
+            let newStatusId = 'none';
+            if (folder === 'INBOX') {
+                newStatusId = (rp === ptr && ptr !== '') ? 'inbox' : 'rp_test';
+            } else if (folder === 'SPAM') {
+                newStatusId = 'spam';
+            }
+
+            if (newStatusId !== 'none') {
+                if (!statuses[safeIp]) statuses[safeIp] = {};
+                const currentStatusId = statuses[safeIp][today] || 'none';
+                
+                // OVERRIDE RULES:
+                // 1. INBOX overrides everything
+                // 2. RP TEST overrides everything except INBOX
+                // 3. SPAM overrides nothing if INBOX/RP TEST already exist
+                
+                let shouldApply = false;
+                if (newStatusId === 'inbox') {
+                    shouldApply = true;
+                } else if (newStatusId === 'rp_test') {
+                    if (currentStatusId !== 'inbox') shouldApply = true;
+                } else if (newStatusId === 'spam') {
+                    if (currentStatusId === 'none' || currentStatusId === 'spam') shouldApply = true;
+                }
+
+                if (shouldApply && currentStatusId !== newStatusId) {
+                    statuses[safeIp][today] = newStatusId;
+                    updateCount++;
+                    
+                    const item = document.createElement('div');
+                    item.style.cssText = 'display: flex; justify-content: space-between; font-size: 0.8rem; padding: 4px 8px; background: rgba(255,255,255,0.03); border-radius: 4px; margin-bottom: 4px;';
+                    const statusLabel = newStatusId.toUpperCase();
+                    const statusColor = newStatusId === 'inbox' ? '#10b981' : (newStatusId === 'rp_test' ? '#22c55e' : '#ef4444');
+                    item.innerHTML = `<span>${ip}</span><span style="color: ${statusColor}; font-weight: 700;">${statusLabel}</span>`;
+                    listDiv.appendChild(item);
+                }
+            }
+        });
+
+        // Save credentials and state
+        window.app.state.gmail_status = { email, password };
+        window.app.state.statuses = statuses;
+        await window.app.saveState();
+        window.app.updateDashboard();
+
+        btn.innerText = `Updated ${updateCount} IPs!`;
+        setTimeout(() => {
+            if (btn.closest('.modal-overlay')) btn.closest('.modal-overlay').remove();
+        }, 2500);
+
+    } catch (err) {
+        alert('Sync Failed: ' + err.message);
+        btn.innerText = originalText;
+        btn.disabled = false;
+    }
+};
