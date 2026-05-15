@@ -13,13 +13,13 @@ export default async function handler(req, res) {
 
     const results = {};
     
-    // Process in batches to avoid timeouts (Vercel limit is usually 10s on hobby)
     const checkIp = async (ip) => {
         try {
+            // Set a timeout for each individual DNS lookup
             const ptrs = await dns.reverse(ip);
             return {
                 ptr: ptrs[0] || 'No PTR record',
-                status: 'OK',
+                status: ptrs[0] ? 'OK' : 'ERROR',
                 timestamp: new Date().toLocaleString()
             };
         } catch (err) {
@@ -32,15 +32,19 @@ export default async function handler(req, res) {
         }
     };
 
-    // Use Promise.all with a bit of caution for large lists
-    const entries = await Promise.all(ips.map(async (ip) => {
-        const data = await checkIp(ip);
-        return [ip.replace(/\./g, '_'), data];
-    }));
-
-    entries.forEach(([key, val]) => {
-        results[key] = val;
-    });
+    // Chunk processing (10 at a time) to be stable
+    const chunkSize = 10;
+    for (let i = 0; i < ips.length; i += chunkSize) {
+        const chunk = ips.slice(i, i + chunkSize);
+        const chunkResults = await Promise.all(chunk.map(async (ip) => {
+            const data = await checkIp(ip);
+            return [ip.replace(/\./g, '_'), data];
+        }));
+        
+        chunkResults.forEach(([key, val]) => {
+            results[key] = val;
+        });
+    }
 
     return res.status(200).json({ results });
 }

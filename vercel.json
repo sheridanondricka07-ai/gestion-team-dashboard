@@ -8,6 +8,9 @@
   "functions": {
     "api/check-spamhaus.js": {
       "maxDuration": 60
+    },
+    "api/check-vmta.js": {
+      "maxDuration": 60
     }
   },
   "rewrites": [
