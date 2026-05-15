@@ -1611,7 +1611,7 @@ window.renderDropDetails = (app, container) => {
     // Analytics calculations
     const stats = myDrops.reduce((acc, d) => {
         acc.rev += d.rev || 0;
-        acc.sent += d.nbrSent || 0;
+        acc.sent += d.totalOut || 0;
         acc.epc += d.epc || 0;
         acc.cpm += d.cpm || 0;
         return acc;
@@ -1691,7 +1691,7 @@ window.renderDropDetails = (app, container) => {
                                         <div style="font-size: 0.8rem;"><span style="color: var(--text-secondary);">Inbox:</span> <span style="color: ${d.testAfter === '100%' ? 'var(--success)' : 'var(--accent-primary)'}; font-weight: 600;">${d.testAfter || '0%'} INBOX</span></div>
                                     </td>
                                     <td style="padding: 12px;"><code style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">${d.ips || '---'}</code></td>
-                                    <td style="padding: 12px;">${(d.nbrSent || 0).toLocaleString()}</td>
+                                    <td style="padding: 12px;">${(d.totalOut || 0).toLocaleString()}</td>
                                     <td style="padding: 12px;">${(d.clicks || 0).toLocaleString()}</td>
                                     <td style="padding: 12px;">$${(d.epc || 0).toFixed(4)}</td>
                                     <td style="padding: 12px;">$${(d.cpm || 0).toFixed(2)}</td>
