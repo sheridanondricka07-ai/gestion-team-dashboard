@@ -200,13 +200,129 @@ function renderTools(app, container) {
 }
 
 function renderOverview(app, container) {
-    const { rps, servers, currentUser } = app.state;
+    const { rps, servers, currentUser, drops, mailers } = app.state;
+    const isAdmin = currentUser.role === 'admin';
     
-    // Filter by mailer if not admin
-    const myServers = currentUser.role === 'admin' ? servers : servers.filter(s => s.mailerId === currentUser.id);
-    const myRps = currentUser.role === 'admin' ? rps : rps.filter(r => r.mailerId === currentUser.id);
+    // Filter infra by mailer if not admin
+    const myServers = isAdmin ? servers : servers.filter(s => s.mailerId === currentUser.id);
+    const myRps = isAdmin ? rps : rps.filter(r => r.mailerId === currentUser.id);
+
+    // Revenue Analytics
+    const now = new Date();
+    const todayStr = now.toLocaleDateString();
+    
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toLocaleDateString();
+
+    const thisMonth = now.getMonth();
+    const thisYear = now.getFullYear();
+    
+    const lastMonth = thisMonth === 0 ? 11 : thisMonth - 1;
+    const lastMonthYear = thisMonth === 0 ? thisYear - 1 : thisYear;
+
+    const myDrops = isAdmin ? (drops || []) : (drops || []).filter(d => d.mailerName === currentUser.name);
+
+    const stats = myDrops.reduce((acc, d) => {
+        const dDate = new Date(d.timestamp);
+        const dDateStr = dDate.toLocaleDateString();
+        const dMonth = dDate.getMonth();
+        const dYear = dDate.getFullYear();
+
+        if (dDateStr === todayStr) acc.today += d.rev || 0;
+        if (dDateStr === yesterdayStr) acc.yesterday += d.rev || 0;
+        if (dMonth === thisMonth && dYear === thisYear) acc.thisMonth += d.rev || 0;
+        if (dMonth === lastMonth && dYear === lastMonthYear) acc.lastMonth += d.rev || 0;
+        acc.total += d.rev || 0;
+        return acc;
+    }, { today: 0, yesterday: 0, thisMonth: 0, lastMonth: 0, total: 0 });
+
+    // Mailer Leaderboard (Current Month)
+    const leaderboard = isAdmin ? (mailers || []).filter(m => m.role === 'mailer').map(m => {
+        const rev = (drops || []).filter(d => d.mailerName === m.name && new Date(d.timestamp).getMonth() === thisMonth).reduce((sum, d) => sum + (d.rev || 0), 0);
+        return { name: m.name, rev };
+    }).sort((a, b) => b.rev - a.rev) : [];
 
     container.innerHTML = `
+        <div style="padding: 0 0 24px 0;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px;">
+                <h2 style="margin: 0; font-size: 1.25rem; font-weight: 700;">Revenue Performance</h2>
+                <span style="font-size: 0.8rem; color: var(--text-secondary);">Last updated: ${now.toLocaleTimeString()}</span>
+            </div>
+            
+            <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 24px;">
+                <div class="card stat-card" style="border-left: 4px solid var(--success); background: linear-gradient(135deg, rgba(34, 197, 94, 0.05) 0%, transparent 100%);">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div>
+                            <h3 style="font-size: 0.75rem; color: var(--text-secondary); margin: 0; text-transform: uppercase;">Today</h3>
+                            <p style="font-size: 1.5rem; font-weight: 700; margin: 8px 0 0; color: var(--success);">$${stats.today.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
+                        </div>
+                        <div style="font-size: 0.75rem; color: ${stats.today >= stats.yesterday ? 'var(--success)' : 'var(--error)'}; display: flex; align-items: center; gap: 4px; padding: 4px 8px; background: rgba(255,255,255,0.05); border-radius: 6px;">
+                            <i data-lucide="trending-${stats.today >= stats.yesterday ? 'up' : 'down'}" style="width: 12px;"></i>
+                            ${stats.yesterday > 0 ? (((stats.today - stats.yesterday) / stats.yesterday) * 100).toFixed(0) + '%' : '--'}
+                        </div>
+                    </div>
+                </div>
+                <div class="card stat-card" style="border-left: 4px solid var(--accent-primary);">
+                    <h3 style="font-size: 0.75rem; color: var(--text-secondary); margin: 0; text-transform: uppercase;">This Month</h3>
+                    <p style="font-size: 1.5rem; font-weight: 700; margin: 8px 0 0; color: var(--accent-primary);">$${stats.thisMonth.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
+                </div>
+                <div class="card stat-card" style="border-left: 4px solid #8b5cf6;">
+                    <h3 style="font-size: 0.75rem; color: var(--text-secondary); margin: 0; text-transform: uppercase;">Last Month</h3>
+                    <p style="font-size: 1.5rem; font-weight: 700; margin: 8px 0 0;">$${stats.lastMonth.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
+                </div>
+                <div class="card stat-card" style="border-left: 4px solid #f59e0b;">
+                    <h3 style="font-size: 0.75rem; color: var(--text-secondary); margin: 0; text-transform: uppercase;">Total Revenue</h3>
+                    <p style="font-size: 1.5rem; font-weight: 700; margin: 8px 0 0;">$${stats.total.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: ${isAdmin ? '2fr 1fr' : '1fr'}; gap: 24px;">
+                <div class="card" style="padding: 20px;">
+                    <h3 style="margin: 0 0 20px 0; font-size: 1rem; display: flex; align-items: center; gap: 10px;">
+                        <i data-lucide="bar-chart-3" style="width: 18px; color: var(--accent-primary);"></i>
+                        Revenue Highlights
+                    </h3>
+                    <div style="display: flex; flex-direction: column; gap: 16px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
+                            <span style="font-size: 0.85rem; color: var(--text-secondary);">Yesterday's Total</span>
+                            <span style="font-weight: 600;">$${stats.yesterday.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg-tertiary); border-radius: 8px;">
+                            <span style="font-size: 0.85rem; color: var(--text-secondary);">Monthly Growth</span>
+                            <span style="font-weight: 600; color: ${stats.thisMonth >= stats.lastMonth ? 'var(--success)' : 'var(--error)'};">
+                                ${stats.lastMonth > 0 ? (((stats.thisMonth - stats.lastMonth) / stats.lastMonth) * 100).toFixed(1) + '%' : 'New Month'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                ${isAdmin ? `
+                <div class="card" style="padding: 20px;">
+                    <h3 style="margin: 0 0 20px 0; font-size: 1rem; display: flex; align-items: center; gap: 10px;">
+                        <i data-lucide="trophy" style="width: 18px; color: #f59e0b;"></i>
+                        Top Mailers (Month)
+                    </h3>
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        ${leaderboard.slice(0, 3).map((m, i) => `
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <span style="width: 20px; height: 20px; border-radius: 50%; background: ${i === 0 ? '#f59e0b' : (i === 1 ? '#94a3b8' : '#b45309')}; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700;">${i + 1}</span>
+                                    <span style="font-size: 0.85rem;">${m.name}</span>
+                                </div>
+                                <span style="font-weight: 600; font-size: 0.85rem;">$${m.rev.toLocaleString()}</span>
+                            </div>
+                        `).join('')}
+                        ${leaderboard.length === 0 ? '<p style="text-align: center; color: var(--text-secondary); font-size: 0.85rem;">No data yet this month</p>' : ''}
+                    </div>
+                </div>
+                ` : ''}
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin: 32px 0 16px;">
+            <h2 style="margin: 0; font-size: 1.25rem; font-weight: 700;">Infrastructure Stats</h2>
+        </div>
         <div class="stats-grid">
             <div class="card stat-card">
                 <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1); color: var(--accent-primary);">
