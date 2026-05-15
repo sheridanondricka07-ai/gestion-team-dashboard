@@ -40,7 +40,8 @@ class TeamApp {
                 { id: 'm1', name: 'Jaefar LAAKEL HEMDANOU', email: 'jaefar@test.com', password: 'password', role: 'mailer', mailer_id: '3134' },
                 { id: 'm2', name: 'Salma EL KARTIT', email: 'salma@test.com', password: 'password', role: 'mailer', mailer_id: '3329' },
                 { id: 'm3', name: 'Ayoub GHAILAN', email: 'ayoub@test.com', password: 'password', role: 'mailer', mailer_id: '3335' },
-                { id: 'm4', name: 'Inssaf EL HAOUASS', email: 'inssaf@test.com', password: 'password', role: 'mailer', mailer_id: '2310' }
+                { id: 'm4', name: 'Inssaf EL HAOUASS', email: 'inssaf@test.com', password: 'password', role: 'mailer', mailer_id: '2310' },
+                { id: 'm5', name: 'Mohamed Reda ZARYOUH', email: 'mohamed@test.com', password: 'password', role: 'mailer', mailer_id: '2040' }
             ],
             servers: [],
             rps: [],
