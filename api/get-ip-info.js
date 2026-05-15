@@ -1,6 +1,6 @@
-import fetch from 'node-fetch';
+// IP Provider & ASN Lookup using ipwho.is (HTTPS, no auth required)
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
 
     const { ip } = req.body;
@@ -10,7 +10,6 @@ export default async function handler(req, res) {
     }
 
     try {
-        // Switched to ipwho.is which supports HTTPS and is free for basic usage
         const response = await fetch(`https://ipwho.is/${ip}`);
         const data = await response.json();
 
@@ -18,13 +17,15 @@ export default async function handler(req, res) {
             throw new Error(data.message || 'Lookup failed');
         }
 
-        return res.status(200).json({
-            provider: data.connection?.isp || data.org || 'Unknown',
-            asn: data.connection?.asn ? `AS${data.connection.asn} ${data.connection.org || ''}` : 'Unknown'
-        });
+        const provider = data.connection?.isp || data.connection?.org || 'Unknown';
+        const asn = data.connection?.asn
+            ? `AS${data.connection.asn} ${data.connection.org || ''}`
+            : 'Unknown';
+
+        return res.status(200).json({ provider, asn });
 
     } catch (err) {
         console.error('IP Lookup Error:', err.message);
         return res.status(500).json({ error: 'Failed to fetch IP information' });
     }
-}
+};
