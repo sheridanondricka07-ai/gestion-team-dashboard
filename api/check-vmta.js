@@ -104,7 +104,7 @@ export default async function handler(req, res) {
             }
         }
 
-        let report = `<b>👆 Manual VMTA/PTR Check</b>\n`;
+        let report = `<b>👆 Manual PTR/RDNS Check</b>\n`;
         report += `Status: ${errorCount > 0 ? '⚠️ ISSUES DETECTED' : '✅ ALL CLEAR'}\n\n`;
         
         if (errorLines.length > 0) {

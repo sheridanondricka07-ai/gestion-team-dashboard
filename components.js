@@ -2291,23 +2291,19 @@ window.triggerVMTACheck = async (btn) => {
         const data = await response.json();
         if (data.results) {
             app.state.vmtaResults = { ...app.state.vmtaResults, ...data.results };
-            await app.saveState(); // Persist results
+            await app.saveState();
         }
 
-        // Check Telegram Result
-        let telStatus = '';
         if (data.telegram) {
             try {
                 const telObj = typeof data.telegram === 'string' ? JSON.parse(data.telegram) : data.telegram;
                 if (!telObj.ok) {
-                    telStatus = '\n\n⚠️ Telegram Error: ' + (telObj.description || telObj.error || 'Unknown error');
+                    console.warn('Telegram Notification Failed:', telObj.description || telObj.error);
                 }
             } catch (e) {
                 console.error('Error parsing telegram response:', e);
             }
         }
-
-        alert('VMTA Check complete!' + telStatus);
     } catch (err) {
         console.error('VMTA Check Error:', err);
         alert('VMTA Check failed: ' + err.message);
