@@ -4,6 +4,9 @@
   "main": "index.html",
   "dependencies": {
     "@vercel/kv": "^1.0.1",
-    "firebase-admin": "^11.11.1"
+    "firebase-admin": "^11.11.1",
+    "imap-simple": "^5.1.0",
+    "mailparser": "^3.6.5",
+    "node-fetch": "^2.7.0"
   }
 }

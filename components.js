@@ -421,12 +421,17 @@ function renderManagement(app, container) {
                     <span>Stock Pool</span>
                     <i data-lucide="database" style="width: 14px;"></i>
                 </div>
-                <div style="padding: 12px; border-bottom: 1px solid var(--border-color);">
-                    <div style="position: relative;">
+                <div style="padding: 12px; border-bottom: 1px solid var(--border-color); display: flex; gap: 8px;">
+                    <div style="position: relative; flex: 1;">
                         <i data-lucide="search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; color: var(--text-secondary);"></i>
                         <input type="text" id="pool-search" placeholder="Search domains/IPs..." value="${app.state.searchQuery || ''}" 
                                style="width: 100%; padding: 8px 12px 8px 32px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.8rem; color: var(--text-primary);">
                     </div>
+                    ${isAdmin ? `
+                        <button onclick="showGmailSyncModal()" style="width: auto; padding: 0 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 6px; color: var(--accent-primary);" title="Sync VMTA from Gmail">
+                            <i data-lucide="mail"></i>
+                        </button>
+                    ` : ''}
                 </div>
                 <div class="pool-content">
                     <div style="color: var(--text-secondary); font-size: 0.7rem; margin-bottom: 8px; text-transform: uppercase;">Unlinked RPs</div>
@@ -2385,4 +2390,136 @@ window.triggerVMTACheck = async (btn) => {
         btn.innerHTML = originalText;
         btn.disabled = false;
     }
+};
+
+window.showGmailSyncModal = () => {
+    const app = window.app;
+    const gmail = app.state.gmail || { email: '', password: '' };
+    
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+        <div class="modal" style="width: 450px;">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+                <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(234, 67, 53, 0.1); display: flex; align-items: center; justify-content: center; color: #EA4335;">
+                    <i data-lucide="mail" style="width: 24px;"></i>
+                </div>
+                <div>
+                    <h2 style="margin: 0; font-size: 1.25rem;">Gmail VMTA Sync</h2>
+                    <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Automate IP-to-VMTA mapping from test emails.</p>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Gmail Address</label>
+                <input type="email" id="gmail-email" value="${gmail.email}" placeholder="yourname@gmail.com" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
+            </div>
+            <div class="form-group">
+                <label>App Password</label>
+                <input type="password" id="gmail-password" value="${gmail.password}" placeholder="•••• •••• •••• ••••" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
+                <p style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 6px;">
+                    <i data-lucide="info" style="width: 10px; display: inline-block; margin-right: 2px;"></i>
+                    Use a <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color: var(--accent-primary);">Google App Password</a>, not your login password.
+                </p>
+            </div>
+
+            <div id="sync-results" style="margin-top: 16px; display: none; max-height: 200px; overflow-y: auto; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color); padding: 12px;">
+                <h4 style="font-size: 0.75rem; color: var(--text-secondary); margin: 0 0 8px 0; text-transform: uppercase;">Found Mappings</h4>
+                <div id="mappings-list" style="display: flex; flex-direction: column; gap: 6px;"></div>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-top: 24px;">
+                <button id="start-sync-btn" onclick="runGmailSync(this)" style="flex: 2; background: #EA4335; border: none;">Start Sync</button>
+                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary); color: var(--text-primary);">Close</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    if (window.lucide) window.lucide.createIcons();
+};
+
+window.runGmailSync = async (btn) => {
+    const email = document.getElementById('gmail-email').value.trim();
+    const password = document.getElementById('gmail-password').value.trim();
+    
+    if (!email || !password) {
+        alert('Please enter both Gmail address and App Password.');
+        return;
+    }
+
+    const originalText = btn.innerText;
+    btn.innerText = 'Connecting...';
+    btn.disabled = true;
+
+    try {
+        const response = await fetch('/api/sync-gmail', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+        
+        if (data.error) throw new Error(data.error);
+
+        // Save credentials for next time
+        window.app.state.gmail = { email, password };
+        await window.app.saveState();
+
+        const mappings = data.mappings || {};
+        const count = Object.keys(mappings).length;
+
+        if (count === 0) {
+            alert('No IP-to-VMTA mappings found in recent emails.');
+            btn.innerText = originalText;
+            btn.disabled = false;
+            return;
+        }
+
+        // Show results
+        const resultsDiv = document.getElementById('sync-results');
+        const listDiv = document.getElementById('mappings-list');
+        resultsDiv.style.display = 'block';
+        listDiv.innerHTML = '';
+        
+        Object.entries(mappings).forEach(([ip, vmta]) => {
+            const item = document.createElement('div');
+            item.style.cssText = 'display: flex; justify-content: space-between; font-size: 0.8rem; padding: 4px 8px; background: rgba(255,255,255,0.03); border-radius: 4px;';
+            item.innerHTML = `<span>${ip}</span><span style="color: var(--accent-primary); font-weight: 600;">${vmta}</span>`;
+            listDiv.appendChild(item);
+        });
+
+        btn.innerText = `Apply ${count} Mappings`;
+        btn.onclick = () => applyGmailMappings(mappings, btn);
+        btn.disabled = false;
+
+    } catch (err) {
+        alert('Sync Failed: ' + err.message);
+        btn.innerText = originalText;
+        btn.disabled = false;
+    }
+};
+
+window.applyGmailMappings = async (mappings, btn) => {
+    btn.innerText = 'Applying...';
+    btn.disabled = true;
+    
+    const app = window.app;
+    let updateCount = 0;
+
+    app.state.servers.forEach(srv => {
+        if (!srv.vmtaMap) srv.vmtaMap = {};
+        srv.allIps.forEach(ip => {
+            if (mappings[ip]) {
+                srv.vmtaMap[ip] = mappings[ip];
+                updateCount++;
+            }
+        });
+    });
+
+    await app.saveState();
+    app.updateDashboard();
+    
+    alert(`Successfully updated ${updateCount} VMTA mappings!`);
+    btn.closest('.modal-overlay').remove();
 };
