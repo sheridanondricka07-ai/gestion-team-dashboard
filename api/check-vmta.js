@@ -100,6 +100,7 @@ export default async function handler(req, res) {
         });
     }
 
+    let telegramResponse = null;
     // Send Telegram Notification for Manual Check
     try {
         const servers = await getFirebaseData('state/servers') || [];
@@ -126,7 +127,6 @@ export default async function handler(req, res) {
         
         if (errorLines.length > 0) {
             report += `<b>❌ Attention Required:</b>\n`;
-            // Limit error lines to avoid hitting Telegram message size limits
             const displayLines = errorLines.slice(0, 50); 
             report += displayLines.join('\n');
             if (errorLines.length > 50) report += `\n...and ${errorLines.length - 50} more.`;
@@ -140,11 +140,11 @@ export default async function handler(req, res) {
         report += `👤 Triggered from Dashboard`;
 
         console.log('Sending Telegram report for manual check...');
-        const telRes = await sendTelegram(report);
-        console.log('Telegram response status:', telRes ? 'Sent' : 'Failed');
+        telegramResponse = await sendTelegram(report);
     } catch (e) {
         console.error('Telegram Logic Error:', e);
+        telegramResponse = JSON.stringify({ ok: false, error: e.message });
     }
 
-    return res.status(200).json({ results });
+    return res.status(200).json({ results, telegram: telegramResponse });
 }

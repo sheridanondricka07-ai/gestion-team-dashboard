@@ -2293,6 +2293,21 @@ window.triggerVMTACheck = async (btn) => {
             app.state.vmtaResults = { ...app.state.vmtaResults, ...data.results };
             await app.saveState(); // Persist results
         }
+
+        // Check Telegram Result
+        let telStatus = '';
+        if (data.telegram) {
+            try {
+                const telObj = typeof data.telegram === 'string' ? JSON.parse(data.telegram) : data.telegram;
+                if (!telObj.ok) {
+                    telStatus = '\n\n⚠️ Telegram Error: ' + (telObj.description || telObj.error || 'Unknown error');
+                }
+            } catch (e) {
+                console.error('Error parsing telegram response:', e);
+            }
+        }
+
+        alert('VMTA Check complete!' + telStatus);
     } catch (err) {
         console.error('VMTA Check Error:', err);
         alert('VMTA Check failed: ' + err.message);
@@ -2300,6 +2315,5 @@ window.triggerVMTACheck = async (btn) => {
         app.updateDashboard();
         btn.innerHTML = originalText;
         btn.disabled = false;
-        alert('VMTA Check complete! Report has been sent to Telegram.');
     }
 };
