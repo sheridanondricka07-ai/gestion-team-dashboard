@@ -36,6 +36,24 @@ async function updateFirebaseData(path, data) {
     }
 }
 
+async function sendTelegram(message) {
+    const token = "8737550836:AAFK68Ig7xyW3KIvBhI5gpO1bGaPTwUimr0";
+    const chatId = "-5252005797";
+    try {
+        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: chatId,
+                text: message,
+                parse_mode: 'HTML'
+            })
+        });
+    } catch (e) {
+        console.error('Telegram Error:', e);
+    }
+}
+
 export default async function handler(req, res) {
     // Only allow Vercel Cron to trigger this
     if (!req.headers['x-vercel-cron'] && process.env.NODE_ENV === 'production') {
@@ -102,6 +120,39 @@ export default async function handler(req, res) {
                 }
 
                 await updateFirebaseData('state/vmtaResults', vmtaResults);
+                
+                // Build Telegram Report
+                let okCount = 0;
+                let errorCount = 0;
+                let errorLines = [];
+
+                for (const ip of uniqueIps) {
+                    const data = vmtaResults[ip.replace(/\./g, '_')];
+                    if (data.status === 'OK') {
+                        okCount++;
+                    } else {
+                        errorCount++;
+                        // Find server name for this IP
+                        const server = servers.find(s => s.allIps && s.allIps.includes(ip));
+                        errorLines.push(`• <b>${server ? server.name : 'Unknown'}</b>: ${ip} (${data.ptr})`);
+                    }
+                }
+
+                let report = `<b>🔍 VMTA/PTR Check Report</b>\n`;
+                report += `Status: ${errorCount > 0 ? '⚠️ ISSUES DETECTED' : '✅ ALL CLEAR'}\n\n`;
+                
+                if (errorLines.length > 0) {
+                    report += `<b>❌ Attention Required:</b>\n`;
+                    report += errorLines.join('\n') + `\n\n`;
+                }
+
+                report += `<b>📊 Summary:</b>\n`;
+                report += `✅ Total OK: ${okCount}\n`;
+                report += `❌ Total ERROR: ${errorCount}\n`;
+                report += `⏰ Time: ${new Date().toLocaleString()}`;
+
+                await sendTelegram(report);
+
                 results.vmtaTriggered = true;
                 results.vmtaCount = uniqueIps.length;
             }

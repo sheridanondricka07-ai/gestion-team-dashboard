@@ -1,5 +1,34 @@
 const dns = require('dns').promises;
 
+const DB_URL = "https://gestion-team-c-default-rtdb.firebaseio.com";
+
+async function sendTelegram(message) {
+    const token = "8737550836:AAFK68Ig7xyW3KIvBhI5gpO1bGaPTwUimr0";
+    const chatId = "-5252005797";
+    try {
+        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: chatId,
+                text: message,
+                parse_mode: 'HTML'
+            })
+        });
+    } catch (e) {
+        console.error('Telegram Error:', e);
+    }
+}
+
+async function getFirebaseData(path) {
+    try {
+        const resp = await fetch(`${DB_URL}/${path}.json`);
+        return await resp.json();
+    } catch (e) {
+        return null;
+    }
+}
+
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
@@ -44,6 +73,43 @@ export default async function handler(req, res) {
         chunkResults.forEach(([key, val]) => {
             results[key] = val;
         });
+    }
+
+    // Send Telegram Notification for Manual Check
+    try {
+        const servers = await getFirebaseData('state/servers') || [];
+        let okCount = 0;
+        let errorCount = 0;
+        let errorLines = [];
+
+        for (const ip of ips) {
+            const data = results[ip.replace(/\./g, '_')];
+            if (data.status === 'OK') {
+                okCount++;
+            } else {
+                errorCount++;
+                const server = servers.find(s => s.allIps && s.allIps.includes(ip));
+                errorLines.push(`• <b>${server ? server.name : 'Unknown'}</b>: ${ip} (${data.ptr})`);
+            }
+        }
+
+        let report = `<b>👆 Manual VMTA/PTR Check</b>\n`;
+        report += `Status: ${errorCount > 0 ? '⚠️ ISSUES DETECTED' : '✅ ALL CLEAR'}\n\n`;
+        
+        if (errorLines.length > 0) {
+            report += `<b>❌ Attention Required:</b>\n`;
+            report += errorLines.join('\n') + `\n\n`;
+        }
+
+        report += `<b>📊 Summary:</b>\n`;
+        report += `✅ Total OK: ${okCount}\n`;
+                report += `❌ Total ERROR: ${errorCount}\n`;
+        report += `⏰ Time: ${new Date().toLocaleString()}\n`;
+        report += `👤 Triggered from Dashboard`;
+
+        await sendTelegram(report);
+    } catch (e) {
+        console.error('Telegram Trigger Error:', e);
     }
 
     return res.status(200).json({ results });
