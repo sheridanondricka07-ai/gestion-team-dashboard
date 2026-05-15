@@ -1636,18 +1636,20 @@ function renderSpamhaus(app, container) {
                                     
                                     return sIps.map((ip, ipIdx) => {
                                         const safeIp = ip.replace(/\./g, '_');
+                                        const isFirstInServer = ipIdx === 0 && sIdx !== 0;
+                                        const thickBorder = isFirstInServer ? 'border-top: 3px solid rgba(255,255,255,0.15);' : '';
                                         
                                         return `
-                                            <tr style="border-bottom: 1px solid var(--border-color); vertical-align: middle; ${ipIdx === 0 && sIdx !== 0 ? 'border-top: 3px solid rgba(255,255,255,0.1);' : ''}">
+                                            <tr style="border-bottom: 1px solid var(--border-color); vertical-align: middle;">
                                                 ${ipIdx === 0 ? `
-                                                    <td rowspan="${sIps.length}" style="padding: 16px 12px; border-right: 1px solid var(--border-color); background: rgba(59, 130, 246, 0.02); font-weight: 700; color: var(--accent-primary); border-bottom: 1px solid var(--border-color);">
+                                                    <td rowspan="${sIps.length}" style="padding: 16px 12px; border-right: 1px solid var(--border-color); background: rgba(59, 130, 246, 0.02); font-weight: 700; color: var(--accent-primary); border-bottom: 1px solid var(--border-color); ${thickBorder}">
                                                         <div style="position: sticky; top: 60px;">
                                                             ${s.name}
                                                             <div style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 400; margin-top: 4px;">${sIps.length} IPs</div>
                                                         </div>
                                                     </td>
                                                 ` : ''}
-                                                <td style="padding: 12px; font-family: monospace; border-right: 1px solid var(--border-color);">
+                                                <td style="padding: 12px; font-family: monospace; border-right: 1px solid var(--border-color); ${thickBorder}">
                                                     ${ip}
                                                 </td>
                                                 ${last7Days.map(date => {
@@ -1662,9 +1664,9 @@ function renderSpamhaus(app, container) {
                                                         statusHtml = `<span style="background: ${color}20; color: ${color}; padding: 4px 8px; border-radius: 4px; font-size: 0.65rem; font-weight: 700; border: 1px solid ${color}30;">${label}</span>`;
                                                     }
 
-                                                    return `<td style="padding: 12px 8px; text-align: center; background: ${isToday ? 'rgba(59,130,246,0.02)' : 'transparent'}">${statusHtml}</td>`;
+                                                    return `<td style="padding: 12px 8px; text-align: center; background: ${isToday ? 'rgba(59,130,246,0.02)' : 'transparent'}; ${thickBorder}">${statusHtml}</td>`;
                                                 }).join('')}
-                                                <td style="padding: 12px; text-align: right;">
+                                                <td style="padding: 12px; text-align: right; ${thickBorder}">
                                                     <button onclick="window.open('https://check.spamhaus.org/query/ip/${ip}', '_blank')" style="background: rgba(59, 130, 246, 0.1); border: none; color: var(--accent-primary); cursor: pointer; padding: 6px 12px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">Check</button>
                                                 </td>
                                             </tr>
