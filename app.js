@@ -146,6 +146,19 @@ class TeamApp {
         await this.saveState();
     }
 
+    detectServers(ipString) {
+        if (!ipString || ipString === '---') return 'Unknown Server';
+        const dropIps = ipString.split(/[\s,]+/).filter(ip => ip.trim());
+        const detected = [];
+        if (this.state.servers) {
+            this.state.servers.forEach(srv => {
+                const srvIps = (srv.allIps || []);
+                if (dropIps.some(ip => srvIps.includes(ip))) detected.push(srv.name);
+            });
+        }
+        return detected.length > 0 ? detected.join(', ') : 'Unknown Server';
+    }
+
     async addDrop(dropData) {
         const now = new Date();
         const rev = parseFloat(dropData.rev) || 0;
@@ -175,6 +188,7 @@ class TeamApp {
             epc: epc,
             cpm: cpm,
             rev: rev,
+            servers: this.detectServers(dropData.ips),
             timestamp: now.getTime()
         };
         this.state.drops.push(drop);
@@ -197,7 +211,8 @@ class TeamApp {
             this.state.drops[index] = { 
                 ...current, 
                 ...updates,
-                totalOut, rev, clicks, cpm, epc 
+                totalOut, rev, clicks, cpm, epc,
+                servers: updates.ips ? this.detectServers(updates.ips) : current.servers
             };
             await this.saveState();
             await this.sendDropToTelegram(this.state.drops[index], 'EDITED DROP');
@@ -208,18 +223,7 @@ class TeamApp {
         const token = "8773719558:AAH-VYZZ0E7F092n1ywBsHts3UOWPxlB9Z0";
         const chatId = "-5184683836";
         
-        // Auto-detect server name(s) from IPs
-        let detectedServers = [];
-        if (drop.ips && drop.ips !== '---') {
-            const dropIpList = drop.ips.split(/[\n\s,]+/).map(ip => ip.trim()).filter(ip => ip);
-            this.state.servers.forEach(srv => {
-                const srvIps = srv.allIps || [];
-                if (dropIpList.some(ip => srvIps.includes(ip))) {
-                    if (!detectedServers.includes(srv.name)) detectedServers.push(srv.name);
-                }
-            });
-        }
-        const serverDisplay = detectedServers.length > 0 ? detectedServers.join(', ') : 'Unknown Server';
+        const serverDisplay = drop.servers || this.detectServers(drop.ips);
 
         const formatNum = (num) => num.toLocaleString('en-US').replace(/,/g, ' ');
         const message = `🚀 <b>${type}</b>\n` +
@@ -387,6 +391,10 @@ class TeamApp {
                                 const cleanName = (d.mailerName || '').trim();
                                 if (knownIds[cleanName] && (!d.mailerId || d.mailerId === 'N/A')) {
                                     d.mailerId = knownIds[cleanName];
+                                    patched = true;
+                                }
+                                if (!d.servers) {
+                                    d.servers = this.detectServers(d.ips);
                                     patched = true;
                                 }
                             });

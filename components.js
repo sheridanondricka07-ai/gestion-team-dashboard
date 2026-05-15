@@ -1667,6 +1667,7 @@ window.renderDropDetails = (app, container) => {
                                 </th>
                                 ${isAdmin ? `<th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('mailerName')">Mailer ${key === 'mailerName' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>` : ''}
                                 <th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('offer')">Offer ${key === 'offer' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
+                                <th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('servers')">Server(s) ${key === 'servers' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
                                 <th style="padding: 12px;">Details</th>
                                 <th style="padding: 12px;">IP(s)</th>
                                 <th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('totalOut')">Sent ${key === 'totalOut' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
@@ -1699,6 +1700,9 @@ window.renderDropDetails = (app, container) => {
                                     <td style="padding: 12px;">
                                         <div style="font-weight: 600;">${d.offer || '---'}</div>
                                         <div style="font-size: 0.7rem; color: var(--text-secondary);">Deploys: ${d.deployIds || '---'}</div>
+                                    </td>
+                                    <td style="padding: 12px;">
+                                        <div style="font-weight: 600; color: var(--accent-primary);">${d.servers || '---'}</div>
                                     </td>
                                     <td style="padding: 12px;">
                                         <div style="font-size: 0.8rem;"><span style="color: var(--text-secondary);">DATA Profil:</span> ${d.profile || 'N/A'}</div>
