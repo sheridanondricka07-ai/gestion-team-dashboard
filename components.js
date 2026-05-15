@@ -241,6 +241,9 @@ function renderServerInventory(app, container) {
                         <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Manage administrative details and cancellation schedules.</p>
                     </div>
                     <div style="display: flex; gap: 8px;">
+                        <button onclick="showBulkDeclareCancelModal()" style="padding: 8px 16px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px; width: auto; background: var(--bg-tertiary); border: 1px solid #ef444455; color: #f87171;">
+                            <i data-lucide="trash-2" style="width: 14px;"></i> Bulk Declare Cancel
+                        </button>
                         <button onclick="showBulkImportInventoryModal()" style="padding: 8px 16px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color);">
                             <i data-lucide="file-text" style="width: 14px;"></i> Bulk Import Details
                         </button>
@@ -487,6 +490,59 @@ window.importInventoryData = async (btn) => {
         btn.innerText = 'Import & Apply to Inventory';
         btn.disabled = false;
         alert('No matching server names found. Please check your data.');
+    }
+};
+
+window.showBulkDeclareCancelModal = () => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+        <div class="modal" style="width: 500px;">
+            <h2 style="margin-bottom: 8px;">Bulk Declare Cancellation</h2>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 20px;">
+                Enter server names (one per line) to mark them as <b>DECLARED</b>.
+            </p>
+            
+            <textarea id="cancel-srv-list" placeholder="s_wmn3_2232&#10;s_wmn3_2231&#10;s_wmn3_2230" 
+                style="width: 100%; height: 250px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; padding: 12px; font-family: monospace; font-size: 0.8rem; margin-bottom: 20px;"></textarea>
+
+            <div style="display: flex; gap: 12px;">
+                <button onclick="bulkDeclareCancel(this)" style="flex: 2; background: #ef4444; border: none;">Declare for Cancellation</button>
+                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary); color: var(--text-primary);">Cancel</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+};
+
+window.bulkDeclareCancel = async (btn) => {
+    const text = document.getElementById('cancel-srv-list').value;
+    if (!text.trim()) return;
+
+    btn.innerText = 'Processing...';
+    btn.disabled = true;
+
+    const names = text.split('\n').map(n => n.trim()).filter(n => n !== '');
+    const servers = window.app.state.servers;
+    let updateCount = 0;
+
+    names.forEach(name => {
+        const srv = servers.find(s => s.name === name);
+        if (srv) {
+            srv.markedForCancel = true;
+            updateCount++;
+        }
+    });
+
+    if (updateCount > 0) {
+        await window.app.saveState();
+        window.app.updateDashboard();
+        btn.closest('.modal-overlay').remove();
+        alert(`Successfully marked ${updateCount} servers as DECLARED!`);
+    } else {
+        btn.innerText = 'Declare for Cancellation';
+        btn.disabled = false;
+        alert('No matching server names found.');
     }
 };
 
