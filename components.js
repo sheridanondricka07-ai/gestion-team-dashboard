@@ -1546,7 +1546,7 @@ window.renderDropDetails = (app, container) => {
                                     </td>
                                     <td style="padding: 12px;">
                                         <div style="font-size: 0.8rem;"><span style="color: var(--text-secondary);">Profile:</span> ${d.profile || 'N/A'}</div>
-                                        <div style="font-size: 0.8rem;"><span style="color: var(--text-secondary);">Test:</span> <span style="color: ${d.testAfter === '100% INBOX' ? 'var(--success)' : 'var(--accent-primary)'}; font-weight: 600;">${d.testAfter || '0%'}</span></div>
+                                        <div style="font-size: 0.8rem;"><span style="color: var(--text-secondary);">Inbox:</span> <span style="color: ${d.testAfter === '100%' ? 'var(--success)' : 'var(--accent-primary)'}; font-weight: 600;">${d.testAfter || '0%'} INBOX</span></div>
                                     </td>
                                     <td style="padding: 12px;">${(d.nbrSent || 0).toLocaleString()}</td>
                                     <td style="padding: 12px;">${(d.clicks || 0).toLocaleString()}</td>
@@ -1600,14 +1600,14 @@ window.showAddDropModal = () => {
                         <input type="text" id="drop-profile" placeholder="Mailer Profile Name" required>
                     </div>
                     <div class="form-group">
-                        <label>Test After</label>
+                        <label>Inbox Rate (%)</label>
                         <select id="drop-test-after" style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px;">
                             <option value="0%">0%</option>
                             <option value="25%">25%</option>
                             <option value="50%">50%</option>
                             <option value="75%">75%</option>
                             <option value="85%">85%</option>
-                            <option value="100% INBOX">100% INBOX</option>
+                            <option value="100%">100%</option>
                         </select>
                     </div>
                     <div class="form-group" style="grid-column: span 2;">
@@ -1685,9 +1685,9 @@ window.showEditDropModal = (dropId) => {
                         <input type="text" id="edit-drop-profile" value="${drop.profile || ''}" required>
                     </div>
                     <div class="form-group">
-                        <label>Test After</label>
+                        <label>Inbox Rate (%)</label>
                         <select id="edit-drop-test-after" style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px;">
-                            ${['0%', '25%', '50%', '75%', '85%', '100% INBOX'].map(opt => `<option value="${opt}" ${drop.testAfter === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+                            ${['0%', '25%', '50%', '75%', '85%', '100%'].map(opt => `<option value="${opt}" ${drop.testAfter === opt ? 'selected' : ''}>${opt}</option>`).join('')}
                         </select>
                     </div>
                     <div class="form-group" style="grid-column: span 2;">

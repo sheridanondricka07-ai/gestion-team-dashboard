@@ -212,7 +212,7 @@ class TeamApp {
             `🆔 <b>Deploys:</b> ${drop.deployIds}\n\n` +
             `📑 <b>Details:</b>\n` +
             `• <b>Profile:</b> ${drop.profile}\n` +
-            `• <b>Test After:</b> ${drop.testAfter}\n` +
+            `• <b>Inbox Rate:</b> ${drop.testAfter} INBOX\n` +
             `• <b>Return Path:</b> ${drop.returnPath}\n\n` +
             `📊 <b>Performance:</b>\n` +
             `• <b>Sent:</b> ${drop.nbrSent.toLocaleString()}\n` +
