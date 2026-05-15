@@ -2414,6 +2414,16 @@ window.showGmailSyncModal = () => {
                 </p>
             </div>
 
+            <div id="sync-progress-container" style="display: none; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 6px;">
+                    <span id="sync-status-text">Ready</span>
+                    <span id="sync-percent">0%</span>
+                </div>
+                <div style="width: 100%; height: 6px; background: var(--bg-tertiary); border-radius: 10px; overflow: hidden; border: 1px solid var(--border-color);">
+                    <div id="sync-progress-bar" style="width: 0%; height: 100%; background: #EA4335; transition: width 0.3s ease;"></div>
+                </div>
+            </div>
+
             <div id="sync-results" style="margin-top: 16px; display: none; max-height: 200px; overflow-y: auto; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color); padding: 12px;">
                 <h4 style="font-size: 0.75rem; color: var(--text-secondary); margin: 0 0 8px 0; text-transform: uppercase;">Found Mappings</h4>
                 <div id="mappings-list" style="display: flex; flex-direction: column; gap: 6px;"></div>
@@ -2442,6 +2452,22 @@ window.runGmailSync = async (btn) => {
     btn.innerText = 'Scanning...';
     btn.disabled = true;
 
+    // Show progress bar
+    const progressContainer = document.getElementById('sync-progress-container');
+    const progressBar = document.getElementById('sync-progress-bar');
+    const statusText = document.getElementById('sync-status-text');
+    const percentText = document.getElementById('sync-percent');
+    
+    progressContainer.style.display = 'block';
+    
+    const setProgress = (percent, text) => {
+        progressBar.style.width = percent + '%';
+        percentText.innerText = percent + '%';
+        statusText.innerText = text;
+    };
+
+    setProgress(20, 'Connecting to Gmail...');
+
     // Get all current production IPs
     const targetIps = [];
     window.app.state.servers.forEach(srv => {
@@ -2449,6 +2475,17 @@ window.runGmailSync = async (btn) => {
             if (!targetIps.includes(ip)) targetIps.push(ip);
         });
     });
+
+    // Simulate progress while waiting for backend
+    let currentProgress = 20;
+    const interval = setInterval(() => {
+        if (currentProgress < 85) {
+            currentProgress += Math.random() * 5;
+            let label = 'Scanning folders...';
+            if (currentProgress > 50) label = 'Extracting mappings...';
+            setProgress(Math.floor(currentProgress), label);
+        }
+    }, 800);
 
     try {
         const response = await fetch('/api/sync-gmail', {
@@ -2458,8 +2495,11 @@ window.runGmailSync = async (btn) => {
         });
 
         const data = await response.json();
+        clearInterval(interval);
         
         if (data.error) throw new Error(data.error);
+
+        setProgress(100, 'Scan Complete!');
 
         // Save credentials for next time
         window.app.state.gmail = { email, password };
