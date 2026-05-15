@@ -41,41 +41,25 @@ async function sendTelegram(message) {
     const token = "8737550836:AAFK68Ig7xyW3KIvBhI5gpO1bGaPTwUimr0";
     const chatId = "-5252005797";
     
-    return new Promise((resolve, reject) => {
-        const data = JSON.stringify({
-            chat_id: chatId,
-            text: message,
-            parse_mode: 'HTML'
-        });
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000); 
 
-        const options = {
-            hostname: 'api.telegram.org',
-            port: 443,
-            path: `/bot${token}/sendMessage`,
+        const resp = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Content-Length': data.length
-            }
-        };
-
-        const req = https.request(options, (res) => {
-            let body = '';
-            res.on('data', (d) => body += d);
-            res.on('end', () => {
-                console.log('Telegram response:', body);
-                resolve(body);
-            });
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: chatId,
+                text: message,
+                parse_mode: 'HTML'
+            }),
+            signal: controller.signal
         });
-
-        req.on('error', (e) => {
-            console.error('Telegram error:', e);
-            reject(e);
-        });
-
-        req.write(data);
-        req.end();
-    });
+        clearTimeout(timeout);
+        return await resp.json();
+    } catch (e) {
+        return { ok: false, error: e.message };
+    }
 }
 
 export default async function handler(req, res) {
