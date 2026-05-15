@@ -1035,7 +1035,6 @@ window.copyAllLinkedRps = (btn) => {
 
 const STATUS_TYPES = [
     { id: 'none', label: 'None', color: 'transparent' },
-    { id: 'inbox', label: 'INBOX', color: '#10b981' },
     { id: 'rp_test', label: 'RP TEST', color: '#22c55e' },
     { id: 'spam', label: 'SPAM', color: '#ef4444' },
     { id: 'paused', label: 'PAUSED', color: '#3b82f6' },
@@ -2623,7 +2622,7 @@ window.runGmailIPStatusSync = async (btn) => {
             if (folder === 'INBOX') {
                 // MATCH LOGIC: Check if Return-Path matches the RDNS hostname or domain
                 const isMatch = (targetRdns && (rpFull.includes(targetRdns) || targetRdns.includes(rpDomain)));
-                newStatusId = isMatch ? 'inbox' : 'rp_test';
+                newStatusId = isMatch ? 'rdns' : 'rp_test';
             } else if (folder === 'SPAM') {
                 newStatusId = 'spam';
             }
@@ -2633,15 +2632,15 @@ window.runGmailIPStatusSync = async (btn) => {
                 const currentStatusId = statuses[safeIp][today] || 'none';
                 
                 // OVERRIDE RULES:
-                // 1. INBOX overrides everything
-                // 2. RP TEST overrides everything except INBOX
-                // 3. SPAM overrides nothing if INBOX/RP TEST already exist
+                // 1. RDNS overrides everything
+                // 2. RP TEST overrides everything except RDNS
+                // 3. SPAM overrides nothing if RDNS/RP TEST already exist
                 
                 let shouldApply = false;
-                if (newStatusId === 'inbox') {
+                if (newStatusId === 'rdns') {
                     shouldApply = true;
                 } else if (newStatusId === 'rp_test') {
-                    if (currentStatusId !== 'inbox') shouldApply = true;
+                    if (currentStatusId !== 'rdns') shouldApply = true;
                 } else if (newStatusId === 'spam') {
                     if (currentStatusId === 'none' || currentStatusId === 'spam') shouldApply = true;
                 }
@@ -2653,7 +2652,7 @@ window.runGmailIPStatusSync = async (btn) => {
                     const item = document.createElement('div');
                     item.style.cssText = 'display: flex; justify-content: space-between; font-size: 0.8rem; padding: 4px 8px; background: rgba(255,255,255,0.03); border-radius: 4px; margin-bottom: 4px;';
                     const statusLabel = newStatusId.toUpperCase();
-                    const statusColor = newStatusId === 'inbox' ? '#10b981' : (newStatusId === 'rp_test' ? '#22c55e' : '#ef4444');
+                    const statusColor = newStatusId === 'rdns' ? '#166534' : (newStatusId === 'rp_test' ? '#22c55e' : '#ef4444');
                     item.innerHTML = `<span>${ip}</span><span style="color: ${statusColor}; font-weight: 700;">${statusLabel}</span>`;
                     listDiv.appendChild(item);
                 }
