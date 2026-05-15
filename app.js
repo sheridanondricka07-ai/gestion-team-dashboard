@@ -150,8 +150,8 @@ class TeamApp {
             // Initialize notification tracking if not present
             if (!srv.notified) srv.notified = {};
 
-            // Check milestones: 3, 2, 1 days
-            if (diffDays <= 3 && diffDays > 0) {
+            // Check milestones: 3, 2, 1, 0 days
+            if (diffDays <= 3 && diffDays >= 0) {
                 const milestone = `${diffDays}d`;
                 console.log(`Checking milestone ${milestone} for ${srv.name}. Already notified: ${srv.notified[milestone]}`);
                 
