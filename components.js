@@ -1773,9 +1773,10 @@ window.showAddDropModal = () => {
         const breakdown = [];
 
         lines.forEach(line => {
-            // Pattern to match: s_wmn3_2088 41 40 (ServerName IN OUT)
-            // Or handle tabs/spaces
-            const parts = line.trim().split(/\s+/);
+            const trimmed = line.trim();
+            if (trimmed.includes('(IN)') || trimmed.includes('(OUT)')) return; // Skip header lines
+
+            const parts = trimmed.split(/\s+/);
             if (parts.length >= 3) {
                 const srvName = parts[0];
                 const inVal = parseInt(parts[1]);
@@ -1896,7 +1897,10 @@ window.showEditDropModal = (dropId) => {
         let totalOut = 0;
         const breakdown = [];
         lines.forEach(line => {
-            const parts = line.trim().split(/\s+/);
+            const trimmed = line.trim();
+            if (trimmed.includes('(IN)') || trimmed.includes('(OUT)')) return;
+
+            const parts = trimmed.split(/\s+/);
             if (parts.length >= 3) {
                 const srvName = parts[0];
                 const inVal = parseInt(parts[1]);
