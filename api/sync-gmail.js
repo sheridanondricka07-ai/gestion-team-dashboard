@@ -4,7 +4,7 @@ const { simpleParser } = require('mailparser');
 export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
 
-    const { email, password, limit = 50 } = req.body;
+    const { email, password, targetIps = [] } = req.body;
 
     if (!email || !password) {
         return res.status(400).json({ error: 'Email and App Password are required' });
@@ -24,40 +24,53 @@ export default async function handler(req, res) {
 
     try {
         const connection = await imap.connect(config);
-        await connection.openBox('INBOX');
-
-        const searchCriteria = ['ALL'];
-        const fetchOptions = {
-            bodies: ['HEADER', 'TEXT'],
-            markSeen: false
-        };
-
-        const messages = await connection.search(searchCriteria, fetchOptions);
+        const boxes = ['INBOX', '[Gmail]/Spam'];
         const results = {};
+        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
 
-        for (const msg of messages.reverse().slice(0, limit)) {
-            const all = msg.parts.find(part => part.which === 'HEADER');
-            const id = msg.attributes.uid;
-            const headers = all.body;
+        for (const boxName of boxes) {
+            try {
+                await connection.openBox(boxName);
+                
+                // Fetch last 100 messages from each box to filter by time
+                const searchCriteria = ['ALL'];
+                const fetchOptions = {
+                    bodies: ['HEADER'],
+                    markSeen: false,
+                    struct: true
+                };
 
-            // Look for Received header that contains mx.google.com
-            // Example: Received: from szg.iirmnwi.tw (crc-dans.filterorbit.com. [51.83.146.80]) by mx.google.com ...
-            const receivedHeaders = headers.received || [];
-            const receivedList = Array.isArray(receivedHeaders) ? receivedHeaders : [receivedHeaders];
+                const messages = await connection.search(searchCriteria, fetchOptions);
+                
+                for (const msg of messages.reverse().slice(0, 100)) {
+                    const headerPart = msg.parts.find(part => part.which === 'HEADER');
+                    const msgDate = new Date(msg.attributes.date);
 
-            for (const rh of receivedList) {
-                if (rh.includes('by mx.google.com')) {
-                    // Regex to extract VMTA and IP
-                    // Received: from szg.iirmnwi.tw (crc-dans.filterorbit.com. [51.83.146.80])
-                    const match = rh.match(/from\s+([^\s\(\)]+)\s+\([^\)]*?\[(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\]\)/i);
-                    if (match) {
-                        const vmta = match[1];
-                        const ip = match[2];
-                        if (!results[ip]) {
-                            results[ip] = vmta;
+                    if (msgDate < twoHoursAgo) continue;
+
+                    const headers = headerPart.body;
+                    const receivedHeaders = headers.received || [];
+                    const receivedList = Array.isArray(receivedHeaders) ? receivedHeaders : [receivedHeaders];
+
+                    for (const rh of receivedList) {
+                        if (rh.includes('by mx.google.com')) {
+                            const match = rh.match(/from\s+([^\s\(\)]+)\s+\([^\)]*?\[(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\]\)/i);
+                            if (match) {
+                                const vmta = match[1];
+                                const ip = match[2];
+                                
+                                // Only add if it's one of our target IPs
+                                if (targetIps.length === 0 || targetIps.includes(ip)) {
+                                    if (!results[ip]) {
+                                        results[ip] = vmta;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
+            } catch (e) {
+                console.warn(`Could not open box ${boxName}:`, e.message);
             }
         }
 

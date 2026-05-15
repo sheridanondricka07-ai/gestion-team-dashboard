@@ -2406,7 +2406,7 @@ window.showGmailSyncModal = () => {
                 </div>
                 <div>
                     <h2 style="margin: 0; font-size: 1.25rem;">Gmail VMTA Sync</h2>
-                    <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Automate IP-to-VMTA mapping from test emails.</p>
+                    <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Scanning Inbox & Spam (Last 2 Hours).</p>
                 </div>
             </div>
 
@@ -2419,7 +2419,7 @@ window.showGmailSyncModal = () => {
                 <input type="password" id="gmail-password" value="${gmail.password}" placeholder="•••• •••• •••• ••••" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
                 <p style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 6px;">
                     <i data-lucide="info" style="width: 10px; display: inline-block; margin-right: 2px;"></i>
-                    Use a <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color: var(--accent-primary);">Google App Password</a>, not your login password.
+                    Use a <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color: var(--accent-primary);">Google App Password</a>.
                 </p>
             </div>
 
@@ -2448,14 +2448,22 @@ window.runGmailSync = async (btn) => {
     }
 
     const originalText = btn.innerText;
-    btn.innerText = 'Connecting...';
+    btn.innerText = 'Scanning...';
     btn.disabled = true;
+
+    // Get all current production IPs
+    const targetIps = [];
+    window.app.state.servers.forEach(srv => {
+        (srv.allIps || []).forEach(ip => {
+            if (!targetIps.includes(ip)) targetIps.push(ip);
+        });
+    });
 
     try {
         const response = await fetch('/api/sync-gmail', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify({ email, password, targetIps })
         });
 
         const data = await response.json();
