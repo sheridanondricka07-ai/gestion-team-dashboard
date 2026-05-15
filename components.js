@@ -326,9 +326,21 @@ window.importInventoryData = async (btn) => {
             if (parts[5]) srv.group = parts[5];
             if (parts[6]) srv.provider = parts[6];
             if (parts[7]) srv.asn = parts[7];
-            if (parts[8]) srv.cancelNoticeDate = parts[8];
-            if (parts[9]) srv.reqAt = parts[9];
-            if (parts[10]) srv.cancelDate = parts[10];
+            
+            // Smarter logic for the last 3 date columns which can be tricky
+            // Cancellation Date is always the LAST one
+            if (parts.length >= 10) {
+                srv.cancelDate = parts[parts.length - 1];
+                // Req.At is often the second or third from last depending on the 'User' column
+                // We'll look for the notice date around index 8
+                if (parts[8]) srv.cancelNoticeDate = parts[8];
+                
+                // For Req At, we take what's between Notice and Cancel Date
+                const middleParts = parts.slice(9, parts.length - 1);
+                if (middleParts.length > 0) {
+                    srv.reqAt = middleParts.join(' ');
+                }
+            }
             
             updateCount++;
         }
