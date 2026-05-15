@@ -1759,15 +1759,15 @@ function renderSpamhaus(app, container) {
             ` : ''}
 
             ${app.state.spamhausTab === 'vmta' ? `
-                <!-- NEW VMTA Check Section (Hostname Match) -->
+                <!-- VMTA Extraction Section (From Gmail) -->
                 <div class="card" style="padding: 0; overflow: hidden;">
                     <div style="padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02);">
                         <div>
-                            <h3 style="margin: 0; font-size: 1.1rem;">VMTA Consistency Check</h3>
-                            <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Match current RDNS against your expected virtual names.</p>
+                            <h3 style="margin: 0; font-size: 1.1rem;">VMTA Mapping (from Gmail)</h3>
+                            <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">IP to Virtual Name mappings extracted from your test inbox.</p>
                         </div>
-                        <button onclick="triggerVMTACheck(this)" class="btn-primary" style="width: auto; padding: 8px 16px; font-size: 0.85rem; display: flex; align-items: center; gap: 8px;">
-                            <i data-lucide="check-square" style="width: 14px;"></i> Verify Mappings
+                        <button onclick="showGmailSyncModal()" class="btn-primary" style="width: auto; padding: 8px 16px; font-size: 0.85rem; display: flex; align-items: center; gap: 8px; background: #EA4335; border: none;">
+                            <i data-lucide="mail" style="width: 14px;"></i> Sync from Gmail
                         </button>
                     </div>
                     <div style="overflow-x: auto; background: var(--bg-secondary);">
@@ -1776,9 +1776,8 @@ function renderSpamhaus(app, container) {
                                 <tr style="text-align: left; background: var(--bg-tertiary);">
                                     <th style="padding: 16px 12px; width: 180px;">Server</th>
                                     <th style="padding: 16px 12px; width: 150px;">IP Address</th>
-                                    <th style="padding: 16px 12px;">Expected VMTA (Virtual Name)</th>
-                                    <th style="padding: 16px 12px;">Actual RDNS (PTR)</th>
-                                    <th style="padding: 16px 12px; width: 100px;">Match</th>
+                                    <th style="padding: 16px 12px;">Virtual Machine Terminal Address (VMTA)</th>
+                                    <th style="padding: 16px 12px; width: 120px;">Source</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1786,12 +1785,7 @@ function renderSpamhaus(app, container) {
                                     const sIps = s.allIps || [];
                                     const vmtaMap = s.vmtaMap || {};
                                     return sIps.map((ip, ipIdx) => {
-                                        const expected = vmtaMap[ip] || '---';
-                                        const safeIp = ip.replace(/\./g, '_');
-                                        const data = app.state.vmtaResults[safeIp] || { ptr: '---' };
-                                        const actual = data.ptr || '---';
-                                        const isMatch = expected !== '---' && actual.toLowerCase().replace(/\.$/, '') === expected.toLowerCase().replace(/\.$/, '');
-                                        
+                                        const vmta = vmtaMap[ip] || '---';
                                         const isFirstInServer = ipIdx === 0 && sIdx !== 0;
                                         const thickBorder = isFirstInServer ? 'border-top: 3px solid rgba(255,255,255,0.15);' : '';
                                         
@@ -1803,22 +1797,19 @@ function renderSpamhaus(app, container) {
                                                     </td>
                                                 ` : ''}
                                                 <td style="padding: 12px; font-family: monospace; border-right: 1px solid var(--border-color); ${thickBorder}">${ip}</td>
-                                                <td style="padding: 12px; font-family: monospace; color: var(--accent-primary); ${thickBorder}">${expected}</td>
-                                                <td style="padding: 12px; font-family: monospace; color: var(--text-secondary); ${thickBorder}">${actual}</td>
+                                                <td style="padding: 12px; font-family: monospace; color: var(--accent-primary); ${thickBorder}">${vmta}</td>
                                                 <td style="padding: 12px; ${thickBorder}">
-                                                    ${expected === '---' ? `
-                                                        <span style="color: var(--text-secondary); font-size: 0.65rem; opacity: 0.5;">NO MAPPING</span>
+                                                    ${vmta !== '---' ? `
+                                                        <span style="padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; background: rgba(59, 130, 246, 0.1); color: var(--accent-primary); border: 1px solid rgba(59, 130, 246, 0.2);">GMAIL SYNC</span>
                                                     ` : `
-                                                        <span style="padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; background: ${isMatch ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)'}; color: ${isMatch ? 'var(--success)' : 'var(--error)'}; border: 1px solid ${isMatch ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'};">
-                                                            ${isMatch ? 'MATCH' : 'MISMATCH'}
-                                                        </span>
+                                                        <span style="color: var(--text-secondary); font-size: 0.7rem; opacity: 0.5;">NO DATA</span>
                                                     `}
                                                 </td>
                                             </tr>
                                         `;
                                     }).join('');
                                 }).join('')}
-                                ${servers.length === 0 ? '<tr><td colspan="5" style="padding: 40px; text-align: center; color: var(--text-secondary);">No servers mapped yet.</td></tr>' : ''}
+                                ${servers.length === 0 ? '<tr><td colspan="4" style="padding: 40px; text-align: center; color: var(--text-secondary);">No servers found.</td></tr>' : ''}
                             </tbody>
                         </table>
                     </div>
