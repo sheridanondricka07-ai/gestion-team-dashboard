@@ -1694,60 +1694,69 @@ window.showAddDropModal = () => {
     overlay.className = 'modal-overlay';
     overlay.style.zIndex = '10000';
     overlay.innerHTML = `
-        <div class="modal" style="max-width: 550px;">
+        <div class="modal" style="max-width: 800px;">
             <h2 style="margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
                 <i data-lucide="plus-circle" style="color: var(--success);"></i>
                 Add New Drop Record
             </h2>
             <form id="add-drop-form">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                    <div class="form-group">
-                        <label>Entity</label>
-                        <input type="text" id="drop-entity" value="WMN3" required>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                    <!-- Column 1 -->
+                    <div style="display: flex; flex-direction: column; gap: 16px;">
+                        <div class="form-group">
+                            <label>Entity</label>
+                            <input type="text" id="drop-entity" value="WMN3" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Offer Name</label>
+                            <input type="text" id="drop-offer" placeholder="e.g. Finance_Offer" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Deploy ID(s)</label>
+                            <input type="text" id="drop-deploys" placeholder="e.g. 1024, 1025" required>
+                        </div>
+                        <div class="form-group">
+                            <label>IP(s) (One per line)</label>
+                            <textarea id="drop-ips" placeholder="Paste IPs here..." style="width: 100%; height: 120px; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; font-family: monospace; font-size: 0.75rem;"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Return Path</label>
+                            <input type="text" id="drop-return-path" placeholder="e.g. bounce@domain.com">
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>Offer Name</label>
-                        <input type="text" id="drop-offer" placeholder="e.g. Finance_Offer" required>
-                    </div>
-                    <div class="form-group" style="grid-column: span 2;">
-                        <label>Deploy ID(s)</label>
-                        <input type="text" id="drop-deploys" placeholder="e.g. 1024, 1025" required>
-                    </div>
-                    <div class="form-group" style="grid-column: span 2;">
-                        <label>IP(s) (One per line)</label>
-                        <textarea id="drop-ips" placeholder="Paste IPs here..." style="width: 100%; height: 60px; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; font-family: monospace; font-size: 0.75rem;"></textarea>
-                    </div>
-                    <div class="form-group" style="grid-column: span 2;">
-                        <label>Paste Raw Server Stats (Calculates Sent)</label>
-                        <textarea id="drop-raw-stats" placeholder="Paste logs here..." style="width: 100%; height: 80px; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; font-family: monospace; font-size: 0.75rem;"></textarea>
-                        <p style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 4px;">App will auto-calculate SENT (IN) and SENT (OUT).</p>
-                    </div>
-                    <div class="form-group">
-                        <label>DATA Profil</label>
-                        <input type="text" id="drop-profile" placeholder="DATA Profil Name" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Inbox Rate (%)</label>
-                        <select id="drop-test-after" style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px;">
-                            <option value="0%">0%</option>
-                            <option value="25%">25%</option>
-                            <option value="50%">50%</option>
-                            <option value="75%">75%</option>
-                            <option value="85%">85%</option>
-                            <option value="100%">100%</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="grid-column: span 2;">
-                        <label>Return Path</label>
-                        <input type="text" id="drop-return-path" placeholder="e.g. bounce@domain.com">
-                    </div>
-                    <div class="form-group">
-                        <label>Clicks</label>
-                        <input type="number" id="drop-clicks" step="1" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Revenue ($)</label>
-                        <input type="number" id="drop-rev" step="0.01" required>
+
+                    <!-- Column 2 -->
+                    <div style="display: flex; flex-direction: column; gap: 16px;">
+                        <div class="form-group">
+                            <label>DATA Profil</label>
+                            <input type="text" id="drop-profile" placeholder="DATA Profil Name" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Inbox Rate (%)</label>
+                            <select id="drop-test-after" style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px;">
+                                <option value="0%">0%</option>
+                                <option value="25%">25%</option>
+                                <option value="50%">50%</option>
+                                <option value="75%">75%</option>
+                                <option value="85%">85%</option>
+                                <option value="100%">100%</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Paste Raw Server Stats (Calculates Sent)</label>
+                            <textarea id="drop-raw-stats" placeholder="Paste logs here..." style="width: 100%; height: 120px; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; font-family: monospace; font-size: 0.75rem;"></textarea>
+                            <p style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 4px;">App will auto-calculate SENT (IN) and SENT (OUT).</p>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                            <div class="form-group">
+                                <label>Clicks</label>
+                                <input type="number" id="drop-clicks" step="1" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Revenue ($)</label>
+                                <input type="number" id="drop-rev" step="0.01" required>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div style="display: flex; gap: 12px; margin-top: 24px;">
@@ -1816,51 +1825,60 @@ window.showEditDropModal = (dropId) => {
     overlay.className = 'modal-overlay';
     overlay.style.zIndex = '10000';
     overlay.innerHTML = `
-        <div class="modal" style="max-width: 550px;">
+        <div class="modal" style="max-width: 800px;">
             <h2 style="margin-bottom: 20px;">Edit Drop Record</h2>
             <form id="edit-drop-form">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                    <div class="form-group">
-                        <label>Entity</label>
-                        <input type="text" id="edit-drop-entity" value="${drop.entity || 'WMN3'}">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                    <!-- Column 1 -->
+                    <div style="display: flex; flex-direction: column; gap: 16px;">
+                        <div class="form-group">
+                            <label>Entity</label>
+                            <input type="text" id="edit-drop-entity" value="${drop.entity || 'WMN3'}">
+                        </div>
+                        <div class="form-group">
+                            <label>Offer Name</label>
+                            <input type="text" id="edit-drop-offer" value="${drop.offer || ''}">
+                        </div>
+                        <div class="form-group">
+                            <label>Deploy ID(s)</label>
+                            <input type="text" id="edit-drop-deploys" value="${drop.deployIds || ''}">
+                        </div>
+                        <div class="form-group">
+                            <label>IP(s) (One per line)</label>
+                            <textarea id="edit-drop-ips" style="width: 100%; height: 120px; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; font-family: monospace; font-size: 0.75rem;">${drop.ips || ''}</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Return Path</label>
+                            <input type="text" id="edit-drop-return-path" value="${drop.returnPath || ''}">
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>Offer Name</label>
-                        <input type="text" id="edit-drop-offer" value="${drop.offer || ''}">
-                    </div>
-                    <div class="form-group" style="grid-column: span 2;">
-                        <label>Deploy ID(s)</label>
-                        <input type="text" id="edit-drop-deploys" value="${drop.deployIds || ''}">
-                    </div>
-                    <div class="form-group" style="grid-column: span 2;">
-                        <label>IP(s) (One per line)</label>
-                        <textarea id="edit-drop-ips" style="width: 100%; height: 60px; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; font-family: monospace; font-size: 0.75rem;">${drop.ips || ''}</textarea>
-                    </div>
-                    <div class="form-group" style="grid-column: span 2;">
-                        <label>Paste Raw Server Stats (Calculates Sent)</label>
-                        <textarea id="edit-drop-raw-stats" placeholder="Paste logs here..." style="width: 100%; height: 80px; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; font-family: monospace; font-size: 0.75rem;"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>DATA Profil</label>
-                        <input type="text" id="edit-drop-profile" value="${drop.profile || ''}" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Inbox Rate (%)</label>
-                        <select id="edit-drop-test-after" style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px;">
-                            ${['0%', '25%', '50%', '75%', '85%', '100%'].map(opt => `<option value="${opt}" ${drop.testAfter === opt ? 'selected' : ''}>${opt}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div class="form-group" style="grid-column: span 2;">
-                        <label>Return Path</label>
-                        <input type="text" id="edit-drop-return-path" value="${drop.returnPath || ''}">
-                    </div>
-                    <div class="form-group">
-                        <label>Clicks</label>
-                        <input type="number" id="edit-drop-clicks" value="${drop.clicks || 0}">
-                    </div>
-                    <div class="form-group">
-                        <label>Revenue ($)</label>
-                        <input type="number" id="edit-drop-rev" step="0.01" value="${drop.rev || 0}">
+
+                    <!-- Column 2 -->
+                    <div style="display: flex; flex-direction: column; gap: 16px;">
+                        <div class="form-group">
+                            <label>DATA Profil</label>
+                            <input type="text" id="edit-drop-profile" value="${drop.profile || ''}" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Inbox Rate (%)</label>
+                            <select id="edit-drop-test-after" style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px;">
+                                ${['0%', '25%', '50%', '75%', '85%', '100%'].map(opt => `<option value="${opt}" ${drop.testAfter === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Paste Raw Server Stats (Calculates Sent)</label>
+                            <textarea id="edit-drop-raw-stats" placeholder="Paste logs here..." style="width: 100%; height: 120px; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; font-family: monospace; font-size: 0.75rem;"></textarea>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                            <div class="form-group">
+                                <label>Clicks</label>
+                                <input type="number" id="edit-drop-clicks" value="${drop.clicks || 0}">
+                            </div>
+                            <div class="form-group">
+                                <label>Revenue ($)</label>
+                                <input type="number" id="edit-drop-rev" step="0.01" value="${drop.rev || 0}">
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div style="display: flex; gap: 12px; margin-top: 24px;">
