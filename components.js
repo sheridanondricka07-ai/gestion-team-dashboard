@@ -603,7 +603,11 @@ function renderTeamManagement(app, container) {
                                     <div style="font-size: 0.75rem; color: var(--text-secondary);">${member.email}</div>
                                 </div>
                             </div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+                                <div style="background: var(--bg-secondary); padding: 8px; border-radius: 8px; text-align: center;">
+                                    <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase;">Mailer ID</div>
+                                    <div style="font-weight: 700; font-size: 1.1rem; color: var(--accent-primary);">${member.mailer_id || 'N/A'}</div>
+                                </div>
                                 <div style="background: var(--bg-secondary); padding: 8px; border-radius: 8px; text-align: center;">
                                     <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase;">Servers</div>
                                     <div style="font-weight: 700; font-size: 1.1rem;">${memberSrvs.length}</div>
@@ -642,6 +646,10 @@ window.showAddMailerModal = () => {
                 <input type="text" id="m-pass" placeholder="Password" autocomplete="off">
             </div>
             <div class="form-group">
+                <label>Mailer ID (External)</label>
+                <input type="text" id="m-mailer-id" placeholder="e.g. 3329" autocomplete="off">
+            </div>
+            <div class="form-group">
                 <label>Account Type</label>
                 <select id="m-role">
                     <option value="mailer">Standard Mailer</option>
@@ -663,10 +671,11 @@ window.saveMailer = async (btn) => {
     const email = document.getElementById('m-email').value;
     const password = document.getElementById('m-pass').value;
     const role = document.getElementById('m-role').value;
+    const mailer_id = document.getElementById('m-mailer-id').value;
     if (name && email && password) {
         btn.innerText = 'Creating...';
         btn.disabled = true;
-        await window.app.addMailer({ name, email, password, role });
+        await window.app.addMailer({ name, email, password, role, mailer_id });
         btn.closest('.modal-overlay').remove();
     }
 };
@@ -902,6 +911,10 @@ window.showProfileModal = () => {
                 <label>New Password</label>
                 <input type="text" id="p-pass" value="${user.password}">
             </div>
+            <div class="form-group">
+                <label>Mailer ID</label>
+                <input type="text" id="p-mailer-id" value="${user.mailer_id || ''}" placeholder="e.g. 3329">
+            </div>
             
             <div style="display: flex; gap: 12px; margin-top: 24px;">
                 <button onclick="saveProfile(this)" style="flex: 1;">Save Changes</button>
@@ -916,11 +929,12 @@ window.saveProfile = async (btn) => {
     const name = document.getElementById('p-name').value;
     const email = document.getElementById('p-email').value;
     const password = document.getElementById('p-pass').value;
+    const mailer_id = document.getElementById('p-mailer-id').value;
     
     if (name && email && password) {
         btn.innerText = 'Saving...';
         btn.disabled = true;
-        await window.app.updateProfile({ name, email, password });
+        await window.app.updateProfile({ name, email, password, mailer_id });
         btn.closest('.modal-overlay').remove();
     }
 };
@@ -1656,7 +1670,18 @@ window.renderDropDetails = (app, container) => {
                                         <div style="font-weight: 600;">${d.displayDate ? d.displayDate.split(',')[0] : '---'}</div>
                                         <div style="font-size: 0.7rem; color: var(--text-secondary);">${d.displayDate ? (d.displayDate.split(',')[1] || '') : ''}</div>
                                     </td>
-                                    ${isAdmin ? `<td style="padding: 12px;"><span style="color: var(--accent-primary); font-weight: 600;">ID: ${d.mailerId}</span><br><span style="font-size: 0.75rem;">${d.mailerName}</span></td>` : ''}
+                                    <td style="padding: 12px;">
+                                        <span style="color: var(--accent-primary); font-weight: 600;">
+                                            ID: ${ (() => {
+                                                if (d.mailerId && d.mailerId !== 'N/A') return d.mailerId;
+                                                const searchName = (d.mailerName || '').trim().toLowerCase();
+                                                const found = (app.state.mailers || []).find(m => (m.name || '').trim().toLowerCase() === searchName);
+                                                return found ? found.mailer_id : 'N/A';
+                                            })() }
+                                        </span>
+                                        <br>
+                                        <span style="font-size: 0.75rem;">${d.mailerName}</span>
+                                    </td>
                                     <td style="padding: 12px;">
                                         <div style="font-weight: 600;">${d.offer || '---'}</div>
                                         <div style="font-size: 0.7rem; color: var(--text-secondary);">Deploys: ${d.deployIds || '---'}</div>

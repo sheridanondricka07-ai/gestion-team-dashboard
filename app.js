@@ -115,7 +115,8 @@ class TeamApp {
             name: data.name,
             email: data.email,
             password: data.password,
-            role: data.role || 'mailer'
+            role: data.role || 'mailer',
+            mailer_id: data.mailer_id || 'N/A'
         };
         this.state.mailers.push(mailer);
         await this.saveState();
@@ -219,25 +220,20 @@ class TeamApp {
         }
         const serverDisplay = detectedServers.length > 0 ? detectedServers.join(', ') : 'Unknown Server';
 
+        const formatNum = (num) => num.toLocaleString('en-US').replace(/,/g, ' ');
         const message = `🚀 <b>${type}</b>\n` +
             `━━━━━━━━━━━━━━━━━━\n` +
-            `👤 <b>Mailer:</b> ${drop.mailerName} (ID: ${drop.mailerId})\n` +
-            `🖥️ <b>Server:</b> ${serverDisplay}\n` +
-            `🏢 <b>Entity:</b> ${drop.entity}\n` +
+            `👤 <b>Mailer:</b> ${drop.mailerName} (ID: ${drop.mailerId})   <b>Entity:</b> ${drop.entity}\n` +
             `🏷️ <b>Offer:</b> ${drop.offer}\n` +
             `🆔 <b>Deploys:</b> ${drop.deployIds}\n` +
-            `🌐 <b>IP(s):</b> ${drop.ips}\n\n` +
+            `🌐 <b>Server:</b> ${serverDisplay}   • <b>IP(s):</b> ${drop.ips}\n\n` +
             `📑 <b>Details:</b>\n` +
-            `• <b>DATA Profil:</b> ${drop.profile}\n` +
-            `• <b>Inbox Rate:</b> ${drop.testAfter} INBOX\n` +
+            `• <b>DATA Profil:</b> ${drop.profile}  • <b>Inbox Rate:</b> ${drop.testAfter} INBOX\n` +
             `• <b>Return Path:</b> ${drop.returnPath}\n\n` +
             `📊 <b>Performance:</b>\n` +
-            `• <b>SENT (IN):</b> ${drop.totalIn.toLocaleString()}\n` +
-            `• <b>SENT (OUT):</b> ${drop.totalOut.toLocaleString()}\n` +
-            `• <b>Clicks:</b> ${drop.clicks.toLocaleString()}\n` +
-            `• <b>EPC:</b> $${drop.epc.toFixed(4)}\n` +
-            `• <b>CPM:</b> $${drop.cpm.toFixed(2)}\n` +
-            `• 💰 <b>REV: $${drop.rev.toLocaleString(undefined, {minimumFractionDigits: 2})}</b>\n` +
+            `• <b>SENT (IN):</b> ${formatNum(drop.totalIn)}   <b>(OUT):</b> ${formatNum(drop.totalOut)}\n` +
+            `• <b>Clicks:</b> ${drop.clicks.toLocaleString()}  • <b>EPC:</b> $${drop.epc.toFixed(4)}  • <b>CPM:</b> $${drop.cpm.toFixed(2)}\n` +
+            `• 💰 <b>REV: $${drop.rev.toLocaleString('fr-FR', {minimumFractionDigits: 2})}</b>\n` +
             `━━━━━━━━━━━━━━━━━━\n` +
             `📅 <i>${drop.displayDate}</i>`;
 
@@ -364,6 +360,41 @@ class TeamApp {
                         // SAFETY: Firebase may return null for these — always ensure safe defaults
                         if (!this.state.spamhausProgress) this.state.spamhausProgress = { status: 'idle', current: 0, total: 0 };
                         if (!this.state.spamhaus) this.state.spamhaus = {};
+                        
+                        // Patch missing Mailer IDs for known team members
+                        let patched = false;
+                        const knownIds = {
+                            'Jaefar LAAKEL HEMDANOU': '3134',
+                            'Salma EL KARTIT': '3329',
+                            'Ayoub GHAILAN': '3335',
+                            'Inssaf EL HAOUASS': '2310'
+                        };
+                        
+                        if (this.state.mailers) {
+                            this.state.mailers.forEach(m => {
+                                const cleanName = (m.name || '').trim();
+                                if (knownIds[cleanName] && (!m.mailer_id || m.mailer_id === 'N/A')) {
+                                    m.mailer_id = knownIds[cleanName];
+                                    patched = true;
+                                }
+                            });
+                        }
+                        
+                        // Also patch existing drops that show "N/A"
+                        if (this.state.drops && Array.isArray(this.state.drops)) {
+                            this.state.drops.forEach(d => {
+                                const cleanName = (d.mailerName || '').trim();
+                                if (knownIds[cleanName] && (!d.mailerId || d.mailerId === 'N/A')) {
+                                    d.mailerId = knownIds[cleanName];
+                                    patched = true;
+                                }
+                            });
+                        }
+                        
+                        if (patched) {
+                            console.log("Auto-patched missing Mailer IDs in mailers and drops. Saving back to Firebase...");
+                            this.saveState();
+                        }
                         
                         // If scan is running and only progress changed, just update the bar
                         if (progressChanged && cloudData.spamhausProgress && cloudData.spamhausProgress.status === 'running') {
