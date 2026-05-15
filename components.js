@@ -1661,7 +1661,18 @@ window.renderDropDetails = (app, container) => {
     const isAdmin = currentUser.role === 'admin';
     
     // Filter drops if not admin
-    const myDrops = isAdmin ? (drops || []) : (drops || []).filter(d => d.mailerName === currentUser.name);
+    let myDrops = isAdmin ? (drops || []) : (drops || []).filter(d => d.mailerName === currentUser.name);
+
+    // Apply Search Filter
+    const search = (app.state.dropSearch || '').toLowerCase().trim();
+    if (search) {
+        myDrops = myDrops.filter(d => {
+            const dateStr = (d.displayDate || '').toLowerCase();
+            const mailerStr = (d.mailerName || '').toLowerCase();
+            const offerStr = (d.offer || '').toLowerCase();
+            return dateStr.includes(search) || mailerStr.includes(search) || offerStr.includes(search);
+        });
+    }
     
     // Sort drops based on state
     const { key, order } = app.state.dropSort || { key: 'timestamp', order: 'desc' };
@@ -1712,9 +1723,20 @@ window.renderDropDetails = (app, container) => {
             </div>
 
             <div class="card" style="padding: 0; overflow: hidden;">
-                <div style="padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02);">
-                    <h3 style="margin: 0; font-size: 1.1rem;">Drop History</h3>
-                    <div style="font-size: 0.8rem; color: var(--text-secondary);">${myDrops.length} records found</div>
+                <div style="padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); flex-wrap: wrap; gap: 16px;">
+                    <div style="display: flex; align-items: center; gap: 16px;">
+                        <h3 style="margin: 0; font-size: 1.1rem;">Drop History</h3>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary);">${myDrops.length} records found</div>
+                    </div>
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                        <div style="position: relative; width: 250px;">
+                            <i data-lucide="search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; color: var(--text-secondary);"></i>
+                            <input type="text" id="drop-history-search" placeholder="Search mailer, offer or date..." 
+                                value="${app.state.dropSearch || ''}"
+                                style="padding: 8px 12px 8px 32px; font-size: 0.85rem; width: 100%; border-radius: 8px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary);">
+                        </div>
+                        <button onclick="showAddDropModal()" class="btn-primary" style="width: auto; padding: 8px 16px; font-size: 0.85rem;">+ New Drop</button>
+                    </div>
                 </div>
                 <div style="overflow-x: auto; background: var(--bg-secondary);">
                     <table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.85rem; min-width: 1400px; table-layout: fixed;">
@@ -1792,6 +1814,23 @@ window.renderDropDetails = (app, container) => {
             </div>
         </div>
     `;
+
+    const searchInput = document.getElementById('drop-history-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            app.state.dropSearch = e.target.value;
+            renderView(app);
+            // Re-focus search input
+            const sInput = document.getElementById('drop-history-search');
+            if (sInput) {
+                sInput.focus();
+                const val = sInput.value;
+                sInput.value = '';
+                sInput.value = val;
+            }
+        });
+    }
+
     if (window.lucide) window.lucide.createIcons();
 };
 

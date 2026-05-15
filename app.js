@@ -50,7 +50,8 @@ class TeamApp {
             spamhaus: {},
             spamhausProgress: { status: 'idle', current: 0, total: 0 },
             spamhausHistory: null,
-            dropSort: { key: 'timestamp', order: 'desc' }
+            dropSort: { key: 'timestamp', order: 'desc' },
+            dropSearch: ''
         };
         this.expandedServers = new Set();
         this.statusRange = 7;
