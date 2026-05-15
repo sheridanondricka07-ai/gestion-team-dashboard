@@ -2269,23 +2269,36 @@ window.triggerVMTACheck = async (btn) => {
     btn.innerHTML = '<i data-lucide="refresh-cw" class="spin" style="width: 14px;"></i> Checking...';
     btn.disabled = true;
     
-    // Mock check for now - will be replaced with real API call
     const app = window.app;
     const ips = [];
     app.state.servers.forEach(s => (s.allIps || []).forEach(ip => ips.push(ip)));
     
-    for (const ip of ips) {
-        const safeIp = ip.replace(/\./g, '_');
-        app.state.vmtaResults[safeIp] = {
-            ptr: `vmta-${safeIp.replace(/_/g, '-')}.prod.server.com`,
-            status: Math.random() > 0.1 ? 'OK' : 'ERROR',
-            timestamp: new Date().toLocaleString()
-        };
-        // Update UI every few IPs for progress feel
-        if (ips.indexOf(ip) % 5 === 0) app.updateDashboard();
+    if (ips.length === 0) {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        return;
     }
-    
-    app.updateDashboard();
-    btn.innerHTML = originalText;
-    btn.disabled = false;
+
+    try {
+        const response = await fetch('/api/check-vmta', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ips })
+        });
+        
+        if (!response.ok) throw new Error('API request failed');
+        
+        const data = await response.json();
+        if (data.results) {
+            app.state.vmtaResults = { ...app.state.vmtaResults, ...data.results };
+            await app.saveState(); // Persist results
+        }
+    } catch (err) {
+        console.error('VMTA Check Error:', err);
+        alert('VMTA Check failed: ' + err.message);
+    } finally {
+        app.updateDashboard();
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
 };
