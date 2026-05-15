@@ -1605,8 +1605,20 @@ window.renderDropDetails = (app, container) => {
     // Filter drops if not admin
     const myDrops = isAdmin ? (drops || []) : (drops || []).filter(d => d.mailerName === currentUser.name);
     
-    // Sort by date descending
-    const sortedDrops = [...myDrops].sort((a, b) => b.timestamp - a.timestamp);
+    // Sort drops based on state
+    const { key, order } = app.state.dropSort || { key: 'timestamp', order: 'desc' };
+    const sortedDrops = [...myDrops].sort((a, b) => {
+        let valA = a[key];
+        let valB = b[key];
+        
+        // Handle special cases
+        if (key === 'displayDate') { valA = a.timestamp; valB = b.timestamp; }
+        
+        if (typeof valA === 'string') {
+            return order === 'desc' ? valB.localeCompare(valA) : valA.localeCompare(valB);
+        }
+        return order === 'desc' ? (valB || 0) - (valA || 0) : (valA || 0) - (valB || 0);
+    });
 
     // Analytics calculations
     const stats = myDrops.reduce((acc, d) => {
@@ -1650,16 +1662,18 @@ window.renderDropDetails = (app, container) => {
                     <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
                         <thead>
                             <tr style="text-align: left; background: var(--bg-tertiary); border-bottom: 2px solid var(--border-color);">
-                                <th style="padding: 12px;">Date & Time</th>
-                                ${isAdmin ? '<th style="padding: 12px;">Mailer</th>' : ''}
-                                <th style="padding: 12px;">Offer</th>
+                                <th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('timestamp')">
+                                    Date & Time ${key === 'timestamp' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}
+                                </th>
+                                ${isAdmin ? `<th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('mailerName')">Mailer ${key === 'mailerName' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>` : ''}
+                                <th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('offer')">Offer ${key === 'offer' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
                                 <th style="padding: 12px;">Details</th>
                                 <th style="padding: 12px;">IP(s)</th>
-                                <th style="padding: 12px;">Sent</th>
-                                <th style="padding: 12px;">Clicks</th>
-                                <th style="padding: 12px;">EPC</th>
-                                <th style="padding: 12px;">CPM</th>
-                                <th style="padding: 12px;">Revenue</th>
+                                <th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('totalOut')">Sent ${key === 'totalOut' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
+                                <th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('clicks')">Clicks ${key === 'clicks' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
+                                <th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('epc')">EPC ${key === 'epc' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
+                                <th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('cpm')">CPM ${key === 'cpm' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
+                                <th style="padding: 12px; cursor: pointer;" onclick="app.setDropSort('rev')">Revenue ${key === 'rev' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
                                 <th style="padding: 12px; text-align: right;">Actions</th>
                             </tr>
                         </thead>

@@ -49,7 +49,8 @@ class TeamApp {
             statuses: {},
             spamhaus: {},
             spamhausProgress: { status: 'idle', current: 0, total: 0 },
-            spamhausHistory: null
+            spamhausHistory: null,
+            dropSort: { key: 'timestamp', order: 'desc' }
         };
         this.expandedServers = new Set();
         this.statusRange = 7;
@@ -449,6 +450,17 @@ class TeamApp {
             localStorage.setItem('team_management_state', JSON.stringify(this.state));
             this.updateDashboard();
         }
+    }
+
+    setDropSort(key) {
+        if (this.state.dropSort.key === key) {
+            this.state.dropSort.order = this.state.dropSort.order === 'desc' ? 'asc' : 'desc';
+        } else {
+            this.state.dropSort.key = key;
+            this.state.dropSort.order = 'desc';
+        }
+        this.updateDashboard();
+        if (this.state.dbConnected) this.saveState();
     }
 
     async resetApp() {
