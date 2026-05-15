@@ -177,8 +177,8 @@ export default async function handler(req, res) {
         }
     }
 
-    // 3. Automated Gmail VMTA Sync (Same schedule as RDNS check: 09:00, 15:00, 21:00 UTC)
-    if ([9, 15, 21].includes(hour)) {
+    // 3. Automated Gmail VMTA Sync (New schedule: 12:00, 18:00 UTC)
+    if ([12, 18].includes(hour)) {
         console.log('Running Automated Gmail Sync...');
         try {
             const gmail = await getFirebaseData('state/gmail');
@@ -200,66 +200,60 @@ export default async function handler(req, res) {
                 const discoveredMappings = {};
                 const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
 
-                // Collect all current prod IPs
                 let targetIps = [];
                 servers.forEach(s => { if (s && s.allIps) targetIps = targetIps.concat(s.allIps); });
 
                 for (const boxName of boxes) {
                     try {
                         await connection.openBox(boxName);
-                        const today = new Date();
-                        const messages = await connection.search([['SINCE', today]], { bodies: ['HEADER'], markSeen: false });
-                        const sortedMessages = messages.sort((a, b) => b.attributes.uid - a.attributes.uid).slice(0, 50);
+                        const messages = await connection.search([['SINCE', new Date()]], { bodies: ['HEADER'], markSeen: false });
+                        const sorted = messages.sort((a, b) => b.attributes.uid - a.attributes.uid).slice(0, 50);
 
-                        for (const msg of sortedMessages) {
-                            const headerPart = msg.parts.find(part => part.which === 'HEADER');
+                        for (const msg of sorted) {
                             if (new Date(msg.attributes.date) < twoHoursAgo) continue;
-                            
-                            const receivedHeaders = headerPart.body.received || [];
-                            const receivedList = Array.isArray(receivedHeaders) ? receivedHeaders : [receivedHeaders];
-                            for (const rh of receivedList) {
-                                if (rh.includes('by mx.google.com')) {
-                                    const match = rh.match(/from\s+([^\s\(\)]+)\s+\([^\)]*?\[(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\]\)/i);
-                                    if (match) {
-                                        const vmta = match[1];
-                                        const ip = match[2];
-                                        if (targetIps.includes(ip)) discoveredMappings[ip] = vmta;
-                                    }
+                            const rh = msg.parts.find(p => p.which === 'HEADER').body.received || [];
+                            const rList = Array.isArray(rh) ? rh : [rh];
+                            for (const line of rList) {
+                                if (line.includes('by mx.google.com')) {
+                                    const m = line.match(/from\s+([^\s\(\)]+)\s+\([^\)]*?\[(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\]\)/i);
+                                    if (m && targetIps.includes(m[2])) discoveredMappings[m[2]] = m[1];
                                 }
                             }
                         }
-                    } catch (e) { console.warn(`Cron Gmail Sync: Folder ${boxName} skipped.`); }
+                    } catch (e) {}
                 }
                 connection.end();
 
-                // Apply mappings to servers
-                let updateCount = 0;
+                // Detect Changes
+                let changes = [];
                 const updatedServers = servers.map(srv => {
-                    if (!srv.allIps) return srv;
                     if (!srv.vmtaMap) srv.vmtaMap = {};
-                    let srvUpdated = false;
-                    srv.allIps.forEach(ip => {
+                    (srv.allIps || []).forEach(ip => {
                         const safeIp = ip.replace(/\./g, '_');
-                        if (discoveredMappings[ip] && srv.vmtaMap[safeIp] !== discoveredMappings[ip]) {
-                            srv.vmtaMap[safeIp] = discoveredMappings[ip];
-                            updateCount++;
-                            srvUpdated = true;
+                        const oldVmta = srv.vmtaMap[safeIp] || '---';
+                        const newVmta = discoveredMappings[ip];
+                        
+                        if (newVmta && oldVmta !== newVmta) {
+                            changes.push(`• <b>${ip}</b>: <code>${oldVmta}</code> → <b>${newVmta}</b>`);
+                            srv.vmtaMap[safeIp] = newVmta;
                         }
                     });
                     return srv;
                 });
 
-                if (updateCount > 0) {
+                if (changes.length > 0) {
                     await setFirebaseData('state/servers', updatedServers);
-                    await sendTelegram(`<b>📥 Automated VMTA Sync</b>\nFound and updated <b>${updateCount}</b> VMTA mappings from Gmail.\n\n⏰ Time: ${new Date().toLocaleString()}\n⚙️ Automated Scheduled Sync`);
+                    let report = `<b>🔄 VMTA Changes Detected</b>\n`;
+                    report += `The following mappings were updated from Gmail:\n\n`;
+                    report += changes.join('\n');
+                    report += `\n\n⏰ Time: ${new Date().toLocaleString()}\n⚙️ Automated Scheduled Sync`;
+                    await sendTelegram(report);
                 }
                 
                 results.gmailSyncTriggered = true;
-                results.gmailMappingsFound = updateCount;
+                results.gmailChangesFound = changes.length;
             }
-        } catch (e) {
-            console.error('Automated Gmail Sync Error:', e);
-        }
+        } catch (e) { console.error('Automated Gmail Sync Error:', e); }
     }
 
     return res.status(200).json(results);

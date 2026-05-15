@@ -2525,17 +2525,25 @@ window.runGmailSync = async (btn) => {
             listDiv.appendChild(item);
         });
 
-        // Automatically Apply
+        // Automatically Apply and Track Changes
         btn.innerText = 'Applying...';
         
         let updateCount = 0;
+        let changeSummary = [];
+
         window.app.state.servers.forEach(srv => {
             if (!srv.vmtaMap) srv.vmtaMap = {};
             (srv.allIps || []).forEach(ip => {
                 if (mappings[ip]) {
                     const safeIp = ip.replace(/\./g, '_');
-                    srv.vmtaMap[safeIp] = mappings[ip];
-                    updateCount++;
+                    const oldVmta = srv.vmtaMap[safeIp] || '---';
+                    const newVmta = mappings[ip];
+
+                    if (oldVmta !== newVmta) {
+                        srv.vmtaMap[safeIp] = newVmta;
+                        updateCount++;
+                        changeSummary.push(`• ${ip}: ${oldVmta} → ${newVmta}`);
+                    }
                 }
             });
         });
