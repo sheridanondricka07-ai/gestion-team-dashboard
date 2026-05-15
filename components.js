@@ -1578,14 +1578,14 @@ function renderSpamhaus(app, container) {
                 </div>
             </div>
 
-            <div class="card" style="margin-bottom: 24px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div class="card" style="margin-bottom: 24px; padding: 0; overflow: hidden;">
+                <div style="padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02);">
                     <div>
-                        <h3 style="margin: 0; font-size: 1.1rem;">Spamhaus Report: ${selectedDate}</h3>
-                        <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Daily automated check at 09:00 Moroccan time.</p>
+                        <h3 style="margin: 0; font-size: 1.1rem;">Infrastructure Historical Status</h3>
+                        <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Showing last 7 check cycles for all active IPs.</p>
                     </div>
                     <div style="display: flex; gap: 12px; align-items: center;">
-                        <span style="font-size: 0.75rem; color: var(--text-secondary);">Last update: ${app.state.spamhausLastUpdate || 'Never'}</span>
+                        <span style="font-size: 0.75rem; color: var(--text-secondary);">Last scan: ${app.state.spamhausLastUpdate || 'Never'}</span>
                         <button id="spamhaus-check-btn" onclick="triggerManualSpamhausCheck(this)" style="width: auto; padding: 8px 16px; font-size: 0.8rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 8px; border-radius: 6px;">
                             <i data-lucide="refresh-cw" class="${isRunning ? 'spin' : ''}" style="width: 14px;"></i> 
                             ${isRunning ? 'Scanning...' : 'Check Status'}
@@ -1593,55 +1593,77 @@ function renderSpamhaus(app, container) {
                     </div>
                 </div>
 
-                <div style="overflow-x: auto;">
-                    <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                <div style="overflow-x: auto; background: var(--bg-secondary);">
+                    <table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.85rem; min-width: 1200px;">
                         <thead>
-                            <tr style="text-align: left; border-bottom: 2px solid var(--border-color);">
-                                <th style="padding: 12px; width: 300px;">Server & IPs</th>
-                                <th style="padding: 12px;">Spamhaus Status</th>
-                                <th style="padding: 12px;">Last Checked</th>
-                                <th style="padding: 12px; text-align: right;">Action</th>
+                            <tr style="text-align: left; background: var(--bg-tertiary);">
+                                <th style="padding: 16px 12px; width: 180px; border-bottom: 2px solid var(--border-color);">Server</th>
+                                <th style="padding: 16px 12px; width: 160px; border-bottom: 2px solid var(--border-color);">IP Address</th>
+                                ${(() => {
+                                    const dates = [];
+                                    for(let i=0; i<7; i++) {
+                                        const d = new Date();
+                                        d.setDate(d.getDate() - i);
+                                        dates.push(d.toISOString().split('T')[0]);
+                                    }
+                                    return dates.map(date => {
+                                        const [y, m, d] = date.split('-');
+                                        return `<th style="padding: 16px 8px; text-align: center; border-bottom: 2px solid var(--border-color); background: ${date === today ? 'rgba(59,130,246,0.05)' : 'transparent'}">${d}/${m}</th>`;
+                                    }).join('');
+                                })()}
+                                <th style="padding: 16px 12px; text-align: right; border-bottom: 2px solid var(--border-color);">Action</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${servers.map(s => {
-                                const sIps = s.allIps || [];
-                                if (sIps.length === 0) return '';
-                                
-                                return sIps.map((ip, idx) => {
-                                    const safeIp = ip.replace(/\./g, '_');
-                                    const data = results[safeIp];
-                                    const isListed = data && data.status === 'listed';
+                            ${(() => {
+                                const last7Days = [];
+                                for(let i=0; i<7; i++) {
+                                    const d = new Date();
+                                    d.setDate(d.getDate() - i);
+                                    last7Days.push(d.toISOString().split('T')[0]);
+                                }
+
+                                return servers.map((s, sIdx) => {
+                                    const sIps = s.allIps || [];
+                                    if (sIps.length === 0) return '';
                                     
-                                    return `
-                                        <tr style="border-bottom: 1px solid var(--border-color); ${idx === 0 ? 'border-top: 1px solid var(--border-color);' : ''}">
-                                            ${idx === 0 ? `
-                                                <td rowspan="${sIps.length}" style="padding: 12px; border-right: 1px solid var(--border-color); vertical-align: top; background: rgba(255,255,255,0.02);">
-                                                    <div style="font-weight: 600; color: var(--accent-primary); margin-bottom: 4px;">${s.name}</div>
-                                                    <div style="font-size: 0.7rem; color: var(--text-secondary);">${sIps.length} IPs</div>
+                                    return sIps.map((ip, ipIdx) => {
+                                        const safeIp = ip.replace(/\./g, '_');
+                                        
+                                        return `
+                                            <tr style="border-bottom: 1px solid var(--border-color); vertical-align: middle;">
+                                                ${ipIdx === 0 ? `
+                                                    <td rowspan="${sIps.length}" style="padding: 16px 12px; border-right: 1px solid var(--border-color); background: rgba(255,255,255,0.01); font-weight: 700; color: var(--accent-primary);">
+                                                        ${s.name}
+                                                        <div style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 400; margin-top: 4px;">${sIps.length} IPs</div>
+                                                    </td>
+                                                ` : ''}
+                                                <td style="padding: 12px; font-family: monospace; border-right: 1px solid var(--border-color);">
+                                                    ${ip}
                                                 </td>
-                                            ` : ''}
-                                            <td style="padding: 12px; font-family: monospace;">
-                                                <div style="display: flex; align-items: center; gap: 8px;">
-                                                    <span style="color: var(--text-primary);">${ip}</span>
-                                                </div>
-                                            </td>
-                                            <td style="padding: 12px;">
-                                                <span class="badge ${isListed ? 'badge-sbl' : (data ? 'badge-clean' : 'badge-rp')}">
-                                                    ${isListed ? (data.list || 'LISTED') : (data ? 'CLEAN' : 'PENDING')}
-                                                </span>
-                                            </td>
-                                            <td style="padding: 12px; color: var(--text-secondary); font-size: 0.75rem;">
-                                                ${data ? (data.timestamp ? (typeof data.timestamp === 'string' ? data.timestamp.split('T')[0] : new Date(data.timestamp).toLocaleDateString()) : selectedDate) : 'Not recorded'}
-                                            </td>
-                                            <td style="padding: 12px; text-align: right;">
-                                                <button onclick="window.open('https://check.spamhaus.org/query/ip/${ip}', '_blank')" style="background: transparent; border: none; color: var(--accent-primary); cursor: pointer; font-size: 0.75rem; text-decoration: underline;">Details</button>
-                                            </td>
-                                        </tr>
-                                    `;
+                                                ${last7Days.map(date => {
+                                                    const history = (spamhausHistory && spamhausHistory[date]) || { results: {} };
+                                                    const data = history.results[safeIp];
+                                                    const isToday = date === today;
+                                                    
+                                                    let statusHtml = '<span style="color: var(--text-secondary); opacity: 0.3;">---</span>';
+                                                    if (data) {
+                                                        const color = data.status === 'listed' ? 'var(--error)' : 'var(--success)';
+                                                        const label = data.status === 'listed' ? (data.list || 'LIST') : 'CLEAN';
+                                                        statusHtml = `<span style="background: ${color}20; color: ${color}; padding: 4px 8px; border-radius: 4px; font-size: 0.65rem; font-weight: 700; border: 1px solid ${color}30;">${label}</span>`;
+                                                    }
+
+                                                    return `<td style="padding: 12px 8px; text-align: center; background: ${isToday ? 'rgba(59,130,246,0.02)' : 'transparent'}">${statusHtml}</td>`;
+                                                }).join('')}
+                                                <td style="padding: 12px; text-align: right;">
+                                                    <button onclick="window.open('https://check.spamhaus.org/query/ip/${ip}', '_blank')" style="background: rgba(59, 130, 246, 0.1); border: none; color: var(--accent-primary); cursor: pointer; padding: 6px 12px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">Check</button>
+                                                </td>
+                                            </tr>
+                                        `;
+                                    }).join('');
                                 }).join('');
-                            }).join('')}
-                            ${servers.length === 0 ? '<tr><td colspan="5" style="padding: 40px; text-align: center; color: var(--text-secondary);">No servers found.</td></tr>' : ''}
+                            })()}
+                            ${servers.length === 0 ? '<tr><td colspan="10" style="padding: 60px; text-align: center; color: var(--text-secondary);">No servers found. Start by adding infrastructure in Management.</td></tr>' : ''}
                         </tbody>
                     </table>
                 </div>
