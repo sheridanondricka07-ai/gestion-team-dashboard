@@ -211,7 +211,7 @@ class TeamApp {
             `🏷️ <b>Offer:</b> ${drop.offer}\n` +
             `🆔 <b>Deploys:</b> ${drop.deployIds}\n\n` +
             `📑 <b>Details:</b>\n` +
-            `• <b>Profile:</b> ${drop.profile}\n` +
+            `• <b>DATA Profil:</b> ${drop.profile}\n` +
             `• <b>Inbox Rate:</b> ${drop.testAfter} INBOX\n` +
             `• <b>Return Path:</b> ${drop.returnPath}\n\n` +
             `📊 <b>Performance:</b>\n` +

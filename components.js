@@ -1545,7 +1545,7 @@ window.renderDropDetails = (app, container) => {
                                         <div style="font-size: 0.7rem; color: var(--text-secondary);">Deploys: ${d.deployIds || '---'}</div>
                                     </td>
                                     <td style="padding: 12px;">
-                                        <div style="font-size: 0.8rem;"><span style="color: var(--text-secondary);">Profile:</span> ${d.profile || 'N/A'}</div>
+                                        <div style="font-size: 0.8rem;"><span style="color: var(--text-secondary);">DATA Profil:</span> ${d.profile || 'N/A'}</div>
                                         <div style="font-size: 0.8rem;"><span style="color: var(--text-secondary);">Inbox:</span> <span style="color: ${d.testAfter === '100%' ? 'var(--success)' : 'var(--accent-primary)'}; font-weight: 600;">${d.testAfter || '0%'} INBOX</span></div>
                                     </td>
                                     <td style="padding: 12px;">${(d.nbrSent || 0).toLocaleString()}</td>
@@ -1596,8 +1596,8 @@ window.showAddDropModal = () => {
                         <input type="text" id="drop-deploys" placeholder="e.g. 1024, 1025" required>
                     </div>
                     <div class="form-group">
-                        <label>Profile</label>
-                        <input type="text" id="drop-profile" placeholder="Mailer Profile Name" required>
+                        <label>DATA Profil</label>
+                        <input type="text" id="drop-profile" placeholder="DATA Profil Name" required>
                     </div>
                     <div class="form-group">
                         <label>Inbox Rate (%)</label>
@@ -1681,7 +1681,7 @@ window.showEditDropModal = (dropId) => {
                         <input type="text" id="edit-drop-deploys" value="${drop.deployIds || ''}">
                     </div>
                     <div class="form-group">
-                        <label>Profile</label>
+                        <label>DATA Profil</label>
                         <input type="text" id="edit-drop-profile" value="${drop.profile || ''}" required>
                     </div>
                     <div class="form-group">
