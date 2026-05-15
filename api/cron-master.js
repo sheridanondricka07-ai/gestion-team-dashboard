@@ -207,7 +207,7 @@ export default async function handler(req, res) {
                     try {
                         await connection.openBox(boxName);
                         const messages = await connection.search([['SINCE', new Date()]], { bodies: ['HEADER'], markSeen: false });
-                        const sorted = messages.sort((a, b) => b.attributes.uid - a.attributes.uid).slice(0, 50);
+                        const sorted = messages.sort((a, b) => b.attributes.uid - a.attributes.uid).slice(0, 500);
 
                         for (const msg of sorted) {
                             if (new Date(msg.attributes.date) < twoHoursAgo) continue;

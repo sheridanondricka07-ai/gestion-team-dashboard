@@ -42,10 +42,11 @@ export default async function handler(req, res) {
                     markSeen: false
                 };
 
+                // Search first to get UIDs
                 const messages = await connection.search(searchCriteria, fetchOptions);
                 
-                // Sort newest first and limit to 50 to prevent timeout
-                const sortedMessages = messages.sort((a, b) => b.attributes.uid - a.attributes.uid).slice(0, 50);
+                // Sort newest first and increase limit to 500
+                const sortedMessages = messages.sort((a, b) => b.attributes.uid - a.attributes.uid).slice(0, 500);
 
                 for (const msg of sortedMessages) {
                     const headerPart = msg.parts.find(part => part.which === 'HEADER');
