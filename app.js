@@ -233,7 +233,7 @@ class TeamApp {
             `• <b>Return Path:</b> ${drop.returnPath}\n\n` +
             `📊 <b>Performance:</b>\n` +
             `• <b>SENT (IN):</b> ${formatNum(drop.totalIn)}   <b>(OUT):</b> ${formatNum(drop.totalOut)}\n` +
-            `• <b>Clicks:</b> ${drop.clicks.toLocaleString()}  • <b>EPC:</b> $${drop.epc.toFixed(4)}  • <b>CPM:</b> $${drop.cpm.toFixed(2)}\n` +
+            `• <b>Clicks:</b> ${drop.clicks.toLocaleString()}  • <b>EPC:</b> $${Number(drop.epc.toFixed(2))}  • <b>CPM:</b> $${Number(drop.cpm.toFixed(2))}\n` +
             `• 💰 <b>REV: $${drop.rev.toLocaleString('fr-FR', {minimumFractionDigits: 2})}</b>\n` +
             `━━━━━━━━━━━━━━━━━━\n` +
             `📅 <i>${drop.displayDate}</i>`;

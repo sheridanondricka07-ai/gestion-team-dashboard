@@ -1629,8 +1629,8 @@ window.renderDropDetails = (app, container) => {
         return acc;
     }, { rev: 0, sent: 0, epc: 0, cpm: 0 });
 
-    const avgEpc = myDrops.length > 0 ? (stats.epc / myDrops.length).toFixed(4) : '0.0000';
-    const avgCpm = myDrops.length > 0 ? (stats.cpm / myDrops.length).toFixed(2) : '0.00';
+    const avgEpc = myDrops.length > 0 ? Number((stats.epc / myDrops.length).toFixed(2)) : '0';
+    const avgCpm = myDrops.length > 0 ? Number((stats.cpm / myDrops.length).toFixed(2)) : '0';
 
     container.innerHTML = `
         <div style="padding: 24px;">
@@ -1707,8 +1707,8 @@ window.renderDropDetails = (app, container) => {
                                     <td style="padding: 12px;"><code style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">${d.ips || '---'}</code></td>
                                     <td style="padding: 12px;">${(d.totalOut || 0).toLocaleString()}</td>
                                     <td style="padding: 12px;">${(d.clicks || 0).toLocaleString()}</td>
-                                    <td style="padding: 12px;">$${(d.epc || 0).toFixed(4)}</td>
-                                    <td style="padding: 12px;">$${(d.cpm || 0).toFixed(2)}</td>
+                                    <td style="padding: 12px;">$${Number((d.epc || 0).toFixed(2))}</td>
+                                    <td style="padding: 12px;">$${Number((d.cpm || 0).toFixed(2))}</td>
                                     <td style="padding: 12px; font-weight: 700; color: var(--success);">$${(d.rev || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                                     <td style="padding: 12px; text-align: right;">
                                         <div style="display: flex; gap: 8px; justify-content: flex-end;">
