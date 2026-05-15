@@ -1,61 +1,62 @@
-// IP Provider & ASN Lookup - uses multiple fallback services
+// IP Provider & ASN Lookup - Multi-Service Fallback
+// Uses global fetch (Node 18+)
 
 module.exports = async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
 
     const { ip } = req.body;
+    if (!ip) return res.status(400).json({ error: 'IP address is required' });
 
-    if (!ip) {
-        return res.status(400).json({ error: 'IP address is required' });
-    }
+    console.log(`Lookup requested for: ${ip}`);
 
-    // Try multiple services in order of reliability
     const services = [
         {
-            name: 'ipinfo.io',
-            url: `https://ipinfo.io/${ip}/json`,
-            parse: (data) => ({
-                provider: data.org ? data.org.replace(/^AS\d+\s*/, '') : 'Unknown',
-                asn: data.org || 'Unknown'
+            name: 'freeipapi.com',
+            url: `https://freeipapi.com/api/json/${ip}`,
+            parse: (d) => ({
+                provider: d.attribution?.includes('IP-API') ? 'Unknown' : (d.cityName ? `${d.isp || d.org || d.asName}` : d.isp || d.org),
+                asn: d.asn ? `AS${d.asn}` : ''
             })
         },
         {
             name: 'ip-api.com',
-            url: `http://ip-api.com/json/${ip}?fields=status,isp,as,org`,
-            parse: (data) => ({
-                provider: data.isp || data.org || 'Unknown',
-                asn: data.as || 'Unknown'
+            url: `https://demo.ip-api.com/json/${ip}?fields=status,message,isp,as,org`,
+            parse: (d) => ({
+                provider: d.isp || d.org,
+                asn: d.as
+            })
+        },
+        {
+            name: 'ipwho.is',
+            url: `https://ipwho.is/${ip}`,
+            parse: (d) => ({
+                provider: d.connection?.isp || d.connection?.org,
+                asn: d.connection?.asn ? `AS${d.connection.asn}` : ''
             })
         }
     ];
 
     for (const service of services) {
         try {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 8000);
-
-            const response = await fetch(service.url, {
-                signal: controller.signal,
-                headers: { 'User-Agent': 'GestionTeam/1.0' }
+            console.log(`Trying ${service.name}...`);
+            const response = await fetch(service.url, { 
+                headers: { 'User-Agent': 'GestionTeam-Bot/1.0' },
+                signal: AbortSignal.timeout(5000) 
             });
-            clearTimeout(timeout);
 
             if (!response.ok) continue;
-
+            
             const data = await response.json();
-
-            // ip-api returns status field
-            if (data.status && data.status === 'fail') continue;
-
             const result = service.parse(data);
+
             if (result.provider && result.provider !== 'Unknown') {
+                console.log(`Success with ${service.name}`);
                 return res.status(200).json(result);
             }
-        } catch (err) {
-            console.warn(`${service.name} failed:`, err.message);
-            continue;
+        } catch (e) {
+            console.warn(`${service.name} failed: ${e.message}`);
         }
     }
 
-    return res.status(500).json({ error: 'All lookup services failed' });
+    return res.status(500).json({ error: 'All lookup providers failed or were rate-limited' });
 };
