@@ -153,17 +153,24 @@ class TeamApp {
             // Check milestones: 3, 2, 1 days
             if (diffDays <= 3 && diffDays > 0) {
                 const milestone = `${diffDays}d`;
+                console.log(`Checking milestone ${milestone} for ${srv.name}. Already notified: ${srv.notified[milestone]}`);
+                
                 if (!srv.notified[milestone]) {
                     const status = srv.markedForCancel ? "🔴 DECLARED TO CANCEL" : "⚠️ NOT DECLARED (Will Auto-Renew)";
                     const message = `🔔 *Server Cancellation Alert*\n\n` +
                                     `🖥 *Server:* ${srv.name}\n` +
                                     `⏳ *Time Left:* ${diffDays} Day(s)\n` +
                                     `📅 *Date:* ${srv.cancelDate}\n` +
-                                    `📝 *Status:* ${status}\n\n` +
-                                    `🌐 *Main IP:* ${srv.mainIp || 'N/A'}`;
+                                    `📝 *Status:* ${status}`;
                     
                     await this.sendTelegramNotification(message);
                     srv.notified[milestone] = true;
+                    needsSave = true;
+                }
+            } else {
+                // If we are far from the date, reset notifications so they can trigger again next month if needed
+                if (diffDays > 5 && Object.keys(srv.notified).length > 0) {
+                    srv.notified = {};
                     needsSave = true;
                 }
             }
