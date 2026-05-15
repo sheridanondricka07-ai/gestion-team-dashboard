@@ -683,6 +683,61 @@ window.saveMailer = async (btn) => {
     }
 };
 
+window.showEditMailerModal = (id) => {
+    const member = window.app.state.mailers.find(m => m.id === id);
+    if (!member) return;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+        <div class="modal">
+            <h2 style="margin-bottom: 16px;">Edit Mailer Info</h2>
+            <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" id="edit-m-name" value="${member.name}">
+            </div>
+            <div class="form-group">
+                <label>Email Address</label>
+                <input type="email" id="edit-m-email" value="${member.email}">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="text" id="edit-m-pass" value="${member.password}">
+            </div>
+            <div class="form-group">
+                <label>Mailer ID (External)</label>
+                <input type="text" id="edit-m-mailer-id" value="${member.mailer_id || ''}">
+            </div>
+            <div style="display: flex; gap: 12px; margin-top: 24px;">
+                <button onclick="saveEditMailer('${member.id}', this)" style="flex: 1;">Save Changes</button>
+                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary); color: var(--text-primary);">Cancel</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    if (window.lucide) window.lucide.createIcons();
+};
+
+window.saveEditMailer = async (id, btn) => {
+    const name = document.getElementById('edit-m-name').value;
+    const email = document.getElementById('edit-m-email').value;
+    const password = document.getElementById('edit-m-pass').value;
+    const mailer_id = document.getElementById('edit-m-mailer-id').value;
+
+    if (name && email && password) {
+        btn.innerText = 'Saving...';
+        btn.disabled = true;
+        await window.app.updateMailer(id, { name, email, password, mailer_id });
+        btn.closest('.modal-overlay').remove();
+    }
+};
+
+window.deleteMailer = async (id) => {
+    if (confirm("Are you sure you want to remove this mailer?")) {
+        await window.app.deleteMailer(id);
+    }
+};
+
 window.showAddServerModal = () => {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
