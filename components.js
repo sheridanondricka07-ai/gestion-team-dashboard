@@ -366,10 +366,6 @@ function renderHistoryTable(app) {
         </table>
     `;
 }
-            </div>
-        </div>
-    `;
-}
 
 window.autoFetchIpInfo = async (ip) => {
     if (!ip || !ip.includes('.')) return;
