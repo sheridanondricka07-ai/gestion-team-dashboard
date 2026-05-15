@@ -75,7 +75,10 @@ class TeamApp {
             const hostname = parts[1] || '';
             if (ip) {
                 ips.push(ip);
-                if (hostname) vmtaMap[ip] = hostname;
+                if (hostname) {
+                    const safeIp = ip.replace(/\./g, '_');
+                    vmtaMap[safeIp] = hostname;
+                }
             }
         });
 
@@ -91,7 +94,8 @@ class TeamApp {
                     currentIps.push(ip);
                 }
                 if (vmtaMap[ip]) {
-                    currentVmtaMap[ip] = vmtaMap[ip];
+                    const safeIp = ip.replace(/\./g, '_');
+                    currentVmtaMap[safeIp] = vmtaMap[ip];
                 }
             });
 

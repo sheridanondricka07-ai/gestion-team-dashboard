@@ -1785,7 +1785,8 @@ function renderSpamhaus(app, container) {
                                     const sIps = s.allIps || [];
                                     const vmtaMap = s.vmtaMap || {};
                                     return sIps.map((ip, ipIdx) => {
-                                        const vmta = vmtaMap[ip] || '---';
+                                        const safeIp = ip.replace(/\./g, '_');
+                                        const vmta = vmtaMap[safeIp] || '---';
                                         const isFirstInServer = ipIdx === 0 && sIdx !== 0;
                                         const thickBorder = isFirstInServer ? 'border-top: 3px solid rgba(255,255,255,0.15);' : '';
                                         
@@ -2532,7 +2533,8 @@ window.runGmailSync = async (btn) => {
             if (!srv.vmtaMap) srv.vmtaMap = {};
             (srv.allIps || []).forEach(ip => {
                 if (mappings[ip]) {
-                    srv.vmtaMap[ip] = mappings[ip];
+                    const safeIp = ip.replace(/\./g, '_');
+                    srv.vmtaMap[safeIp] = mappings[ip];
                     updateCount++;
                 }
             });

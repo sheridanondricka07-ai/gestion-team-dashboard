@@ -239,8 +239,9 @@ export default async function handler(req, res) {
                     if (!srv.vmtaMap) srv.vmtaMap = {};
                     let srvUpdated = false;
                     srv.allIps.forEach(ip => {
-                        if (discoveredMappings[ip] && srv.vmtaMap[ip] !== discoveredMappings[ip]) {
-                            srv.vmtaMap[ip] = discoveredMappings[ip];
+                        const safeIp = ip.replace(/\./g, '_');
+                        if (discoveredMappings[ip] && srv.vmtaMap[safeIp] !== discoveredMappings[ip]) {
+                            srv.vmtaMap[safeIp] = discoveredMappings[ip];
                             updateCount++;
                             srvUpdated = true;
                         }
