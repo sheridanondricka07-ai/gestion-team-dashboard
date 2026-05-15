@@ -177,5 +177,89 @@ export default async function handler(req, res) {
         }
     }
 
+    // 3. Automated Gmail VMTA Sync (Same schedule as RDNS check: 09:00, 15:00, 21:00 UTC)
+    if ([9, 15, 21].includes(hour)) {
+        console.log('Running Automated Gmail Sync...');
+        try {
+            const gmail = await getFirebaseData('state/gmail');
+            const servers = await getFirebaseData('state/servers') || [];
+            
+            if (gmail && gmail.email && gmail.password && servers.length > 0) {
+                const imap = require('imap-simple');
+                const config = {
+                    imap: {
+                        user: gmail.email,
+                        password: gmail.password,
+                        host: 'imap.gmail.com', port: 993, tls: true,
+                        authTimeout: 15000, tlsOptions: { rejectUnauthorized: false }
+                    }
+                };
+
+                const connection = await imap.connect(config);
+                const boxes = ['INBOX', '[Gmail]/Spam'];
+                const discoveredMappings = {};
+                const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+
+                // Collect all current prod IPs
+                let targetIps = [];
+                servers.forEach(s => { if (s && s.allIps) targetIps = targetIps.concat(s.allIps); });
+
+                for (const boxName of boxes) {
+                    try {
+                        await connection.openBox(boxName);
+                        const today = new Date();
+                        const messages = await connection.search([['SINCE', today]], { bodies: ['HEADER'], markSeen: false });
+                        const sortedMessages = messages.sort((a, b) => b.attributes.uid - a.attributes.uid).slice(0, 50);
+
+                        for (const msg of sortedMessages) {
+                            const headerPart = msg.parts.find(part => part.which === 'HEADER');
+                            if (new Date(msg.attributes.date) < twoHoursAgo) continue;
+                            
+                            const receivedHeaders = headerPart.body.received || [];
+                            const receivedList = Array.isArray(receivedHeaders) ? receivedHeaders : [receivedHeaders];
+                            for (const rh of receivedList) {
+                                if (rh.includes('by mx.google.com')) {
+                                    const match = rh.match(/from\s+([^\s\(\)]+)\s+\([^\)]*?\[(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\]\)/i);
+                                    if (match) {
+                                        const vmta = match[1];
+                                        const ip = match[2];
+                                        if (targetIps.includes(ip)) discoveredMappings[ip] = vmta;
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e) { console.warn(`Cron Gmail Sync: Folder ${boxName} skipped.`); }
+                }
+                connection.end();
+
+                // Apply mappings to servers
+                let updateCount = 0;
+                const updatedServers = servers.map(srv => {
+                    if (!srv.allIps) return srv;
+                    if (!srv.vmtaMap) srv.vmtaMap = {};
+                    let srvUpdated = false;
+                    srv.allIps.forEach(ip => {
+                        if (discoveredMappings[ip] && srv.vmtaMap[ip] !== discoveredMappings[ip]) {
+                            srv.vmtaMap[ip] = discoveredMappings[ip];
+                            updateCount++;
+                            srvUpdated = true;
+                        }
+                    });
+                    return srv;
+                });
+
+                if (updateCount > 0) {
+                    await setFirebaseData('state/servers', updatedServers);
+                    await sendTelegram(`<b>📥 Automated VMTA Sync</b>\nFound and updated <b>${updateCount}</b> VMTA mappings from Gmail.\n\n⏰ Time: ${new Date().toLocaleString()}\n⚙️ Automated Scheduled Sync`);
+                }
+                
+                results.gmailSyncTriggered = true;
+                results.gmailMappingsFound = updateCount;
+            }
+        } catch (e) {
+            console.error('Automated Gmail Sync Error:', e);
+        }
+    }
+
     return res.status(200).json(results);
 }

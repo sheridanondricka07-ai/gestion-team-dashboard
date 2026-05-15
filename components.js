@@ -2501,10 +2501,6 @@ window.runGmailSync = async (btn) => {
 
         setProgress(100, 'Scan Complete!');
 
-        // Save credentials for next time
-        window.app.state.gmail = { email, password };
-        await window.app.saveState();
-
         const mappings = data.mappings || {};
         const count = Object.keys(mappings).length;
 
@@ -2515,7 +2511,7 @@ window.runGmailSync = async (btn) => {
             return;
         }
 
-        // Show results
+        // Show results preview
         const resultsDiv = document.getElementById('sync-results');
         const listDiv = document.getElementById('mappings-list');
         resultsDiv.style.display = 'block';
@@ -2528,9 +2524,29 @@ window.runGmailSync = async (btn) => {
             listDiv.appendChild(item);
         });
 
-        btn.innerText = `Apply ${count} Mappings`;
-        btn.onclick = () => applyGmailMappings(mappings, btn);
-        btn.disabled = false;
+        // Automatically Apply
+        btn.innerText = 'Applying...';
+        
+        let updateCount = 0;
+        window.app.state.servers.forEach(srv => {
+            if (!srv.vmtaMap) srv.vmtaMap = {};
+            (srv.allIps || []).forEach(ip => {
+                if (mappings[ip]) {
+                    srv.vmtaMap[ip] = mappings[ip];
+                    updateCount++;
+                }
+            });
+        });
+
+        // Save credentials and state
+        window.app.state.gmail = { email, password };
+        await window.app.saveState();
+        window.app.updateDashboard();
+
+        btn.innerText = `Updated ${updateCount} Mappings!`;
+        setTimeout(() => {
+            if (btn.closest('.modal-overlay')) btn.closest('.modal-overlay').remove();
+        }, 2000);
 
     } catch (err) {
         alert('Sync Failed: ' + err.message);
@@ -2539,26 +2555,4 @@ window.runGmailSync = async (btn) => {
     }
 };
 
-window.applyGmailMappings = async (mappings, btn) => {
-    btn.innerText = 'Applying...';
-    btn.disabled = true;
-    
-    const app = window.app;
-    let updateCount = 0;
-
-    app.state.servers.forEach(srv => {
-        if (!srv.vmtaMap) srv.vmtaMap = {};
-        srv.allIps.forEach(ip => {
-            if (mappings[ip]) {
-                srv.vmtaMap[ip] = mappings[ip];
-                updateCount++;
-            }
-        });
-    });
-
-    await app.saveState();
-    app.updateDashboard();
-    
-    alert(`Successfully updated ${updateCount} VMTA mappings!`);
-    btn.closest('.modal-overlay').remove();
-};
+// Remove old applyGmailMappings as it's now integrated
