@@ -63,8 +63,9 @@ async function sendTelegram(message) {
 }
 
 export default async function handler(req, res) {
-    // Only allow Vercel Cron to trigger this
-    if (!req.headers['x-vercel-cron'] && process.env.NODE_ENV === 'production') {
+    // Only allow authorized triggers
+    const isCronJobOrg = req.headers['authorization'] === 'Bearer internal-cron-secret';
+    if (!req.headers['x-vercel-cron'] && !isCronJobOrg && process.env.NODE_ENV === 'production') {
         return res.status(405).send('Method Not Allowed');
     }
 
@@ -78,8 +79,8 @@ export default async function handler(req, res) {
         vmtaTriggered: false
     };
 
-    // 1. Trigger Spamhaus Check (Once a day at 09:00 UTC)
-    if (hour === 9) {
+    // 1. Trigger Spamhaus Check (Twice a day: 09:00, 21:00 UTC)
+    if ([9, 21].includes(hour)) {
         console.log('Triggering Spamhaus Check...');
         try {
             // We call our own API endpoint. 
