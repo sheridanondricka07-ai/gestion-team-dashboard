@@ -273,63 +273,76 @@ window.autoFetchIpInfo = async (ip) => {
     }
 };
 
-window.refreshServerInfo = async (id, btn) => {
+window.refreshServerInfo = async (id, btn, skipRender) => {
     const srv = window.app.state.servers.find(s => s.id === id);
-    if (!srv) return;
+    if (!srv) { console.warn('Server not found:', id); return; }
     
-    const ip = srv.mainIp || srv.ip;
-    if (!ip || ip === '0.0.0.0') return;
+    const ip = srv.mainIp || srv.ip || (srv.allIps && srv.allIps[0]);
+    if (!ip || ip === '0.0.0.0') { console.warn('No valid IP for:', srv.name); return; }
 
     if (btn) btn.classList.add('rotating');
 
     try {
+        console.log(`Fetching info for ${srv.name} (${ip})...`);
         const response = await fetch('/api/get-ip-info', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ip })
         });
+        
+        if (!response.ok) {
+            const errText = await response.text();
+            console.error(`API error for ${ip}:`, response.status, errText);
+            return;
+        }
+        
         const data = await response.json();
+        console.log(`Result for ${ip}:`, data);
         
-        if (data.provider) srv.provider = data.provider;
-        if (data.asn) srv.asn = data.asn;
+        if (data.provider && data.provider !== 'Unknown') srv.provider = data.provider;
+        if (data.asn && data.asn !== 'Unknown') srv.asn = data.asn;
         
-        await window.app.saveState();
-        window.app.updateDashboard();
+        if (!skipRender) {
+            await window.app.saveState();
+            window.app.updateDashboard();
+        }
     } catch (err) {
-        console.warn('Refresh failed:', err);
+        console.error('Refresh failed for', srv.name, ':', err);
     } finally {
         if (btn) btn.classList.remove('rotating');
     }
 };
 
 window.bulkFetchServerInfo = async (btn) => {
-    const servers = window.app.state.servers.filter(s => !s.provider || s.provider === '---' || s.provider === 'Unknown');
-    if (servers.length === 0) {
-        alert('All servers already have info!');
+    const allServers = window.app.state.servers;
+    const toFetch = allServers.filter(s => !s.provider || s.provider === '---' || s.provider === 'Unknown');
+    
+    if (toFetch.length === 0) {
+        alert('All servers already have provider info!');
         return;
     }
 
-    if (btn) {
-        const originalHtml = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<i class="rotating" data-lucide="refresh-cw" style="width:14px;"></i> Working...';
-        if (window.lucide) window.lucide.createIcons();
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<i class="rotating" data-lucide="refresh-cw" style="width:14px;"></i> 0/${toFetch.length}`;
+    if (window.lucide) window.lucide.createIcons();
 
-        let count = 0;
-        for (const srv of servers) {
-            await window.refreshServerInfo(srv.id);
-            count++;
-            btn.innerHTML = `<i class="rotating" data-lucide="refresh-cw" style="width:14px;"></i> ${count}/${servers.length}`;
-            if (window.lucide) window.lucide.createIcons();
-            // Small delay to respect rate limits (45 req/min = ~1.3s/req)
-            await new Promise(r => setTimeout(r, 1500));
-        }
-
-        btn.innerHTML = originalHtml;
-        btn.disabled = false;
+    let successCount = 0;
+    for (let i = 0; i < toFetch.length; i++) {
+        const srv = toFetch[i];
+        await window.refreshServerInfo(srv.id, null, true); // skipRender = true
+        if (srv.provider && srv.provider !== '---') successCount++;
+        btn.innerHTML = `<i class="rotating" data-lucide="refresh-cw" style="width:14px;"></i> ${i + 1}/${toFetch.length}`;
         if (window.lucide) window.lucide.createIcons();
-        alert(`Finished updating ${count} servers!`);
+        // Delay between requests to respect rate limits
+        await new Promise(r => setTimeout(r, 1200));
     }
+
+    // Save once and re-render once at the end
+    await window.app.saveState();
+    window.app.updateDashboard();
+    
+    alert(`Done! Updated ${successCount} of ${toFetch.length} servers.`);
 };
 
 function renderTools(app, container) {
