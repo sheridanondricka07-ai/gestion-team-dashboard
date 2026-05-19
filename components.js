@@ -741,6 +741,69 @@ function renderOverview(app, container) {
         });
     }
 
+    // Filter drops by the selected date range for the charts and tables below
+    let activeRangeDrops = myDrops;
+    const startRange = window._revStartDate ? new Date(window._revStartDate + 'T00:00:00') : null;
+    const endRange = window._revEndDate ? new Date(window._revEndDate + 'T23:59:59') : null;
+    
+    if (startRange || endRange) {
+        activeRangeDrops = myDrops.filter(d => {
+            const dDate = new Date(d.timestamp);
+            if (startRange && dDate < startRange) return false;
+            if (endRange && dDate > endRange) return false;
+            return true;
+        });
+    }
+
+    // Offer Statistics
+    const offerStatsMap = {};
+    activeRangeDrops.forEach(d => {
+        const offerName = d.offer || 'Unknown Offer';
+        if (!offerStatsMap[offerName]) {
+            offerStatsMap[offerName] = { name: offerName, rev: 0, count: 0 };
+        }
+        offerStatsMap[offerName].rev += d.rev || 0;
+        offerStatsMap[offerName].count++;
+    });
+    const offerStatsList = Object.values(offerStatsMap).sort((a, b) => b.rev - a.rev);
+
+    // Mailer Statistics
+    const mailerStatsMap = {};
+    activeRangeDrops.forEach(d => {
+        const mailerName = d.mailerName || 'Unknown Mailer';
+        if (!mailerStatsMap[mailerName]) {
+            mailerStatsMap[mailerName] = { name: mailerName, rev: 0, count: 0, offers: {}, epcSum: 0, cpmSum: 0 };
+        }
+        mailerStatsMap[mailerName].rev += d.rev || 0;
+        mailerStatsMap[mailerName].count++;
+        mailerStatsMap[mailerName].epcSum += d.epc || 0;
+        mailerStatsMap[mailerName].cpmSum += d.cpm || 0;
+        
+        const offerName = d.offer || 'Unknown Offer';
+        mailerStatsMap[mailerName].offers[offerName] = (mailerStatsMap[mailerName].offers[offerName] || 0) + (d.rev || 0);
+    });
+    
+    const mailerStatsList = Object.values(mailerStatsMap).map(m => {
+        let bestOffer = 'N/A';
+        let maxOfferRev = -1;
+        Object.entries(m.offers).forEach(([offName, offRev]) => {
+            if (offRev > maxOfferRev) {
+                maxOfferRev = offRev;
+                bestOffer = offName;
+            }
+        });
+        return {
+            name: m.name,
+            rev: m.rev,
+            count: m.count,
+            avgEpc: m.count > 0 ? (m.epcSum / m.count).toFixed(2) : '0.00',
+            avgCpm: m.count > 0 ? (m.cpmSum / m.count).toFixed(2) : '0.00',
+            bestOffer
+        };
+    }).sort((a, b) => b.rev - a.rev);
+
+    const periodLabel = (window._revStartDate || window._revEndDate) ? 'Selected Period' : 'All Time';
+
     // Mailer Leaderboard
     const leaderboard = isAdmin ? (mailers || []).filter(m => m.role === 'mailer').map(m => {
         const rev = (drops || []).filter(d => {
@@ -835,7 +898,7 @@ function renderOverview(app, container) {
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: ${isAdmin ? '2fr 1fr' : '1fr'}; gap: 24px;">
+            <div style="display: grid; grid-template-columns: ${isAdmin ? '2fr 1fr' : '1fr'}; gap: 24px; margin-bottom: 24px;">
                 <div class="card" style="padding: 20px;">
                     <h3 style="margin: 0 0 20px 0; font-size: 1rem; display: flex; align-items: center; gap: 10px;">
                         <i data-lucide="bar-chart-3" style="width: 18px; color: var(--accent-primary);"></i>
@@ -856,7 +919,7 @@ function renderOverview(app, container) {
                 </div>
 
                 ${isAdmin ? `
-                <div class="card" style="padding: 20px; max-height: 400px; overflow-y: auto;">
+                <div class="card" style="padding: 20px; max-height: 250px; overflow-y: auto;">
                     <h3 style="margin: 0 0 20px 0; font-size: 1rem; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; background: var(--bg-secondary); padding-bottom: 10px; z-index: 5;">
                         <i data-lucide="trophy" style="width: 18px; color: #f59e0b;"></i>
                         ${leaderboardTitle}
@@ -880,6 +943,114 @@ function renderOverview(app, container) {
                     </div>
                 </div>
                 ` : ''}
+            </div>
+
+            <!-- Performance Analytics & Charting Section -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin: 32px 0 16px;">
+                <h2 style="margin: 0; font-size: 1.25rem; font-weight: 700;">Performance Analytics (${periodLabel})</h2>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 24px; margin-bottom: 24px;">
+                <!-- Column 1: Mailer Revenue Share (Chart) -->
+                ${isAdmin ? `
+                <div class="card" style="padding: 20px; max-height: 400px; overflow-y: auto;">
+                    <h3 style="margin: 0 0 20px 0; font-size: 1rem; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; background: var(--bg-secondary); padding-bottom: 10px; z-index: 5;">
+                        <i data-lucide="bar-chart-3" style="width: 18px; color: var(--accent-primary);"></i>
+                        Mailer Revenue Distribution
+                    </h3>
+                    <div style="display: flex; flex-direction: column; gap: 16px;">
+                        ${mailerStatsList.map(m => {
+                            const maxRev = mailerStatsList[0] ? mailerStatsList[0].rev : 1;
+                            const pct = maxRev > 0 ? (m.rev / maxRev) * 100 : 0;
+                            return `
+                                <div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                        <span style="font-size: 0.85rem; font-weight: 600;">${m.name}</span>
+                                        <span style="font-size: 0.8rem; color: var(--text-secondary);">${m.count} drops • <b style="color: var(--accent-primary); font-size: 0.85rem;">$${m.rev.toLocaleString(undefined, {minimumFractionDigits: 2})}</b></span>
+                                    </div>
+                                    <div style="width: 100%; height: 10px; background: var(--bg-primary); border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color); padding: 1px;">
+                                        <div style="width: ${pct}%; height: 100%; background: linear-gradient(90deg, var(--accent-primary) 0%, #a855f7 100%); border-radius: 4px; transition: width 0.6s ease-out;"></div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                        ${mailerStatsList.length === 0 ? '<p style="text-align: center; color: var(--text-secondary); font-size: 0.85rem; padding: 40px 0;">No data found for this period</p>' : ''}
+                    </div>
+                </div>
+                ` : ''}
+
+                <!-- Column 2: Offer Performance -->
+                <div class="card" style="padding: 20px; max-height: 400px; overflow-y: auto;">
+                    <h3 style="margin: 0 0 20px 0; font-size: 1rem; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; background: var(--bg-secondary); padding-bottom: 10px; z-index: 5;">
+                        <i data-lucide="shopping-bag" style="width: 18px; color: #10b981;"></i>
+                        Top Offers ${isAdmin ? '' : '(Your Performance)'}
+                    </h3>
+                    <div style="display: flex; flex-direction: column; gap: 14px;">
+                        ${offerStatsList.map((o, idx) => {
+                            const maxOfferRev = offerStatsList[0] ? offerStatsList[0].rev : 1;
+                            const pct = maxOfferRev > 0 ? (o.rev / maxOfferRev) * 100 : 0;
+                            return `
+                                <div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                        <span style="font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%;">${idx + 1}. ${o.name}</span>
+                                        <span style="font-size: 0.8rem; color: var(--text-secondary);">${o.count} drops • <b style="color: #10b981;">$${o.rev.toLocaleString(undefined, {minimumFractionDigits: 2})}</b></span>
+                                    </div>
+                                    <div style="width: 100%; height: 6px; background: var(--bg-primary); border-radius: 4px; overflow: hidden; border: 1px solid var(--border-color);">
+                                        <div style="width: ${pct}%; height: 100%; background: linear-gradient(90deg, #10b981 0%, #059669 100%); border-radius: 4px;"></div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                        ${offerStatsList.length === 0 ? '<p style="text-align: center; color: var(--text-secondary); font-size: 0.85rem; padding: 40px 0;">No offers found for this period</p>' : ''}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Statistics Table -->
+            <div class="card" style="padding: 20px; margin-bottom: 24px; overflow-x: auto;">
+                <h3 style="margin: 0 0 20px 0; font-size: 1rem; display: flex; align-items: center; gap: 10px;">
+                    <i data-lucide="table" style="width: 18px; color: var(--accent-primary);"></i>
+                    Detailed Performance Matrix (${periodLabel})
+                </h3>
+                <table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.75rem; text-align: left;">
+                    <thead>
+                        <tr style="background: var(--bg-tertiary);">
+                            <th style="padding: 12px; border-bottom: 2px solid var(--border-color);">${isAdmin ? 'Mailer' : 'Profile'}</th>
+                            <th style="padding: 12px; border-bottom: 2px solid var(--border-color);">Drops Count</th>
+                            <th style="padding: 12px; border-bottom: 2px solid var(--border-color);">Best Performing Offer</th>
+                            <th style="padding: 12px; border-bottom: 2px solid var(--border-color);">Avg. EPC</th>
+                            <th style="padding: 12px; border-bottom: 2px solid var(--border-color);">Avg. CPM</th>
+                            <th style="padding: 12px; border-bottom: 2px solid var(--border-color); text-align: right; color: var(--accent-primary); font-weight: 700;">Revenue</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${(isAdmin ? mailerStatsList : [{
+                            name: currentUser.name,
+                            count: activeRangeDrops.length,
+                            bestOffer: offerStatsList[0] ? offerStatsList[0].name : 'N/A',
+                            avgEpc: activeRangeDrops.length > 0 ? (activeRangeDrops.reduce((s, d) => s + (d.epc || 0), 0) / activeRangeDrops.length).toFixed(2) : '0.00',
+                            avgCpm: activeRangeDrops.length > 0 ? (activeRangeDrops.reduce((s, d) => s + (d.cpm || 0), 0) / activeRangeDrops.length).toFixed(2) : '0.00',
+                            rev: activeRangeDrops.reduce((s, d) => s + (d.rev || 0), 0)
+                        }]).map((m, idx) => {
+                            const rowBg = idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent';
+                            return `
+                                <tr style="background: ${rowBg}; border-bottom: 1px solid var(--border-color);">
+                                    <td style="padding: 12px; font-weight: 600;">${m.name}</td>
+                                    <td style="padding: 12px; color: var(--text-secondary);">${m.count}</td>
+                                    <td style="padding: 12px; font-weight: 500; color: var(--text-primary);">${m.bestOffer}</td>
+                                    <td style="padding: 12px; font-family: monospace; color: var(--success); font-weight: 600;">$${m.avgEpc}</td>
+                                    <td style="padding: 12px; font-family: monospace; color: #8b5cf6; font-weight: 600;">$${m.avgCpm}</td>
+                                    <td style="padding: 12px; text-align: right; font-weight: 700; color: var(--accent-primary); font-size: 0.85rem;">$${m.rev.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                        ${(isAdmin ? mailerStatsList.length : activeRangeDrops.length) === 0 ? `
+                            <tr>
+                                <td colspan="6" style="padding: 40px; text-align: center; color: var(--text-secondary);">No data matches this criteria</td>
+                            </tr>
+                        ` : ''}
+                    </tbody>
+                </table>
             </div>
         </div>
 
