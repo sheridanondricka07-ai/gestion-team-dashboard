@@ -313,11 +313,12 @@ function renderActiveTable(app, sortedServers) {
             </thead>
             <tbody>
                 ${sortedServers.map((s, idx) => {
-                    const rowBg = idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent';
                     const isMarked = s.markedForCancel === true;
+                    const defaultBg = isMarked ? 'rgba(249, 115, 22, 0.05)' : (idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent');
+                    const hoverBg = isMarked ? 'rgba(249, 115, 22, 0.1)' : 'rgba(59, 130, 246, 0.05)';
                     return `
-                        <tr style="background: ${rowBg}; border-bottom: 1px solid var(--border-color); transition: background 0.2s;" onmouseover="this.style.background='rgba(59, 130, 246, 0.05)'" onmouseout="this.style.background='${rowBg}'">
-                            <td contenteditable="true" onblur="updateServerField('${s.id}', 'name', this.innerText)" style="padding: 12px; font-weight: 700; color: var(--accent-primary); border-right: 1px solid var(--border-color); position: sticky; left: 0; background: inherit; z-index: 5; cursor: text;">${s.name || '&nbsp;'}</td>
+                        <tr style="background: ${defaultBg}; border-bottom: 1px solid ${isMarked ? '#f97316' : 'var(--border-color)'}; transition: background 0.2s;" onmouseover="this.style.background='${hoverBg}'" onmouseout="this.style.background='${defaultBg}'">
+                            <td contenteditable="true" onblur="updateServerField('${s.id}', 'name', this.innerText)" style="padding: 12px; font-weight: 700; color: ${isMarked ? '#f97316' : 'var(--accent-primary)'}; border-right: 1px solid var(--border-color); position: sticky; left: 0; background: inherit; z-index: 5; cursor: text;">${s.name || '&nbsp;'}</td>
                             <td contenteditable="true" onblur="updateServerField('${s.id}', 'ipClass', this.innerText)" style="padding: 12px; color: var(--text-secondary); max-width: 250px; line-height: 1.4; cursor: text;">${s.ipClass || '&nbsp;'}</td>
                             <td contenteditable="true" onblur="updateServerField('${s.id}', 'mainIp', this.innerText)" style="padding: 12px; font-family: monospace; cursor: text;">${s.mainIp || s.ip || '&nbsp;'}</td>
                             <td contenteditable="true" onblur="updateServerField('${s.id}', 'enteredDate', this.innerText)" style="padding: 12px; cursor: text;">${s.enteredDate || '&nbsp;'}</td>
@@ -875,17 +876,21 @@ function renderManagement(app, container) {
                         </span>
                     </div>
                     <div class="drop-zone" data-type="stock-srv" style="min-height: 80px; border: 1px dashed var(--border-color); border-radius: 8px;">
-                        ${stockSrvs.map(srv => `
-                            <div class="draggable-item" ${isAdmin ? 'draggable="true" ondragstart="handleDragStart(event, \'srv\', \'' + srv.id + '\')"' : ''}>
-                                <span style="flex: 1; font-weight: 500;">${srv.name}</span>
-                                ${isAdmin ? `
-                                    <span class="action-icon delete" onclick="event.stopPropagation(); deleteServer('${srv.id}')" title="Delete Server">
-                                        <i data-lucide="trash-2" style="width: 14px; color: var(--error);"></i>
-                                    </span>
-                                ` : ''}
-                                <span class="badge badge-srv" style="margin-left: 8px;">SRV</span>
-                            </div>
-                        `).join('')}
+                        ${stockSrvs.map(srv => {
+                            const isCancel = srv.markedForCancel === true;
+                            const cancelStyle = isCancel ? 'border-color: #f97316; background: rgba(249, 115, 22, 0.08);' : '';
+                            return `
+                                <div class="draggable-item" ${isAdmin ? 'draggable="true" ondragstart="handleDragStart(event, \'srv\', \'' + srv.id + '\')"' : ''} style="${cancelStyle}">
+                                    <span style="flex: 1; font-weight: 500; color: ${isCancel ? '#f97316' : 'inherit'};">${srv.name}</span>
+                                    ${isAdmin ? `
+                                        <span class="action-icon delete" onclick="event.stopPropagation(); deleteServer('${srv.id}')" title="Delete Server">
+                                            <i data-lucide="trash-2" style="width: 14px; color: var(--error);"></i>
+                                        </span>
+                                    ` : ''}
+                                    <span class="badge ${isCancel ? '' : 'badge-srv'}" style="margin-left: 8px; ${isCancel ? 'background: rgba(249, 115, 22, 0.2); color: #f97316; border: 1px solid #f97316;' : ''}">SRV</span>
+                                </div>
+                            `;
+                        }).join('')}
                     </div>
                 </div>
             </div>
@@ -905,12 +910,14 @@ function renderManagement(app, container) {
                                 ${mSrvs.map(srv => {
                                     const srvRps = rps.filter(r => r.serverId === srv.id);
                                     const isExpanded = app.expandedServers.has(srv.id);
+                                    const isCancel = srv.markedForCancel === true;
+                                    const cancelStyle = isCancel ? 'border-color: #f97316; background: rgba(249, 115, 22, 0.04);' : '';
                                     return `
-                                        <div class="server-container draggable-item" ${isAdmin ? 'draggable="true" ondragstart="handleDragStart(event, \'srv\', \'' + srv.id + '\')"' : ''} style="display: block; padding: 0; margin-bottom: 8px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
-                                            <div class="server-header" onclick="app.toggleServerExpand('${srv.id}')" style="cursor: pointer; background: rgba(255,255,255,0.03);">
+                                        <div class="server-container draggable-item" ${isAdmin ? 'draggable="true" ondragstart="handleDragStart(event, \'srv\', \'' + srv.id + '\')"' : ''} style="display: block; padding: 0; margin-bottom: 8px; border-radius: 8px; overflow: hidden; ${cancelStyle}">
+                                            <div class="server-header" onclick="app.toggleServerExpand('${srv.id}')" style="cursor: pointer; background: ${isCancel ? 'rgba(249, 115, 22, 0.08)' : 'rgba(255,255,255,0.03)'};">
                                                 <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
-                                                    <i data-lucide="chevron-${isExpanded ? 'down' : 'right'}" style="width: 14px; color: var(--text-secondary);"></i>
-                                                    <span style="font-weight: 600; font-size: 0.85rem;">${srv.name} <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.75rem;">(${srvRps.length} RPs)</span></span>
+                                                    <i data-lucide="chevron-${isExpanded ? 'down' : 'right'}" style="width: 14px; color: ${isCancel ? '#f97316' : 'var(--text-secondary)'};"></i>
+                                                    <span style="font-weight: 600; font-size: 0.85rem; color: ${isCancel ? '#f97316' : 'inherit'};">${srv.name} <span style="color: ${isCancel ? 'rgba(249, 115, 22, 0.8)' : 'var(--text-secondary)'}; font-weight: 400; font-size: 0.75rem;">(${srvRps.length} RPs)</span></span>
                                                 </div>
                                                 <div style="display: flex; gap: 4px; align-items: center;" onclick="event.stopPropagation()">
                                                     <span class="action-icon" onclick="copyServerRps('${srv.id}', this)" title="Copy all RPs in this server">
