@@ -69,18 +69,23 @@ export default async function handler(req, res) {
         return res.status(405).send('Method Not Allowed');
     }
 
+    const task = req.query.task;
     const now = new Date();
     const hour = now.getUTCHours(); // UTC time
     
-    console.log(`Cron Master started at ${now.toISOString()} (Hour: ${hour})`);
+    console.log(`Cron Master started at ${now.toISOString()} (Hour: ${hour}, Override Task: ${task || 'none'})`);
 
     const results = {
         spamhausTriggered: false,
         vmtaTriggered: false
     };
 
+    const runSpamhaus = task === 'all' || task === 'spamhaus' || (!task && [9, 21].includes(hour));
+    const runVmta = task === 'all' || task === 'vmta' || task === 'rdns' || (!task && [9, 21].includes(hour));
+    const runGmail = task === 'all' || task === 'gmail' || (!task && [12, 18].includes(hour));
+
     // 1. Trigger Spamhaus Check (Twice a day: 09:00, 21:00 UTC)
-    if ([9, 21].includes(hour)) {
+    if (runSpamhaus) {
         console.log('Triggering Spamhaus Check...');
         try {
             // We call our own API endpoint. 
@@ -96,7 +101,7 @@ export default async function handler(req, res) {
     }
 
     // 2. Trigger VMTA Check (Twice a day: 09:00, 21:00 UTC)
-    if ([9, 21].includes(hour)) {
+    if (runVmta) {
         console.log('Running VMTA Check...');
         try {
             const servers = await getFirebaseData('state/servers') || [];
@@ -178,7 +183,7 @@ export default async function handler(req, res) {
     }
 
     // 3. Automated Gmail VMTA Sync (New schedule: 12:00, 18:00 UTC)
-    if ([12, 18].includes(hour)) {
+    if (runGmail) {
         console.log('Running Automated Gmail Sync...');
         try {
             const gmail = await getFirebaseData('state/gmail');
