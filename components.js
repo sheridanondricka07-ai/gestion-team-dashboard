@@ -228,6 +228,21 @@ window.toggleServerCancelMark = async (id) => {
     window.app.updateDashboard();
 };
 
+window.updateServerField = async (serverId, field, value) => {
+    const srv = window.app.state.servers.find(s => s.id === serverId);
+    if (srv) {
+        const cleanVal = value.replace(/\u00a0/g, ' ').trim();
+        if (srv[field] !== cleanVal) {
+            srv[field] = cleanVal;
+            if (field === 'mainIp') {
+                srv.ip = cleanVal;
+            }
+            await window.app.saveState();
+            window.app.updateDashboard();
+        }
+    }
+};
+
 function renderServerInventory(app, container) {
     const { servers } = app.state;
     const sortedServers = [...servers].sort((a, b) => a.name.localeCompare(b.name));
@@ -302,17 +317,17 @@ function renderActiveTable(app, sortedServers) {
                     const isMarked = s.markedForCancel === true;
                     return `
                         <tr style="background: ${rowBg}; border-bottom: 1px solid var(--border-color); transition: background 0.2s;" onmouseover="this.style.background='rgba(59, 130, 246, 0.05)'" onmouseout="this.style.background='${rowBg}'">
-                            <td style="padding: 12px; font-weight: 700; color: var(--accent-primary); border-right: 1px solid var(--border-color); position: sticky; left: 0; background: inherit; z-index: 5;">${s.name}</td>
-                            <td style="padding: 12px; color: var(--text-secondary); max-width: 250px; line-height: 1.4;">${s.ipClass || '---'}</td>
-                            <td style="padding: 12px; font-family: monospace;">${s.mainIp || s.ip || '---'}</td>
-                            <td style="padding: 12px;">${s.enteredDate || '---'}</td>
-                            <td style="padding: 12px;"><span class="badge" style="background: rgba(59, 130, 246, 0.1); color: var(--accent-primary); border: none;">${s.entity || '---'}</span></td>
-                            <td style="padding: 12px;">${s.group || '---'}</td>
-                            <td style="padding: 12px; font-weight: 600;">${s.provider || '---'}</td>
-                            <td style="padding: 12px; color: var(--text-secondary); font-size: 0.7rem;">${s.asn || '---'}</td>
-                            <td style="padding: 12px; color: #f87171;">${s.cancelNoticeDate || '---'}</td>
-                            <td style="padding: 12px;">${s.reqAt || '---'}</td>
-                            <td style="padding: 12px; color: #ef4444; font-weight: 700; background: rgba(239, 68, 68, 0.03);">${s.cancelDate || '---'}</td>
+                            <td contenteditable="true" onblur="updateServerField('${s.id}', 'name', this.innerText)" style="padding: 12px; font-weight: 700; color: var(--accent-primary); border-right: 1px solid var(--border-color); position: sticky; left: 0; background: inherit; z-index: 5; cursor: text;">${s.name || '&nbsp;'}</td>
+                            <td contenteditable="true" onblur="updateServerField('${s.id}', 'ipClass', this.innerText)" style="padding: 12px; color: var(--text-secondary); max-width: 250px; line-height: 1.4; cursor: text;">${s.ipClass || '&nbsp;'}</td>
+                            <td contenteditable="true" onblur="updateServerField('${s.id}', 'mainIp', this.innerText)" style="padding: 12px; font-family: monospace; cursor: text;">${s.mainIp || s.ip || '&nbsp;'}</td>
+                            <td contenteditable="true" onblur="updateServerField('${s.id}', 'enteredDate', this.innerText)" style="padding: 12px; cursor: text;">${s.enteredDate || '&nbsp;'}</td>
+                            <td contenteditable="true" onblur="updateServerField('${s.id}', 'entity', this.innerText)" style="padding: 12px; font-weight: 600; color: var(--accent-primary); cursor: text;">${s.entity || '&nbsp;'}</td>
+                            <td contenteditable="true" onblur="updateServerField('${s.id}', 'group', this.innerText)" style="padding: 12px; cursor: text;">${s.group || '&nbsp;'}</td>
+                            <td contenteditable="true" onblur="updateServerField('${s.id}', 'provider', this.innerText)" style="padding: 12px; font-weight: 600; cursor: text;">${s.provider || '&nbsp;'}</td>
+                            <td contenteditable="true" onblur="updateServerField('${s.id}', 'asn', this.innerText)" style="padding: 12px; color: var(--text-secondary); font-size: 0.7rem; cursor: text;">${s.asn || '&nbsp;'}</td>
+                            <td contenteditable="true" onblur="updateServerField('${s.id}', 'cancelNoticeDate', this.innerText)" style="padding: 12px; color: #f87171; cursor: text;">${s.cancelNoticeDate || '&nbsp;'}</td>
+                            <td contenteditable="true" onblur="updateServerField('${s.id}', 'reqAt', this.innerText)" style="padding: 12px; cursor: text;">${s.reqAt || '&nbsp;'}</td>
+                            <td contenteditable="true" onblur="updateServerField('${s.id}', 'cancelDate', this.innerText)" style="padding: 12px; color: #ef4444; font-weight: 700; background: rgba(239, 68, 68, 0.03); cursor: text;">${s.cancelDate || '&nbsp;'}</td>
                             <td style="padding: 12px; text-align: center;">
                                 <button onclick="toggleServerCancelMark('${s.id}')" 
                                     style="padding: 4px 10px; font-size: 0.65rem; background: ${isMarked ? '#ef4444' : 'var(--bg-tertiary)'}; border: 1px solid ${isMarked ? '#ef4444' : 'var(--border-color)'}; color: ${isMarked ? '#fff' : 'var(--text-secondary)'}; width: auto;">
@@ -1150,90 +1165,23 @@ window.deleteMailer = async (id) => {
 window.showAddServerModal = () => {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
-    const today = new Date().toISOString().split('T')[0];
     
     overlay.innerHTML = `
-        <div class="modal" style="width: 800px; max-width: 95vw; max-height: 90vh; overflow-y: auto;">
+        <div class="modal" style="width: 500px; max-width: 95vw;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
                 <h2 style="margin: 0;">Add New Server to Inventory</h2>
                 <button onclick="this.closest('.modal-overlay').remove()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">&times;</button>
             </div>
             
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-                <!-- Left Column: Core Info -->
-                <div style="display: flex; flex-direction: column; gap: 16px;">
-                    <div class="form-group">
-                        <label>Server Name</label>
-                        <input type="text" id="srv-name" placeholder="s_wmn3_2235" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Main IP</label>
-                        <input type="text" id="srv-main-ip" placeholder="51.255.198.64" 
-                               onchange="window.autoFetchIpInfo(this.value)"
-                               style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
-                    </div>
-
-                    <div class="form-group">
-                        <label>Class (IP Ranges)</label>
-                        <input type="text" id="srv-class" placeholder="51.255.198.64/32 54.36.95.28/30" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
-                    </div>
-
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                        <div class="form-group">
-                            <label>Entity</label>
-                            <input type="text" id="srv-entity" placeholder="WMN3" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
-                        </div>
-                        <div class="form-group">
-                            <label>Group</label>
-                            <input type="text" id="srv-group" placeholder="WMN" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Production IPs (One per line for PTR/VMTA check)</label>
-                        <textarea id="srv-ips" placeholder="173.44.157.34 vmta1.com&#10;173.44.157.35 vmta2.com" style="width:100%; height:120px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px; padding:12px; font-family:monospace;"></textarea>
-                    </div>
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+                <div class="form-group">
+                    <label>Server Name</label>
+                    <input type="text" id="srv-name" placeholder="s_wmn3_2235" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
                 </div>
 
-                <!-- Right Column: Provider & Lifecycle -->
-                <div style="display: flex; flex-direction: column; gap: 16px;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                        <div class="form-group">
-                            <label>Entered Date</label>
-                            <input type="date" id="srv-entered" value="${today}" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
-                        </div>
-                        <div class="form-group">
-                            <label>IP Provider</label>
-                            <input type="text" id="srv-provider" placeholder="OVH" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>ASN</label>
-                        <input type="text" id="srv-asn" placeholder="* OVH SAS" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
-                    </div>
-
-                    <div style="padding: 16px; background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 12px; display: flex; flex-direction: column; gap: 12px;">
-                        <h4 style="margin: 0; font-size: 0.9rem; color: #ef4444; display: flex; align-items: center; gap: 8px;">
-                            <i data-lucide="calendar-x" style="width: 16px;"></i> Cancellation Tracking
-                        </h4>
-                        
-                        <div class="form-group">
-                            <label style="color: var(--text-secondary);">Cancellation Notice Date</label>
-                            <input type="date" id="srv-cancel-notice" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
-                        </div>
-
-                        <div class="form-group">
-                            <label style="color: var(--text-secondary);">Requested At</label>
-                            <input type="date" id="srv-req-at" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
-                        </div>
-
-                        <div class="form-group">
-                            <label style="color: var(--text-secondary);">Final Cancellation Date</label>
-                            <input type="date" id="srv-cancel-date" style="width:100%; padding:10px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px;">
-                        </div>
-                    </div>
+                <div class="form-group">
+                    <label>Production IPs (One per line for PTR/VMTA check)</label>
+                    <textarea id="srv-ips" placeholder="173.44.157.34 vmta1.com&#10;173.44.157.35 vmta2.com" style="width:100%; height:200px; background:var(--bg-tertiary); border:1px solid var(--border-color); color:var(--text-primary); border-radius:8px; padding:12px; font-family:monospace;"></textarea>
                 </div>
             </div>
 
@@ -1250,26 +1198,16 @@ window.showAddServerModal = () => {
 window.saveServer = async (btn) => {
     const data = {
         name: document.getElementById('srv-name').value.trim(),
-        mainIp: document.getElementById('srv-main-ip').value.trim(),
-        ipClass: document.getElementById('srv-class').value.trim(),
-        entity: document.getElementById('srv-entity').value.trim(),
-        group: document.getElementById('srv-group').value.trim(),
-        ips: document.getElementById('srv-ips').value.trim(),
-        enteredDate: document.getElementById('srv-entered').value,
-        provider: document.getElementById('srv-provider').value.trim(),
-        asn: document.getElementById('srv-asn').value.trim(),
-        cancelNoticeDate: document.getElementById('srv-cancel-notice').value,
-        reqAt: document.getElementById('srv-req-at').value,
-        cancelDate: document.getElementById('srv-cancel-date').value
+        ips: document.getElementById('srv-ips').value.trim()
     };
 
-    if (data.name && (data.ips || data.mainIp)) {
+    if (data.name && data.ips) {
         btn.innerText = 'Saving...';
         btn.disabled = true;
         await window.app.addServer(data);
         btn.closest('.modal-overlay').remove();
     } else {
-        alert('Server Name and at least one IP (Main or List) are required.');
+        alert('Server Name and at least one IP are required.');
     }
 };
 

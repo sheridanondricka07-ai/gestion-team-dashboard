@@ -241,6 +241,8 @@ class TeamApp {
             
             // Update inventory fields if provided
             if (serverData.mainIp) existingServer.mainIp = serverData.mainIp;
+            else if (!existingServer.mainIp && ips[0]) existingServer.mainIp = ips[0];
+
             if (serverData.ipClass) existingServer.ipClass = serverData.ipClass;
             if (serverData.entity) existingServer.entity = serverData.entity;
             if (serverData.group) existingServer.group = serverData.group;
@@ -266,7 +268,7 @@ class TeamApp {
                 mailerId: null,
                 status: 'stock',
                 // Inventory Fields
-                mainIp: serverData.mainIp || '',
+                mainIp: serverData.mainIp || (ips[0] || ''),
                 ipClass: serverData.ipClass || '',
                 entity: serverData.entity || '',
                 group: serverData.group || '',
