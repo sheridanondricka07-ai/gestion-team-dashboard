@@ -60,20 +60,16 @@ class TeamApp {
         this.statusRange = 7;
         this.statusSearch = '';
         this.selectedFilterDate = new Date().toISOString().split('T')[0];
+        this.hasCheckedCancellations = false;
         this.init();
     }
 
-    async init() {
-        console.log("Initializing App...");
-        await this.loadState();
-        
+    async runMaintenanceEngine() {
+        console.log("Running Maintenance Engine...");
         // 1. Run Alerts FIRST (so we notify before archiving/renewing)
         await this.checkUpcomingCancellations();
-
         // 2. Run Maintenance (Archive/Renew)
         await this.checkServerCancellations();
-        
-        this.updateDashboard();
     }
 
     async checkServerCancellations() {
@@ -621,6 +617,11 @@ class TeamApp {
                         
                         this.updateDashboard();
                         if (!this.state.currentUser) renderLogin(this);
+
+                        if (!this.hasCheckedCancellations) {
+                            this.hasCheckedCancellations = true;
+                            this.runMaintenanceEngine();
+                        }
                     } else {
                         console.log("Database is empty. Using defaults.");
                         this.checkAuth();
@@ -629,12 +630,20 @@ class TeamApp {
                     console.error("Firebase Read Error:", error);
                     this.state.dbConnected = false;
                     this.loadLocalState();
+                    if (!this.hasCheckedCancellations) {
+                        this.hasCheckedCancellations = true;
+                        this.runMaintenanceEngine();
+                    }
                     this.checkAuth();
                 });
             } else {
                 console.warn("No Database Connection. Falling back to Local Storage.");
                 this.state.dbConnected = false;
                 this.loadLocalState();
+                if (!this.hasCheckedCancellations) {
+                    this.hasCheckedCancellations = true;
+                    this.runMaintenanceEngine();
+                }
                 this.checkAuth();
             }
         } catch (err) {
