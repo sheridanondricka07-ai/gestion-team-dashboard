@@ -282,6 +282,27 @@ class TeamApp {
             this.state.servers.push(newServer);
             await this.saveState();
         }
+
+        // Trigger automated RDNS check for the newly added/updated server's IPs
+        if (ips.length > 0) {
+            fetch('/api/check-vmta', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ips })
+            })
+            .then(res => {
+                if (res.ok) return res.json();
+                throw new Error('API failed');
+            })
+            .then(async (data) => {
+                if (data.results) {
+                    this.state.vmtaResults = { ...this.state.vmtaResults, ...data.results };
+                    await this.saveState();
+                    this.updateDashboard();
+                }
+            })
+            .catch(err => console.error('Automated RDNS Check failed:', err));
+        }
     }
 
     async addRP(rpData) {

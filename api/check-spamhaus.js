@@ -9,6 +9,31 @@ const SPAMHAUS_PASSWORD = "E1l0&su7d,zVEiP6";
 
 let authToken = null;
 
+async function sendTelegram(message) {
+    const token = "8854626437:AAETvyVLsi_NWbiUkeZxqs-r74VoTVGb4KE";
+    const chatId = "-5109098387";
+    
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000); 
+
+        const resp = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: chatId,
+                text: message,
+                parse_mode: 'HTML'
+            }),
+            signal: controller.signal
+        });
+        clearTimeout(timeout);
+        return await resp.json();
+    } catch (e) {
+        return { ok: false, error: e.message };
+    }
+}
+
 async function updateFirebaseData(path, data) {
     try {
         await fetch(`${DB_URL}/${path}.json`, {
@@ -219,11 +244,74 @@ export default async function handler(req, res) {
             await updateFirebaseData('state/spamhausProgress', { status: 'idle' });
             
             const dateKey = new Date().toISOString().split('T')[0];
-            const finalResults = await getFirebaseData('state/spamhaus');
+            const finalResults = await getFirebaseData('state/spamhaus') || {};
             await setFirebaseData(`state/spamhausHistory/${dateKey}`, {
                 timestamp: timestamp,
                 results: finalResults
             });
+
+            // Build and send Telegram report
+            try {
+                let listedCount = 0;
+                let cleanCount = 0;
+                const newlyListed = [];
+                const newlyCleaned = [];
+
+                // Fetch yesterday's history for comparison
+                const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+                const yesterdayKey = yesterday.toISOString().split('T')[0];
+                const yesterdayData = await getFirebaseData(`state/spamhausHistory/${yesterdayKey}`) || {};
+                const yesterdayResults = yesterdayData.results || {};
+
+                for (const ip of uniqueIps) {
+                    const safeIp = ip.replace(/\./g, '_');
+                    const res = finalResults[safeIp] || {};
+                    const prev = yesterdayResults[safeIp] || {};
+                    if (res.status === 'listed') {
+                        listedCount++;
+                        if (prev.status !== 'listed') {
+                            newlyListed.push(ip);
+                        }
+                    } else {
+                        cleanCount++;
+                        if (prev.status === 'listed') {
+                            newlyCleaned.push(ip);
+                        }
+                    }
+                }
+
+                let tg_msg = `🛡️ <b>Spamhaus Report</b>\n`;
+                tg_msg += `📅 <i>${new Date().toLocaleString()}</i>\n\n`;
+                tg_msg += `📊 <b>Global Stats:</b>\n`;
+                tg_msg += `• Total Checked: ${uniqueIps.length}\n`;
+                tg_msg += `• 🔴 Listed IPs: <b>${listedCount}</b>\n`;
+                tg_msg += `• 🟢 Clean IPs: <b>${cleanCount}</b>\n\n`;
+
+                if (newlyListed.length > 0 || newlyCleaned.length > 0) {
+                    tg_msg += `🔄 <b>Changes:</b>\n`;
+                    if (newlyListed.length > 0) {
+                        tg_msg += `🔥 <b>Newly Listed (${newlyListed.length}):</b>\n`;
+                        tg_msg += newlyListed.slice(0, 10).map(ip => `🔴 ${ip}`).join('\n') + '\n';
+                    }
+                    if (newlyCleaned.length > 0) {
+                        tg_msg += `✨ <b>Newly Cleaned (${newlyCleaned.length}):</b>\n`;
+                        tg_msg += newlyCleaned.slice(0, 10).map(ip => `🟢 ${ip}`).join('\n') + '\n';
+                    }
+                    tg_msg += '\n';
+                }
+
+                if (listedCount > 0) {
+                    tg_msg += `⚠️ <b>Status Alert:</b> ${listedCount} listings currently active.`;
+                } else {
+                    tg_msg += `✅ <b>Status Clear:</b> All IPs are clean.`;
+                }
+
+                tg_msg += `\n\n🔗 <a href="https://gestion-team-dashboard.vercel.app/">Open Dashboard</a>`;
+                
+                await sendTelegram(tg_msg);
+            } catch (tgErr) {
+                console.error('Failed to send Spamhaus Telegram report:', tgErr);
+            }
         }
 
         return res.status(200).json({ 

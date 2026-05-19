@@ -95,8 +95,8 @@ export default async function handler(req, res) {
         }
     }
 
-    // 2. Trigger VMTA Check (3 times a day: 09:00, 15:00, 21:00 UTC)
-    if ([9, 15, 21].includes(hour)) {
+    // 2. Trigger VMTA Check (Twice a day: 09:00, 21:00 UTC)
+    if ([9, 21].includes(hour)) {
         console.log('Running VMTA Check...');
         try {
             const servers = await getFirebaseData('state/servers') || [];
