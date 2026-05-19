@@ -628,8 +628,54 @@ window.updateRevDateRange = () => {
 };
 
 window.clearRevDateRange = () => {
+    window._revPreset = 'all';
     window._revStartDate = '';
     window._revEndDate = '';
+    window.app.updateDashboard();
+};
+
+function getLocalDateString(date) {
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+window.handleRevPresetChange = (preset) => {
+    window._revPreset = preset;
+    const now = new Date();
+    
+    if (preset === 'today') {
+        const todayStr = getLocalDateString(now);
+        window._revStartDate = todayStr;
+        window._revEndDate = todayStr;
+    } else if (preset === 'yesterday') {
+        const yesterday = new Date();
+        yesterday.setDate(now.getDate() - 1);
+        const yesterdayStr = getLocalDateString(yesterday);
+        window._revStartDate = yesterdayStr;
+        window._revEndDate = yesterdayStr;
+    } else if (preset === 'week') {
+        const weekAgo = new Date();
+        weekAgo.setDate(now.getDate() - 6);
+        window._revStartDate = getLocalDateString(weekAgo);
+        window._revEndDate = getLocalDateString(now);
+    } else if (preset === 'month') {
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        window._revStartDate = getLocalDateString(firstDay);
+        window._revEndDate = getLocalDateString(now);
+    } else if (preset === 'last_month') {
+        const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
+        window._revStartDate = getLocalDateString(firstDay);
+        window._revEndDate = getLocalDateString(lastDay);
+    } else if (preset === 'custom') {
+        window._revStartDate = window._revStartDate || '';
+        window._revEndDate = window._revEndDate || '';
+    } else { // 'all'
+        window._revStartDate = '';
+        window._revEndDate = '';
+    }
     window.app.updateDashboard();
 };
 
@@ -715,6 +761,7 @@ function renderOverview(app, container) {
     }).sort((a, b) => b.rev - a.rev) : [];
 
     const leaderboardTitle = (window._revStartDate || window._revEndDate) ? 'Mailers (Filtered)' : 'Top Mailers (Month)';
+    window._revPreset = window._revPreset || 'all';
 
     container.innerHTML = `
         <div style="padding: 0 0 24px 0;">
@@ -723,20 +770,29 @@ function renderOverview(app, container) {
                 <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <i data-lucide="calendar" style="width: 18px; color: var(--accent-primary);"></i>
-                        <span style="font-weight: 600; font-size: 0.85rem;">Date Range Filter</span>
+                        <span style="font-weight: 600; font-size: 0.85rem;">Revenue Filter</span>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                        <div style="display: flex; align-items: center; gap: 6px;">
-                            <label style="font-size: 0.75rem; color: var(--text-secondary);">From:</label>
-                            <input type="date" id="rev-start-date" value="${window._revStartDate || ''}" onchange="updateRevDateRange()" style="padding: 6px 10px; font-size: 0.8rem; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px;">
+                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <select id="rev-preset" onchange="handleRevPresetChange(this.value)" style="padding: 6px 12px; font-size: 0.8rem; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; font-weight: 500;">
+                            <option value="all" ${window._revPreset === 'all' ? 'selected' : ''}>All Time</option>
+                            <option value="today" ${window._revPreset === 'today' ? 'selected' : ''}>Today</option>
+                            <option value="yesterday" ${window._revPreset === 'yesterday' ? 'selected' : ''}>Yesterday</option>
+                            <option value="week" ${window._revPreset === 'week' ? 'selected' : ''}>Last 7 Days</option>
+                            <option value="month" ${window._revPreset === 'month' ? 'selected' : ''}>This Month</option>
+                            <option value="last_month" ${window._revPreset === 'last_month' ? 'selected' : ''}>Last Month</option>
+                            <option value="custom" ${window._revPreset === 'custom' ? 'selected' : ''}>Custom Range</option>
+                        </select>
+                        
+                        <div id="custom-date-container" style="display: ${window._revPreset === 'custom' ? 'flex' : 'none'}; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <label style="font-size: 0.75rem; color: var(--text-secondary);">From:</label>
+                                <input type="date" id="rev-start-date" value="${window._revStartDate || ''}" onchange="updateRevDateRange()" style="padding: 6px 10px; font-size: 0.8rem; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px;">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <label style="font-size: 0.75rem; color: var(--text-secondary);">To:</label>
+                                <input type="date" id="rev-end-date" value="${window._revEndDate || ''}" onchange="updateRevDateRange()" style="padding: 6px 10px; font-size: 0.8rem; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px;">
+                            </div>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 6px;">
-                            <label style="font-size: 0.75rem; color: var(--text-secondary);">To:</label>
-                            <input type="date" id="rev-end-date" value="${window._revEndDate || ''}" onchange="updateRevDateRange()" style="padding: 6px 10px; font-size: 0.8rem; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px;">
-                        </div>
-                        ${(window._revStartDate || window._revEndDate) ? `
-                            <button onclick="clearRevDateRange()" style="padding: 6px 12px; font-size: 0.8rem; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-secondary); cursor: pointer; border-radius: 6px; width: auto; font-weight: 500;">Clear</button>
-                        ` : ''}
                     </div>
                 </div>
                 ${showFilteredStats ? `
