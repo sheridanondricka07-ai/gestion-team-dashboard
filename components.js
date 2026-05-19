@@ -619,6 +619,20 @@ function renderTools(app, container) {
     if (window.lucide) window.lucide.createIcons();
 }
 
+window.updateRevDateRange = () => {
+    const startVal = document.getElementById('rev-start-date').value;
+    const endVal = document.getElementById('rev-end-date').value;
+    window._revStartDate = startVal;
+    window._revEndDate = endVal;
+    window.app.updateDashboard();
+};
+
+window.clearRevDateRange = () => {
+    window._revStartDate = '';
+    window._revEndDate = '';
+    window.app.updateDashboard();
+};
+
 function renderOverview(app, container) {
     const { rps, servers, currentUser, drops, mailers } = app.state;
     const isAdmin = currentUser.role === 'admin';
@@ -643,6 +657,7 @@ function renderOverview(app, container) {
 
     const myDrops = isAdmin ? (drops || []) : (drops || []).filter(d => d.mailerName === currentUser.name);
 
+    // Calculate Standard Stats
     const stats = myDrops.reduce((acc, d) => {
         const dDate = new Date(d.timestamp);
         const dDateStr = dDate.toLocaleDateString();
@@ -657,14 +672,81 @@ function renderOverview(app, container) {
         return acc;
     }, { today: 0, yesterday: 0, thisMonth: 0, lastMonth: 0, total: 0 });
 
-    // Mailer Leaderboard (Current Month)
+    // Calculate Filtered Stats
+    let showFilteredStats = false;
+    let filteredTotal = 0;
+    let filteredCount = 0;
+
+    if (window._revStartDate || window._revEndDate) {
+        showFilteredStats = true;
+        const start = window._revStartDate ? new Date(window._revStartDate + 'T00:00:00') : null;
+        const end = window._revEndDate ? new Date(window._revEndDate + 'T23:59:59') : null;
+
+        myDrops.forEach(d => {
+            const dDate = new Date(d.timestamp);
+            let match = true;
+            if (start && dDate < start) match = false;
+            if (end && dDate > end) match = false;
+            
+            if (match) {
+                filteredTotal += d.rev || 0;
+                filteredCount++;
+            }
+        });
+    }
+
+    // Mailer Leaderboard
     const leaderboard = isAdmin ? (mailers || []).filter(m => m.role === 'mailer').map(m => {
-        const rev = (drops || []).filter(d => d.mailerName === m.name && new Date(d.timestamp).getMonth() === thisMonth).reduce((sum, d) => sum + (d.rev || 0), 0);
+        const rev = (drops || []).filter(d => {
+            if (d.mailerName !== m.name) return false;
+            if (window._revStartDate || window._revEndDate) {
+                const dDate = new Date(d.timestamp);
+                const start = window._revStartDate ? new Date(window._revStartDate + 'T00:00:00') : null;
+                const end = window._revEndDate ? new Date(window._revEndDate + 'T23:59:59') : null;
+                if (start && dDate < start) return false;
+                if (end && dDate > end) return false;
+                return true;
+            } else {
+                const dDate = new Date(d.timestamp);
+                return dDate.getMonth() === thisMonth && dDate.getFullYear() === thisYear;
+            }
+        }).reduce((sum, d) => sum + (d.rev || 0), 0);
         return { name: m.name, rev };
     }).sort((a, b) => b.rev - a.rev) : [];
 
+    const leaderboardTitle = (window._revStartDate || window._revEndDate) ? 'Mailers (Filtered)' : 'Top Mailers (Month)';
+
     container.innerHTML = `
         <div style="padding: 0 0 24px 0;">
+            <!-- Date Filter Panel -->
+            <div class="card" style="padding: 16px; margin-bottom: 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; background: var(--bg-tertiary);">
+                <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i data-lucide="calendar" style="width: 18px; color: var(--accent-primary);"></i>
+                        <span style="font-weight: 600; font-size: 0.85rem;">Date Range Filter</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <label style="font-size: 0.75rem; color: var(--text-secondary);">From:</label>
+                            <input type="date" id="rev-start-date" value="${window._revStartDate || ''}" onchange="updateRevDateRange()" style="padding: 6px 10px; font-size: 0.8rem; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px;">
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <label style="font-size: 0.75rem; color: var(--text-secondary);">To:</label>
+                            <input type="date" id="rev-end-date" value="${window._revEndDate || ''}" onchange="updateRevDateRange()" style="padding: 6px 10px; font-size: 0.8rem; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px;">
+                        </div>
+                        ${(window._revStartDate || window._revEndDate) ? `
+                            <button onclick="clearRevDateRange()" style="padding: 6px 12px; font-size: 0.8rem; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-secondary); cursor: pointer; border-radius: 6px; width: auto; font-weight: 500;">Clear</button>
+                        ` : ''}
+                    </div>
+                </div>
+                ${showFilteredStats ? `
+                    <div style="display: flex; align-items: center; gap: 16px; padding: 6px 16px; background: rgba(59, 130, 246, 0.1); border: 1px solid var(--accent-primary); border-radius: 8px;">
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">Range Total: <b style="font-size: 1rem; color: var(--accent-primary); margin-left: 4px;">$${filteredTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</b></div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">Drops: <b style="font-size: 0.9rem; color: var(--text-primary); margin-left: 4px;">${filteredCount}</b></div>
+                    </div>
+                ` : ''}
+            </div>
+
             <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px;">
                 <h2 style="margin: 0; font-size: 1.25rem; font-weight: 700;">Revenue Performance</h2>
                 <span style="font-size: 0.8rem; color: var(--text-secondary);">Last updated: ${now.toLocaleTimeString()}</span>
@@ -718,22 +800,27 @@ function renderOverview(app, container) {
                 </div>
 
                 ${isAdmin ? `
-                <div class="card" style="padding: 20px;">
-                    <h3 style="margin: 0 0 20px 0; font-size: 1rem; display: flex; align-items: center; gap: 10px;">
+                <div class="card" style="padding: 20px; max-height: 400px; overflow-y: auto;">
+                    <h3 style="margin: 0 0 20px 0; font-size: 1rem; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; background: var(--bg-secondary); padding-bottom: 10px; z-index: 5;">
                         <i data-lucide="trophy" style="width: 18px; color: #f59e0b;"></i>
-                        Top Mailers (Month)
+                        ${leaderboardTitle}
                     </h3>
                     <div style="display: flex; flex-direction: column; gap: 12px;">
-                        ${leaderboard.slice(0, 3).map((m, i) => `
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <div style="display: flex; align-items: center; gap: 10px;">
-                                    <span style="width: 20px; height: 20px; border-radius: 50%; background: ${i === 0 ? '#f59e0b' : (i === 1 ? '#94a3b8' : '#b45309')}; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700;">${i + 1}</span>
-                                    <span style="font-size: 0.85rem;">${m.name}</span>
+                        ${leaderboard.map((m, i) => {
+                            const rankBg = i === 0 ? '#f59e0b' : (i === 1 ? '#94a3b8' : (i === 2 ? '#b45309' : 'var(--bg-primary)'));
+                            const rankColor = i < 3 ? 'white' : 'var(--text-secondary)';
+                            const rankBorder = i < 3 ? 'none' : '1px solid var(--border-color)';
+                            return `
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <span style="width: 20px; height: 20px; border-radius: 50%; background: ${rankBg}; color: ${rankColor}; border: ${rankBorder}; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700;">${i + 1}</span>
+                                        <span style="font-size: 0.85rem;">${m.name}</span>
+                                    </div>
+                                    <span style="font-weight: 600; font-size: 0.85rem;">$${m.rev.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
                                 </div>
-                                <span style="font-weight: 600; font-size: 0.85rem;">$${m.rev.toLocaleString()}</span>
-                            </div>
-                        `).join('')}
-                        ${leaderboard.length === 0 ? '<p style="text-align: center; color: var(--text-secondary); font-size: 0.85rem;">No data yet this month</p>' : ''}
+                            `;
+                        }).join('')}
+                        ${leaderboard.length === 0 ? '<p style="text-align: center; color: var(--text-secondary); font-size: 0.85rem;">No data yet for this period</p>' : ''}
                     </div>
                 </div>
                 ` : ''}
