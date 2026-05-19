@@ -160,7 +160,7 @@ class TeamApp {
                     const timeLabel = diffDays < 0 ? `LATE BY ${Math.abs(diffDays)} DAY(S) 🚨` : `${diffDays} Day(s)`;
                     
                     const message = `🔔 *Server Cancellation Alert*\n\n` +
-                                    `🖥 *Server:* ${srv.name}\n` +
+                                    `🖥 *Server:* \`${srv.name}\`\n` +
                                     `⏳ *Status:* ${timeLabel}\n` +
                                     `📅 *Date:* ${srv.cancelDate}\n` +
                                     `📝 *Action:* ${status}`;
