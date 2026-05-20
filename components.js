@@ -131,6 +131,9 @@ function renderTopBar(app) {
                 <button onclick="showAddRPModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto;">+ RP</button>
             ` : ''}
             ${app.state.currentView === 'rp-inventory' && app.state.currentUser.role === 'admin' ? `
+                <button onclick="window.app.triggerRPSpfCheck()" ${app.state.rpSpfChecking ? 'disabled' : ''} style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--accent-primary); border: none; color: white;">
+                    ${app.state.rpSpfChecking ? 'Checking...' : '<i data-lucide="refresh-cw" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Check SPF'}
+                </button>
                 <button onclick="showImportRPInventoryModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary);"><i data-lucide="upload" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Bulk Import</button>
                 <button onclick="showAddRPInventoryItemModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto;"><i data-lucide="plus" style="width:12px; vertical-align:middle; margin-right:4px;"></i> New RP</button>
             ` : ''}
@@ -3699,6 +3702,9 @@ function renderRPsInventory(app, container) {
     const unsentPct = totalCount > 0 ? Math.round((unsentCount / totalCount) * 100) : 0;
     const includeCount = items.filter(item => item.spfType === 'Include').length;
     const arecodCount = totalCount - includeCount;
+    const spfOkCount = items.filter(item => item.spfStatus === 'OK').length;
+    const spfErrorCount = items.filter(item => item.spfStatus === 'ERROR').length;
+    const spfUnchecked = totalCount - spfOkCount - spfErrorCount;
 
     const search = app.state.rpSearch.trim().toLowerCase();
     const filteredItems = items.filter(item => {
@@ -3883,6 +3889,42 @@ function renderRPsInventory(app, container) {
             .btn-action-delete:hover {
                 background: rgba(239, 68, 68, 0.2);
             }
+            .rp-status-ok {
+                background: rgba(16, 185, 129, 0.1);
+                color: var(--success);
+                padding: 4px 8px;
+                border-radius: 6px;
+                font-size: 0.75rem;
+                font-weight: 700;
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                border: 1px solid rgba(16, 185, 129, 0.2);
+            }
+            .rp-status-error {
+                background: rgba(239, 68, 68, 0.1);
+                color: #ef4444;
+                padding: 4px 8px;
+                border-radius: 6px;
+                font-size: 0.75rem;
+                font-weight: 700;
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                border: 1px solid rgba(239, 68, 68, 0.2);
+            }
+            .rp-status-unknown {
+                background: rgba(255, 255, 255, 0.05);
+                color: var(--text-secondary);
+                padding: 4px 8px;
+                border-radius: 6px;
+                font-size: 0.75rem;
+                font-weight: 700;
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                border: 1px solid var(--border-color);
+            }
         </style>
 
         <div class="rps-inventory-container">
@@ -3902,6 +3944,15 @@ function renderRPsInventory(app, container) {
                 <div class="card rp-stat-card" style="border-left-color: var(--accent-primary);">
                     <h4 class="rp-filter-label" style="margin: 0;">SPF Include / Arecod</h4>
                     <p style="font-size: 1.8rem; font-weight: 800; margin: 8px 0 0;">${includeCount} <span style="font-size: 1.2rem; font-weight: 400; color: var(--text-secondary);">/</span> ${arecodCount}</p>
+                </div>
+                <div class="card rp-stat-card" style="border-left-color: ${spfErrorCount > 0 ? '#ef4444' : 'var(--success)'};">
+                    <h4 class="rp-filter-label" style="margin: 0;">SPF Health</h4>
+                    <p style="font-size: 1.2rem; font-weight: 800; margin: 8px 0 0;">
+                        <span style="color: var(--success);">${spfOkCount} OK</span>
+                        <span style="font-size: 0.9rem; color: var(--text-secondary);"> / </span>
+                        <span style="color: #ef4444;">${spfErrorCount} ERR</span>
+                        ${spfUnchecked > 0 ? `<span style="font-size: 0.75rem; color: var(--text-secondary);"> (${spfUnchecked} unchecked)</span>` : ''}
+                    </p>
                 </div>
             </div>
 
@@ -3959,6 +4010,7 @@ function renderRPsInventory(app, container) {
                                 <th style="width: 160px;">SRV</th>
                                 <th style="width: 120px;">TYPE</th>
                                 <th style="width: 120px;">RPtype</th>
+                                <th style="width: 130px; text-align: center;">SPF Status</th>
                                 <th style="width: 100px; text-align: center;">Sent</th>
                                 ${isAdmin ? `<th style="width: 80px; text-align: right;">Actions</th>` : ''}
                             </tr>
@@ -3994,6 +4046,21 @@ function renderRPsInventory(app, container) {
                                         </select>
                                     </td>
                                     <td style="text-align: center;">
+                                        ${item.spfStatus === 'OK' ? `
+                                            <span class="rp-status-ok" title="SPF Record Valid. Checked at: ${item.spfCheckedAt ? new Date(item.spfCheckedAt).toLocaleString() : 'N/A'}">
+                                                <i data-lucide="check" style="width: 12px; vertical-align: middle;"></i> OK
+                                            </span>
+                                        ` : (item.spfStatus === 'ERROR' ? `
+                                            <span class="rp-status-error" title="${item.spfStatusDetail || 'Invalid SPF'}. Checked at: ${item.spfCheckedAt ? new Date(item.spfCheckedAt).toLocaleString() : 'N/A'}">
+                                                <i data-lucide="alert-triangle" style="width: 12px; vertical-align: middle;"></i> NOT OK
+                                            </span>
+                                        ` : `
+                                            <span class="rp-status-unknown" title="Not checked yet">
+                                                <i data-lucide="help-circle" style="width: 12px; vertical-align: middle;"></i> Unchecked
+                                            </span>
+                                        `)}
+                                    </td>
+                                    <td style="text-align: center;">
                                         ${item.alreadySent ? `
                                             <span class="rp-badge-sent" ${isAdmin ? `onclick="toggleRPSentState('${item.id}', false)"` : 'style="cursor: default;"'} title="${isAdmin ? 'Click to mark unsent' : 'Sent'}">
                                                 <i data-lucide="check-circle" style="width: 12px;"></i> SENT
@@ -4015,7 +4082,7 @@ function renderRPsInventory(app, container) {
                             `).join('')}
                             ${filteredItems.length === 0 ? `
                                 <tr>
-                                    <td colspan="${isAdmin ? 8 : 7}" style="padding: 60px; text-align: center; color: var(--text-secondary);">
+                                    <td colspan="${isAdmin ? 9 : 8}" style="padding: 60px; text-align: center; color: var(--text-secondary);">
                                         No RPs found.${isAdmin ? ' Click <b>"New RP"</b> or <b>"Bulk Import"</b> to add data.' : ''}
                                     </td>
                                 </tr>

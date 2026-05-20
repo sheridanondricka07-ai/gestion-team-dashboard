@@ -916,6 +916,43 @@ class TeamApp {
         });
         await this.saveState();
     }
+
+    async triggerRPSpfCheck() {
+        if (this.state.currentUser.role !== 'admin') {
+            alert('Only administrator can run the SPF check.');
+            return;
+        }
+
+        this.state.rpSpfChecking = true;
+        this.updateDashboard();
+
+        try {
+            const response = await fetch('/api/check-rp-spf');
+            const data = await response.json();
+            
+            if (data && data.success) {
+                if (data.results && this.state.rpInventory) {
+                    data.results.forEach(res => {
+                        const idx = this.state.rpInventory.findIndex(item => item.id === res.id);
+                        if (idx !== -1) {
+                            this.state.rpInventory[idx].spfStatus = res.spfStatus;
+                            this.state.rpInventory[idx].spfStatusDetail = res.spfStatusDetail;
+                            this.state.rpInventory[idx].spfCheckedAt = res.spfCheckedAt;
+                        }
+                    });
+                }
+                alert(`SPF check completed!\nTotal: ${data.summary.total} checked.\nOK: ${data.summary.ok}\nErrors: ${data.summary.error}`);
+            } else {
+                alert('SPF check failed: ' + (data.error || 'Unknown error'));
+            }
+        } catch (err) {
+            console.error('SPF Check Error:', err);
+            alert('Failed to trigger SPF check: ' + err.message);
+        } finally {
+            this.state.rpSpfChecking = false;
+            this.updateDashboard();
+        }
+    }
 }
 
 // App is instantiated in window.onload at the top of the file

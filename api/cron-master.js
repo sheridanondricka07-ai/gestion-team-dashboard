@@ -77,12 +77,14 @@ export default async function handler(req, res) {
 
     const results = {
         spamhausTriggered: false,
-        vmtaTriggered: false
+        vmtaTriggered: false,
+        spfTriggered: false
     };
 
     const runSpamhaus = task === 'all' || task === 'spamhaus' || (!task && [0, 8, 16].includes(hour));
     const runVmta = task === 'all' || task === 'vmta' || task === 'rdns' || (!task && hour % 3 === 0);
     const runGmail = task === 'all' || task === 'gmail' || (!task && [12, 18].includes(hour));
+    const runSpf = task === 'all' || task === 'spf' || (!task && [2, 10, 18].includes(hour));
 
     // 1. Trigger Spamhaus Check
     if (runSpamhaus) {
@@ -262,6 +264,50 @@ export default async function handler(req, res) {
                 results.gmailChangesFound = changes.length;
             }
         } catch (e) { console.error('Automated Gmail Sync Error:', e); }
+    }
+
+    // 4. Trigger SPF Check
+    if (runSpf) {
+        console.log('Triggering SPF Check...');
+        try {
+            const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
+            const triggerResp = await fetch(`${baseUrl}/api/check-rp-spf`, {
+                headers: { 'x-vercel-cron': 'true' }
+            });
+            const triggerData = await triggerResp.json().catch(() => ({}));
+            console.log('SPF Trigger Response:', triggerData);
+            
+            if (triggerData && triggerData.success) {
+                results.spfTriggered = true;
+                results.spfSummary = triggerData.summary;
+                
+                // Build Telegram Report
+                const summary = triggerData.summary;
+                const errors = (triggerData.results || []).filter(r => r.spfStatus === 'ERROR');
+                
+                let report = `<b>🔍 Automated RPs SPF Check</b>\n`;
+                report += `Status: ${summary.error > 0 ? '⚠️ ISSUES DETECTED' : '✅ ALL CLEAR'}\n\n`;
+                
+                if (errors.length > 0) {
+                    report += `<b>❌ Attention Required (SPF Errors):</b>\n`;
+                    const errorLines = errors.map(e => `• <b>${e.rpDomain}</b>: ${e.spfStatusDetail} (${e.spfType})`);
+                    const displayLines = errorLines.slice(0, 50);
+                    report += displayLines.join('\n');
+                    if (errorLines.length > 50) report += `\n...and ${errorLines.length - 50} more.`;
+                    report += `\n\n`;
+                }
+                
+                report += `<b>📊 Summary:</b>\n`;
+                report += `✅ Total OK: ${summary.ok}\n`;
+                report += `❌ Total ERROR: ${summary.error}\n`;
+                report += `⏰ Time: ${new Date().toLocaleString()}\n`;
+                report += `⚙️ Automated Scheduled Check`;
+                
+                await sendTelegram(report);
+            }
+        } catch (e) {
+            console.error('SPF Trigger Error:', e);
+        }
     }
 
     return res.status(200).json(results);
