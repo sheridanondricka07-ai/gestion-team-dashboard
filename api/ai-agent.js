@@ -33,13 +33,24 @@ export default async function handler(req, res) {
         const spamhaus = await getFirebaseData('state/spamhaus') || {};
         const vmtaResults = await getFirebaseData('state/vmtaResults') || {};
 
-        // 3. Format context data for the model to minimize token usage while remaining descriptive
+        // 3. Calculate exact inventory counts & stats in code to avoid LLM counting hallucinations
+        let totalServers = 0;
+        let totalIps = 0;
+        let totalListedSpamhaus = 0;
+        let totalVmtaErrors = 0;
+
         const formattedServers = servers.map(s => {
             if (!s) return null;
+            totalServers++;
             const ips = s.allIps || [];
             const ipStatuses = ips.map(ip => {
+                totalIps++;
                 const sh = spamhaus[ip.replace(/\./g, '_')] || { status: 'clean' };
                 const vm = vmtaResults[ip.replace(/\./g, '_')] || { status: 'OK', ptr: 'N/A' };
+                
+                if (sh.status === 'listed') totalListedSpamhaus++;
+                if (vm.status !== 'OK') totalVmtaErrors++;
+                
                 return `${ip} (Spamhaus: ${sh.status === 'listed' ? `LISTED on ${sh.list}` : 'clean'}, VMTA/PTR: ${vm.status})`;
             }).join(', ');
             return `- Name: ${s.name}, Main IP: ${s.ip || 'N/A'}, Status: ${s.status || 'active'}, IPs: [${ipStatuses}]`;
@@ -58,6 +69,13 @@ export default async function handler(req, res) {
         // Construct System Instruction
         const systemPrompt = `You are "Gestion Team AI Agent", an intelligent assistant integrated into the Team Emailing Infrastructure Dashboard.
 Your job is to analyze real-time infrastructure, server blacklists (Spamhaus), VMTA/PTR status, and drop revenue performance to answer questions, extract data, and generate insights.
+
+SUMMARY STATISTICS (EXACT PRE-COMPUTED COUNTS):
+------------------
+- Total Registered Servers: ${totalServers}
+- Total Registered IPs in Inventory: ${totalIps}
+- Total IPs Currently Listed on Spamhaus: ${totalListedSpamhaus}
+- Total Servers with VMTA/PTR Status Errors: ${totalVmtaErrors}
 
 CURRENT REAL-TIME CONTEXT DATA:
 ------------------
