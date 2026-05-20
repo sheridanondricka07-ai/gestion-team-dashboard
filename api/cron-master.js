@@ -280,30 +280,6 @@ export default async function handler(req, res) {
             if (triggerData && triggerData.success) {
                 results.spfTriggered = true;
                 results.spfSummary = triggerData.summary;
-                
-                // Build Telegram Report
-                const summary = triggerData.summary;
-                const errors = (triggerData.results || []).filter(r => r.spfStatus === 'ERROR');
-                
-                let report = `<b>🔍 Automated RPs SPF Check</b>\n`;
-                report += `Status: ${summary.error > 0 ? '⚠️ ISSUES DETECTED' : '✅ ALL CLEAR'}\n\n`;
-                
-                if (errors.length > 0) {
-                    report += `<b>❌ Attention Required (SPF Errors):</b>\n`;
-                    const errorLines = errors.map(e => `• <b>${e.rpDomain}</b>: ${e.spfStatusDetail} (${e.spfType})`);
-                    const displayLines = errorLines.slice(0, 50);
-                    report += displayLines.join('\n');
-                    if (errorLines.length > 50) report += `\n...and ${errorLines.length - 50} more.`;
-                    report += `\n\n`;
-                }
-                
-                report += `<b>📊 Summary:</b>\n`;
-                report += `✅ Total OK: ${summary.ok}\n`;
-                report += `❌ Total ERROR: ${summary.error}\n`;
-                report += `⏰ Time: ${new Date().toLocaleString()}\n`;
-                report += `⚙️ Automated Scheduled Check`;
-                
-                await sendTelegram(report);
             }
         } catch (e) {
             console.error('SPF Trigger Error:', e);

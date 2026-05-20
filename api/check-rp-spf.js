@@ -24,6 +24,31 @@ async function setFirebaseData(path, data) {
     }
 }
 
+async function sendTelegram(message) {
+    const token = "8737550836:AAFK68Ig7xyW3KIvBhI5gpO1bGaPTwUimr0";
+    const chatId = "-5252005797";
+    
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000); 
+
+        const resp = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: chatId,
+                text: message,
+                parse_mode: 'HTML'
+            }),
+            signal: controller.signal
+        });
+        clearTimeout(timeout);
+        return await resp.json();
+    } catch (e) {
+        return { ok: false, error: e.message };
+    }
+}
+
 async function getSpfRecord(domain) {
     try {
         const records = await dns.resolveTxt(domain);
@@ -269,8 +294,51 @@ export default async function handler(req, res) {
         const summary = {
             total: results.length,
             ok: results.filter(r => r.spfStatus === 'OK').length,
+            warning: results.filter(r => r.spfStatus === 'WARNING').length,
             error: results.filter(r => r.spfStatus === 'ERROR').length
         };
+
+        try {
+            const isCron = req.headers['x-vercel-cron'] === 'true';
+            const triggerType = isCron ? '⚙️ Automated Scheduled Check' : '👤 Manual Check';
+
+            const errors = results.filter(r => r.spfStatus === 'ERROR');
+            const warnings = results.filter(r => r.spfStatus === 'WARNING');
+
+            let report = `<b>🔍 RPs SPF Check</b>\n`;
+            report += `Status: ${errors.length > 0 ? '⚠️ ISSUES DETECTED' : '✅ ALL CLEAR'}\n\n`;
+
+            if (errors.length > 0) {
+                report += `<b>❌ Attention Required (SPF Errors):</b>\n`;
+                const errorLines = errors.map(e => `• <b>${e.rpDomain}</b>: ${e.spfStatusDetail} (${e.spfType})`);
+                const displayLines = errorLines.slice(0, 50);
+                report += displayLines.join('\n');
+                if (errorLines.length > 50) report += `\n...and ${errorLines.length - 50} more.`;
+                report += `\n\n`;
+            }
+
+            if (warnings.length > 0) {
+                report += `<b>⚠️ Warnings (Could be OK):</b>\n`;
+                const warnLines = warnings.map(w => `• <b>${w.rpDomain}</b>: ${w.spfStatusDetail}`);
+                const displayLines = warnLines.slice(0, 30);
+                report += displayLines.join('\n');
+                if (warnLines.length > 30) report += `\n...and ${warnLines.length - 30} more.`;
+                report += `\n\n`;
+            }
+
+            report += `<b>📊 Summary:</b>\n`;
+            report += `✅ Total OK: ${summary.ok}\n`;
+            if (summary.warning > 0) {
+                report += `⚠️ Total Could be OK: ${summary.warning}\n`;
+            }
+            report += `❌ Total ERROR: ${summary.error}\n`;
+            report += `⏰ Time: ${new Date().toLocaleString()}\n`;
+            report += triggerType;
+
+            await sendTelegram(report);
+        } catch (telegramErr) {
+            console.error('Telegram report failed:', telegramErr);
+        }
 
         return res.status(200).json({
             success: true,
