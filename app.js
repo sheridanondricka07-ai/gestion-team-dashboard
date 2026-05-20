@@ -51,6 +51,7 @@ class TeamApp {
             statuses: {},
             spamhaus: {},
             spamhausProgress: { status: 'idle', current: 0, total: 0 },
+            rpSpfProgress: { status: 'idle', current: 0, total: 0 },
             spamhausHistory: null,
             dropSort: { key: 'timestamp', order: 'desc' },
             dropSearch: '',
@@ -580,10 +581,16 @@ class TeamApp {
                         const oldProgress = JSON.stringify(this.state.spamhausProgress || {});
                         const newProgress = JSON.stringify(cloudData.spamhausProgress || {});
                         const progressChanged = oldProgress !== newProgress;
+
+                        // Check if only rpSpfProgress changed — if so, update bar without full re-render
+                        const oldSpfProgress = JSON.stringify(this.state.rpSpfProgress || {});
+                        const newSpfProgress = JSON.stringify(cloudData.rpSpfProgress || {});
+                        const spfProgressChanged = oldSpfProgress !== newSpfProgress;
                         
                         this.state = { ...this.state, ...cloudData, currentUser, currentView, dbConnected: true };
                         // SAFETY: Firebase may return null for these — always ensure safe defaults
                         if (!this.state.spamhausProgress) this.state.spamhausProgress = { status: 'idle', current: 0, total: 0 };
+                        if (!this.state.rpSpfProgress) this.state.rpSpfProgress = { status: 'idle', current: 0, total: 0 };
                         if (!this.state.spamhaus) this.state.spamhaus = {};
                         
                         // Patch missing Mailer IDs for known team members
@@ -635,6 +642,18 @@ class TeamApp {
                                 bar.style.width = pct + '%';
                                 if (text) text.textContent = `${pct}% (${cloudData.spamhausProgress.current}/${cloudData.spamhausProgress.total})`;
                                 if (container) container.classList.add('progress-active');
+                                return; // Skip full re-render
+                            }
+                        }
+
+                        // If SPF check is running and only progress changed, update the SPF progress bar
+                        if (spfProgressChanged && cloudData.rpSpfProgress && cloudData.rpSpfProgress.status === 'running') {
+                            const bar = document.querySelector('#rp-spf-progress-container .progress-bar');
+                            const text = document.querySelector('#rp-spf-progress-text');
+                            if (bar && cloudData.rpSpfProgress.total > 0) {
+                                const pct = Math.round((cloudData.rpSpfProgress.current / cloudData.rpSpfProgress.total) * 100);
+                                bar.style.width = pct + '%';
+                                if (text) text.textContent = `${pct}% (${cloudData.rpSpfProgress.current}/${cloudData.rpSpfProgress.total})`;
                                 return; // Skip full re-render
                             }
                         }

@@ -39,7 +39,6 @@ async function getSpfRecord(domain) {
 function verifySpfRecord(spfRecord, type, domainInc, subdomainInc) {
     if (!spfRecord) return { ok: false, reason: 'No SPF Record' };
     
-    const spf = spfRecord.toLowerCase().replace(/\s/g, '');
     const dom = (domainInc || '').toLowerCase().trim();
     const sub = (subdomainInc || '').toLowerCase().trim();
 
@@ -47,17 +46,44 @@ function verifySpfRecord(spfRecord, type, domainInc, subdomainInc) {
         return { ok: false, reason: 'No Target Configured' };
     }
 
+    const terms = spfRecord.toLowerCase().split(/\s+/);
+    let foundInclude = false;
+    let foundArecord = false;
+
+    for (let term of terms) {
+        // Strip qualifiers
+        if (['+', '-', '~', '?'].includes(term[0])) {
+            term = term.slice(1);
+        }
+
+        if (term.startsWith('include:')) {
+            const target = term.substring('include:'.length);
+            if ((dom && (target === dom || target.endsWith('.' + dom))) ||
+                (sub && (target === sub || target.endsWith('.' + sub)))) {
+                foundInclude = true;
+            }
+        } else if (term.startsWith('a:') || term === 'a' || term.startsWith('a/')) {
+            let target = '';
+            if (term.startsWith('a:')) {
+                const parts = term.substring('a:'.length).split('/');
+                target = parts[0];
+            }
+            if (target) {
+                if ((dom && (target === dom || target.endsWith('.' + dom))) ||
+                    (sub && (target === sub || target.endsWith('.' + sub)))) {
+                    foundArecord = true;
+                }
+            }
+        }
+    }
+
     if (type === 'Include') {
-        const hasDom = dom && spf.includes(`include:${dom}`);
-        const hasSub = sub && spf.includes(`include:${sub}`);
-        if (hasDom || hasSub) {
+        if (foundInclude) {
             return { ok: true, reason: 'OK' };
         }
         return { ok: false, reason: `Missing Include: ${dom || sub}` };
     } else if (type === 'Arecod') {
-        const hasDom = dom && (spf.includes(`a:${dom}`) || spf.includes(`a/${dom}`));
-        const hasSub = sub && (spf.includes(`a:${sub}`) || spf.includes(`a/${sub}`));
-        if (hasDom || hasSub) {
+        if (foundArecord) {
             return { ok: true, reason: 'OK' };
         }
         return { ok: false, reason: `Missing Arecord: ${dom || sub}` };
@@ -82,6 +108,11 @@ export default async function handler(req, res) {
         const checkedAt = new Date().toISOString();
         const results = [];
         const chunkSize = 15;
+
+        // Set initial progress
+        await setFirebaseData('state/rpSpfProgress', { status: 'running', current: 0, total: rpInventory.length, timestamp: Date.now() });
+
+        let processedCount = 0;
 
         // Process in chunks to prevent timeout / rate limiting
         for (let i = 0; i < rpInventory.length; i += chunkSize) {
@@ -113,7 +144,18 @@ export default async function handler(req, res) {
                     spfCheckedAt: item.spfCheckedAt
                 });
             }));
+
+            processedCount += chunk.length;
+            await setFirebaseData('state/rpSpfProgress', { 
+                status: 'running', 
+                current: Math.min(processedCount, rpInventory.length), 
+                total: rpInventory.length,
+                timestamp: Date.now()
+            });
         }
+
+        // Set completed progress state
+        await setFirebaseData('state/rpSpfProgress', { status: 'idle', current: rpInventory.length, total: rpInventory.length, timestamp: Date.now() });
 
         // Save updated state back to Firebase
         await setFirebaseData('state/rpInventory', rpInventory);
@@ -132,6 +174,8 @@ export default async function handler(req, res) {
 
     } catch (err) {
         console.error('SPF Check Handler Error:', err);
+        // Reset progress on error
+        await setFirebaseData('state/rpSpfProgress', { status: 'idle', current: 0, total: 0, timestamp: Date.now() });
         return res.status(500).json({ success: false, error: err.message });
     }
 }

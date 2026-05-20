@@ -121,6 +121,10 @@ function renderSidebar(app) {
 
 function renderTopBar(app) {
     const container = document.getElementById('top-bar');
+    const rpSpfProgress = app.state.rpSpfProgress || { status: 'idle', current: 0, total: 0 };
+    const isSpfRunning = rpSpfProgress.status === 'running' && (Date.now() - (rpSpfProgress.timestamp || 0) < 120000);
+    const checking = app.state.rpSpfChecking || isSpfRunning;
+
     container.innerHTML = `
         <div style="display: flex; align-items: center; gap: var(--spacing-md);">
             <h2 style="font-size: 1.1rem; font-weight: 600;">${app.state.currentView === 'drops' ? 'Drop Details' : (app.state.currentView === 'rp-inventory' ? 'RPs' : app.state.currentView.charAt(0).toUpperCase() + app.state.currentView.slice(1))}</h2>
@@ -131,8 +135,8 @@ function renderTopBar(app) {
                 <button onclick="showAddRPModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto;">+ RP</button>
             ` : ''}
             ${app.state.currentView === 'rp-inventory' && app.state.currentUser.role === 'admin' ? `
-                <button onclick="window.app.triggerRPSpfCheck()" ${app.state.rpSpfChecking ? 'disabled' : ''} style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--accent-primary); border: none; color: white;">
-                    ${app.state.rpSpfChecking ? 'Checking...' : '<i data-lucide="refresh-cw" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Check SPF'}
+                <button onclick="window.app.triggerRPSpfCheck()" ${checking ? 'disabled' : ''} style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--accent-primary); border: none; color: white;">
+                    ${checking ? 'Checking...' : '<i data-lucide="refresh-cw" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Check SPF'}
                 </button>
                 <button onclick="showImportRPInventoryModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary);"><i data-lucide="upload" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Bulk Import</button>
                 <button onclick="showAddRPInventoryItemModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto;"><i data-lucide="plus" style="width:12px; vertical-align:middle; margin-right:4px;"></i> New RP</button>
@@ -3693,6 +3697,9 @@ function renderRPsInventory(app, container) {
     if (app.state.rpFilterRpType === undefined) app.state.rpFilterRpType = 'all';
     if (app.state.rpFilterSent === undefined) app.state.rpFilterSent = 'all';
 
+    const rpSpfProgress = app.state.rpSpfProgress || { status: 'idle', current: 0, total: 0 };
+    const isSpfRunning = rpSpfProgress.status === 'running' && (Date.now() - (rpSpfProgress.timestamp || 0) < 120000);
+
     const items = app.getProcessedRPInventory() || [];
 
     const totalCount = items.length;
@@ -3928,6 +3935,23 @@ function renderRPsInventory(app, container) {
         </style>
 
         <div class="rps-inventory-container">
+            ${isSpfRunning ? `
+                <div id="rp-spf-progress-container" class="card" style="padding: 16px 20px; background: var(--bg-secondary); border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px; animation: fadeIn 0.3s ease;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; font-weight: 600;">
+                        <span style="display: flex; align-items: center; gap: 8px;">
+                            <i data-lucide="refresh-cw" class="rotating" style="width: 14px; color: var(--accent-primary);"></i>
+                            Checking SPF Records...
+                        </span>
+                        <span id="rp-spf-progress-text" style="color: var(--text-secondary);">
+                            ${Math.round((rpSpfProgress.current / rpSpfProgress.total) * 100)}% (${rpSpfProgress.current}/${rpSpfProgress.total})
+                        </span>
+                    </div>
+                    <div class="progress-container progress-active" style="margin: 4px 0 0 0; height: 8px;">
+                        <div class="progress-bar" style="width: ${Math.round((rpSpfProgress.current / rpSpfProgress.total) * 100)}%; height: 100%;"></div>
+                    </div>
+                </div>
+            ` : ''}
+
             <div class="rp-stats-grid">
                 <div class="card rp-stat-card">
                     <h4 class="rp-filter-label" style="margin: 0;">Total RPs</h4>
