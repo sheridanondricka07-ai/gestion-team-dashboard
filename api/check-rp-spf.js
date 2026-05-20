@@ -56,8 +56,15 @@ function ipInCidr(ip, cidr) {
     return (ipNum & mask) === (rangeNum & mask);
 }
 
-function verifySpfRecord(spfRecord, type, domainInc, subdomainInc, rpType, serverIps) {
+function verifySpfRecord(spfRecord, type, domainInc, subdomainInc, rpType, serverIps, rpDomain) {
     if (!spfRecord) return { ok: false, reason: 'No SPF Record' };
+
+    const rpDom = (rpDomain || '').toLowerCase().trim();
+    const dom = (domainInc || '').toLowerCase().trim();
+
+    if (rpDom && dom && rpDom === dom) {
+        return { ok: true, reason: 'OK' };
+    }
 
     if (rpType === 'intern') {
         if (!serverIps || serverIps.length === 0) {
@@ -191,7 +198,8 @@ export default async function handler(req, res) {
                     item.domainIncluded,
                     item.subdomainIncluded,
                     item.rpType || 'extern',
-                    serverIps
+                    serverIps,
+                    rpDomain
                 );
 
                 item.spfStatus = verification.ok ? 'OK' : 'ERROR';
