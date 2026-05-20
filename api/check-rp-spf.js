@@ -104,8 +104,6 @@ function verifySpfRecord(spfRecord, type, domainInc, subdomainInc, rpType, serve
             return { ok: false, reason: `Missing Server IPs: ${missingIps.join(', ')}` };
         }
     }
-    
-    const dom = (domainInc || '').toLowerCase().trim();
     const sub = (subdomainInc || '').toLowerCase().trim();
 
     if (!dom && !sub) {
