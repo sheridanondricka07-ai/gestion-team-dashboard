@@ -80,21 +80,24 @@ export default async function handler(req, res) {
         vmtaTriggered: false
     };
 
-    const runSpamhaus = task === 'all' || task === 'spamhaus' || (!task && [9, 21].includes(hour));
-    const runVmta = task === 'all' || task === 'vmta' || task === 'rdns' || (!task && [9, 21].includes(hour));
+    const runSpamhaus = task === 'all' || task === 'spamhaus' || (!task && [0, 8, 16].includes(hour));
+    const runVmta = task === 'all' || task === 'vmta' || task === 'rdns' || (!task && hour % 3 === 0);
     const runGmail = task === 'all' || task === 'gmail' || (!task && [12, 18].includes(hour));
 
-    // 1. Trigger Spamhaus Check (Twice a day: 09:00, 21:00 UTC)
+    // 1. Trigger Spamhaus Check
     if (runSpamhaus) {
         console.log('Triggering Spamhaus Check...');
         try {
             // We call our own API endpoint. 
             // Note: We use a full URL here. In Vercel, we can use the VERCEL_URL env var.
             const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
-            fetch(`${baseUrl}/api/check-spamhaus`, {
+            const triggerResp = await fetch(`${baseUrl}/api/check-spamhaus`, {
                 headers: { 'x-vercel-cron': 'true' }
-            }).catch(e => console.error('Spamhaus Async Trigger Error:', e));
+            });
+            const triggerData = await triggerResp.json().catch(() => ({}));
+            console.log('Spamhaus Trigger Response:', triggerData);
             results.spamhausTriggered = true;
+            results.spamhausTriggerData = triggerData;
         } catch (e) {
             console.error('Spamhaus Trigger Error:', e);
         }

@@ -198,7 +198,10 @@ export default async function handler(req, res) {
         // --- CHUNKED SCAN LOGIC ---
         const CHUNK_SIZE = 30;
         const body = req.body || {};
-        const startIndex = body.startIndex || 0;
+        let startIndex = body.startIndex || 0;
+        if (req.query && req.query.startIndex) {
+            startIndex = parseInt(req.query.startIndex, 10) || 0;
+        }
         const endIndex = Math.min(startIndex + CHUNK_SIZE, uniqueIps.length);
         const ipsToProcess = uniqueIps.slice(startIndex, endIndex);
         
@@ -312,6 +315,17 @@ export default async function handler(req, res) {
             } catch (tgErr) {
                 console.error('Failed to send Spamhaus Telegram report:', tgErr);
             }
+        } else {
+            // Trigger the next chunk asynchronously via non-blocking self-fetch
+            const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
+            fetch(`${baseUrl}/api/check-spamhaus`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'x-vercel-cron': 'true'
+                },
+                body: JSON.stringify({ startIndex: endIndex })
+            }).catch(e => console.error('Spamhaus self-trigger next chunk error:', e));
         }
 
         return res.status(200).json({ 
