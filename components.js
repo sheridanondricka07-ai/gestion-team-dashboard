@@ -3463,12 +3463,12 @@ window.renderAiAgent = (app, container) => {
                 ${hasKey ? `
                     <div style="display: flex; align-items: center; gap: 8px; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2); padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; color: #22c55e; font-weight: 600;">
                         <span style="display: inline-block; width: 8px; height: 8px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 8px #22c55e; animation: pulse 2s infinite;"></span>
-                        Gemini 1.5 Flash Connected
+                        Gemini 1.5 Flash Active
                     </div>
                 ` : `
-                    <div style="display: flex; align-items: center; gap: 8px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; color: #ef4444; font-weight: 600;">
-                        <span style="display: inline-block; width: 8px; height: 8px; background: #ef4444; border-radius: 50%;"></span>
-                        AI Engine Offline
+                    <div style="display: flex; align-items: center; gap: 8px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; color: #3b82f6; font-weight: 600;">
+                        <span style="display: inline-block; width: 8px; height: 8px; background: #3b82f6; border-radius: 50%; box-shadow: 0 0 8px #3b82f6; animation: pulse 2s infinite;"></span>
+                        Free Keyless AI Active
                     </div>
                 `}
             </div>

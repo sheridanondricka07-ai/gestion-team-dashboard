@@ -26,13 +26,6 @@ export default async function handler(req, res) {
         const aiConfig = await getFirebaseData('state/aiConfig') || {};
         const apiKey = aiConfig.geminiApiKey;
 
-        if (!apiKey) {
-            return res.status(200).json({
-                response: "⚠️ <b>Gemini API Key is not configured yet.</b>\n\nTo use the AI Agent, please enter your Gemini API Key in the settings input above. You can get a free API Key in 10 seconds from <a href=\"https://aistudio.google.com/\" target=\"_blank\">Google AI Studio</a>.",
-                apiKeyMissing: true
-            });
-        }
-
         // 2. Fetch current application state for context
         const servers = await getFirebaseData('state/servers') || [];
         const drops = await getFirebaseData('state/drops') || [];
@@ -86,54 +79,116 @@ GUIDELINES:
 3. Be professional, direct, and actionable. Provide statistical summaries or warnings if you notice listed IPs or low-performing drops.
 4. If the user asks you to perform a task outside of analyzing/extracting this data, guide them back to server administration or performance analytics.`;
 
-        // 4. Construct Gemini REST Payload
-        const contents = [];
-        
-        // Add chat history if present
-        if (Array.isArray(history)) {
-            history.slice(-10).forEach(h => {
-                contents.push({
-                    role: h.role === 'user' ? 'user' : 'model',
-                    parts: [{ text: h.text }]
+        let responseText = '';
+
+        if (apiKey) {
+            // --- USE GEMINI API ---
+            const contents = [];
+            
+            // Add chat history if present
+            if (Array.isArray(history)) {
+                history.slice(-10).forEach(h => {
+                    contents.push({
+                        role: h.role === 'user' ? 'user' : 'model',
+                        parts: [{ text: h.text }]
+                    });
                 });
+            }
+
+            // Add latest user prompt
+            contents.push({
+                role: 'user',
+                parts: [{ text: message }]
             });
-        }
 
-        // Add latest user prompt
-        contents.push({
-            role: 'user',
-            parts: [{ text: message }]
-        });
+            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-
-        const apiResponse = await fetch(geminiUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                contents: contents,
-                systemInstruction: {
-                    parts: [{ text: systemPrompt }]
+            const apiResponse = await fetch(geminiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
                 },
-                generationConfig: {
-                    temperature: 0.2,
-                    maxOutputTokens: 1500
-                }
-            })
-        });
-
-        if (!apiResponse.ok) {
-            const errData = await apiResponse.json().catch(() => ({}));
-            console.error('Gemini API Error:', errData);
-            return res.status(200).json({
-                response: `⚠️ <b>Error communicating with Gemini API.</b><br>Please verify that your API key is correct and valid. Developer message: <i>${errData.error?.message || 'Unknown error'}</i>`
+                body: JSON.stringify({
+                    contents: contents,
+                    systemInstruction: {
+                        parts: [{ text: systemPrompt }]
+                    },
+                    generationConfig: {
+                        temperature: 0.2,
+                        maxOutputTokens: 1500
+                    }
+                })
             });
-        }
 
-        const data = await apiResponse.json();
-        const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "I was unable to generate a response. Please try again.";
+            if (!apiResponse.ok) {
+                const errData = await apiResponse.json().catch(() => ({}));
+                console.error('Gemini API Error:', errData);
+                return res.status(200).json({
+                    response: `⚠️ <b>Error communicating with Gemini API.</b><br>Please verify that your API key is correct and valid. Developer message: <i>${errData.error?.message || 'Unknown error'}</i>`
+                });
+            }
+
+            const data = await apiResponse.json();
+            responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "I was unable to generate a response. Please try again.";
+        } else {
+            // --- USE FREE KEYLESS POLLINATIONS.AI API ---
+            const messages = [
+                { role: 'system', content: systemPrompt }
+            ];
+
+            if (Array.isArray(history)) {
+                history.slice(-10).forEach(h => {
+                    messages.push({
+                        role: h.role === 'user' ? 'user' : 'assistant',
+                        content: h.text
+                    });
+                });
+            }
+
+            messages.push({
+                role: 'user',
+                content: message
+            });
+
+            try {
+                const pollinationsUrl = 'https://text.pollinations.ai/openai';
+                const apiResponse = await fetch(pollinationsUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: 'openai',
+                        messages: messages
+                    })
+                });
+
+                if (!apiResponse.ok) {
+                    throw new Error(`HTTP error! status: ${apiResponse.status}`);
+                }
+
+                const data = await apiResponse.json();
+                responseText = data.choices?.[0]?.message?.content || "I was unable to generate a response. Please try again.";
+            } catch (err) {
+                console.warn('Pollinations POST failed, falling back to GET...', err);
+                
+                // Construct compact prompt for GET request to avoid URL limit issues
+                let combinedPrompt = `System Instructions:\n${systemPrompt.slice(0, 1000)}\n\n`;
+                if (Array.isArray(history)) {
+                    history.slice(-4).forEach(h => {
+                        combinedPrompt += `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.text}\n`;
+                    });
+                }
+                combinedPrompt += `User: ${message}`;
+
+                const getUrl = `https://text.pollinations.ai/${encodeURIComponent(combinedPrompt.slice(0, 3000))}?model=openai`;
+                const getResponse = await fetch(getUrl);
+                if (!getResponse.ok) {
+                    return res.status(200).json({
+                        response: `⚠️ <b>Error:</b> The free keyless AI service is currently overloaded. Please add a free Gemini API Key in settings to get direct dedicated access.`
+                    });
+                }
+                responseText = await getResponse.text();
+            }
+        }
 
         return res.status(200).json({ response: responseText });
 
