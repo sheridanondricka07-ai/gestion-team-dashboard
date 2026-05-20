@@ -3696,6 +3696,7 @@ function renderRPsInventory(app, container) {
     if (app.state.rpFilterSpfType === undefined) app.state.rpFilterSpfType = 'all';
     if (app.state.rpFilterRpType === undefined) app.state.rpFilterRpType = 'all';
     if (app.state.rpFilterSent === undefined) app.state.rpFilterSent = 'all';
+    if (app.state.rpFilterSpfStatus === undefined) app.state.rpFilterSpfStatus = 'all';
 
     const rpSpfProgress = app.state.rpSpfProgress || { status: 'idle', current: 0, total: 0 };
     const isSpfRunning = rpSpfProgress.status === 'running' && (Date.now() - (rpSpfProgress.timestamp || 0) < 120000);
@@ -3745,6 +3746,16 @@ function renderRPsInventory(app, container) {
             const isSent = !!item.alreadySent;
             if (app.state.rpFilterSent === 'sent' && !isSent) return false;
             if (app.state.rpFilterSent === 'unsent' && isSent) return false;
+        }
+
+        if (app.state.rpFilterSpfStatus !== 'all') {
+            if (app.state.rpFilterSpfStatus === 'OK') {
+                if (item.spfStatus !== 'OK') return false;
+            } else if (app.state.rpFilterSpfStatus === 'ERROR') {
+                if (item.spfStatus !== 'ERROR') return false;
+            } else if (app.state.rpFilterSpfStatus === 'none') {
+                if (item.spfStatus === 'OK' || item.spfStatus === 'ERROR') return false;
+            }
         }
 
         return true;
@@ -4014,6 +4025,15 @@ function renderRPsInventory(app, container) {
                     </select>
                 </div>
                 <div class="rp-filter-group">
+                    <span class="rp-filter-label">SPF Status</span>
+                    <select id="rp-filter-spfstatus" class="rp-select">
+                        <option value="all" ${app.state.rpFilterSpfStatus === 'all' ? 'selected' : ''}>All</option>
+                        <option value="OK" ${app.state.rpFilterSpfStatus === 'OK' ? 'selected' : ''}>OK</option>
+                        <option value="ERROR" ${app.state.rpFilterSpfStatus === 'ERROR' ? 'selected' : ''}>NOT OK</option>
+                        <option value="none" ${app.state.rpFilterSpfStatus === 'none' ? 'selected' : ''}>Unchecked</option>
+                    </select>
+                </div>
+                <div class="rp-filter-group">
                     <span class="rp-filter-label">Sent Mark</span>
                     <select id="rp-filter-sent" class="rp-select">
                         <option value="all" ${app.state.rpFilterSent === 'all' ? 'selected' : ''}>All</option>
@@ -4136,6 +4156,10 @@ function renderRPsInventory(app, container) {
     });
     document.getElementById('rp-filter-sent').addEventListener('change', (e) => {
         app.state.rpFilterSent = e.target.value;
+        renderRPsInventory(app, container);
+    });
+    document.getElementById('rp-filter-spfstatus').addEventListener('change', (e) => {
+        app.state.rpFilterSpfStatus = e.target.value;
         renderRPsInventory(app, container);
     });
 
