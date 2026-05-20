@@ -14,6 +14,9 @@
     },
     "api/cron-master.js": {
       "maxDuration": 60
+    },
+    "api/ai-agent.js": {
+      "maxDuration": 60
     }
   },
   "rewrites": [

@@ -93,6 +93,10 @@ function renderSidebar(app) {
                 <i data-lucide="search-check"></i>
                 <span>Spamhaus</span>
             </div>
+            <div class="nav-item ${view === 'ai-agent' ? 'active' : ''}" onclick="app.setView('ai-agent')">
+                <i data-lucide="bot"></i>
+                <span>AI Agent</span>
+            </div>
         </div>
         <div style="margin-top: auto;">
             <div style="padding: 12px; font-size: 0.7rem; color: var(--text-secondary); text-align: center; border-top: 1px solid var(--border-color); margin-bottom: 8px; opacity: 0.5;">
@@ -165,6 +169,8 @@ function renderView(app) {
         renderCanceledServers(app, container);
     } else if (view === 'spamhaus') {
         renderSpamhaus(app, container);
+    } else if (view === 'ai-agent') {
+        renderAiAgent(app, container);
     }
 }
 
@@ -3429,4 +3435,302 @@ window.runGmailIPStatusSync = async (btn) => {
         btn.innerText = originalText;
         btn.disabled = false;
     }
+};
+
+window.renderAiAgent = (app, container) => {
+    const aiConfig = app.state.aiConfig || {};
+    const key = aiConfig.geminiApiKey || '';
+    const hasKey = !!key;
+
+    if (!app.aiChatHistory) {
+        app.aiChatHistory = [];
+    }
+
+    container.innerHTML = `
+        <div style="padding: 24px; display: flex; flex-direction: column; height: calc(100vh - 64px); max-height: calc(100vh - 64px); overflow: hidden; gap: 20px;">
+            
+            <!-- Page Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                <div>
+                    <h2 style="margin: 0; font-size: 1.5rem; display: flex; align-items: center; gap: 10px;">
+                        <i data-lucide="bot" style="width: 28px; height: 28px; color: var(--accent-primary);"></i>
+                        Gestion Team AI Copilot
+                    </h2>
+                    <p style="margin: 4px 0 0; font-size: 0.85rem; color: var(--text-secondary);">
+                        Real-time AI analyst trained on your server inventory, Spamhaus status, and drops performance.
+                    </p>
+                </div>
+                ${hasKey ? `
+                    <div style="display: flex; align-items: center; gap: 8px; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2); padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; color: #22c55e; font-weight: 600;">
+                        <span style="display: inline-block; width: 8px; height: 8px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 8px #22c55e; animation: pulse 2s infinite;"></span>
+                        Gemini 1.5 Flash Connected
+                    </div>
+                ` : `
+                    <div style="display: flex; align-items: center; gap: 8px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; color: #ef4444; font-weight: 600;">
+                        <span style="display: inline-block; width: 8px; height: 8px; background: #ef4444; border-radius: 50%;"></span>
+                        AI Engine Offline
+                    </div>
+                `}
+            </div>
+
+            <!-- Two Column Chat Layout -->
+            <div style="display: flex; gap: 20px; flex: 1; min-height: 0;">
+                
+                <!-- Left Sidebar: Configuration & Quick Prompts -->
+                <div style="width: 320px; display: flex; flex-direction: column; gap: 20px; flex-shrink: 0;">
+                    
+                    <!-- API Key Card -->
+                    <div class="card" style="padding: 20px; background: var(--bg-secondary); border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 12px;">
+                        <h4 style="margin: 0; font-size: 0.9rem; display: flex; align-items: center; gap: 8px;">
+                            <i data-lucide="key" style="width: 16px; color: var(--accent-primary);"></i>
+                            API Key Settings
+                        </h4>
+                        <p style="margin: 0; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4;">
+                            Configure your free Google Gemini API Key. Shared automatically with the entire team.
+                        </p>
+                        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 4px;">
+                            <input type="password" id="gemini-api-key-input" placeholder="${hasKey ? '••••••••••••••••' : 'Enter Gemini API Key...'}" style="width: 100%; padding: 8px 12px; border-radius: 6px; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.8rem; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent-primary)'" onblur="this.style.borderColor='var(--border-color)'">
+                            <button onclick="saveGeminiApiKey(this)" class="btn-primary" style="width: 100%; padding: 8px 16px; font-size: 0.8rem; border-radius: 6px; background: var(--accent-primary); border: none; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;">
+                                <i data-lucide="save" style="width: 14px;"></i> Save Key
+                            </button>
+                        </div>
+                        <a href="https://aistudio.google.com/" target="_blank" style="font-size: 0.75rem; color: var(--accent-primary); text-decoration: none; display: flex; align-items: center; gap: 4px; font-weight: 500;">
+                            <i data-lucide="external-link" style="width: 12px;"></i> Get a free key in Google AI Studio
+                        </a>
+                    </div>
+
+                    <!-- Quick Insights Panel -->
+                    <div class="card" style="padding: 20px; background: var(--bg-secondary); border: 1px solid var(--border-color); flex: 1; display: flex; flex-direction: column; gap: 14px; overflow-y: auto;">
+                        <h4 style="margin: 0; font-size: 0.9rem; display: flex; align-items: center; gap: 8px;">
+                            <i data-lucide="sparkles" style="width: 16px; color: #a855f7;"></i>
+                            AI Quick Insights
+                        </h4>
+                        <p style="margin: 0; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4; margin-bottom: 4px;">
+                            Select a preset analysis prompt to immediately inspect your active dashboard data:
+                        </p>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <div class="insight-prompt-btn" onclick="triggerPresetPrompt('Analyze the current revenue performance, listing top offers and highlighting the highest earners.')">
+                                <div style="font-weight: 600; font-size: 0.8rem; color: var(--text-primary); margin-bottom: 2px;">📈 Revenue Analysis</div>
+                                <div style="font-size: 0.7rem; color: var(--text-secondary);">Ranks top offers & computes revenue share.</div>
+                            </div>
+                            
+                            <div class="insight-prompt-btn" onclick="triggerPresetPrompt('Scan our server inventory and identify if any servers or IPs are blacklisted on Spamhaus or have VMTA/PTR record issues.')">
+                                <div style="font-weight: 600; font-size: 0.8rem; color: var(--text-primary); margin-bottom: 2px;">🚨 Server Health Check</div>
+                                <div style="font-size: 0.7rem; color: var(--text-secondary);">Detects PTR errors & listed IPs.</div>
+                            </div>
+                            
+                            <div class="insight-prompt-btn" onclick="triggerPresetPrompt('Evaluate each mailer\\'s drop volume and total revenue performance. Provide a performance summary.')">
+                                <div style="font-weight: 600; font-size: 0.8rem; color: var(--text-primary); margin-bottom: 2px;">👥 Team Performance</div>
+                                <div style="font-size: 0.7rem; color: var(--text-secondary);">Compares drop volume & contributions.</div>
+                            </div>
+                            
+                            <div class="insight-prompt-btn" onclick="triggerPresetPrompt('Generate a comprehensive executive summary of the entire team state, servers, and financial indicators.')">
+                                <div style="font-weight: 600; font-size: 0.8rem; color: var(--text-primary); margin-bottom: 2px;">📊 Executive Summary</div>
+                                <div style="font-size: 0.7rem; color: var(--text-secondary);">High-level overview & key trends.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Right Column: Interactive Chat Area -->
+                <div class="card" style="flex: 1; background: var(--bg-secondary); border: 1px solid var(--border-color); display: flex; flex-direction: column; padding: 0; overflow: hidden; position: relative;">
+                    
+                    <!-- Chat Header -->
+                    <div style="padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.01);">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <i data-lucide="message-square" style="width: 18px; color: var(--accent-primary);"></i>
+                            <span style="font-weight: 600; font-size: 0.9rem;">Chat Session</span>
+                        </div>
+                        <button onclick="clearAiChat()" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.75rem; transition: color 0.2s;" onmouseover="this.style.color='var(--error)'" onmouseout="this.style.color='var(--text-secondary)'">
+                            <i data-lucide="trash-2" style="width: 14px;"></i> Clear History
+                        </button>
+                    </div>
+
+                    <!-- Chat Messages List -->
+                    <div id="ai-chat-messages" style="flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; scroll-behavior: smooth;">
+                        ${app.aiChatHistory.length === 0 ? `
+                            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; max-width: 400px; margin: 0 auto; gap: 16px; opacity: 0.85;">
+                                <div style="background: rgba(59, 130, 246, 0.1); color: var(--accent-primary); width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(59,130,246,0.15);">
+                                    <i data-lucide="bot" style="width: 28px;"></i>
+                                </div>
+                                <div>
+                                    <h5 style="margin: 0 0 6px 0; font-size: 0.95rem;">Ask your AI Assistant</h5>
+                                    <p style="margin: 0; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5;">
+                                        I have read your current dashboard data. Ask me to find blacklisted IPs, compute average EPCs, summarize top offers, or audit servers!
+                                    </p>
+                                </div>
+                            </div>
+                        ` : app.aiChatHistory.map(msg => `
+                            <div style="display: flex; justify-content: ${msg.role === 'user' ? 'flex-end' : 'flex-start'};">
+                                <div style="max-width: 80%; padding: 12px 16px; border-radius: 12px; font-size: 0.85rem; line-height: 1.5; ${msg.role === 'user' 
+                                    ? 'background: linear-gradient(135deg, var(--accent-primary) 0%, #2563eb 100%); color: #fff; border-bottom-right-radius: 2px; box-shadow: 0 4px 12px rgba(59,130,246,0.2);' 
+                                    : 'background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); border-bottom-left-radius: 2px;'
+                                }">
+                                    ${msg.text}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <!-- Typing Indicator -->
+                    <div id="ai-chat-typing" style="padding: 12px 20px; display: none; align-items: center; gap: 8px; font-size: 0.75rem; color: var(--text-secondary); background: rgba(0,0,0,0.05); border-top: 1px solid var(--border-color); flex-shrink: 0;">
+                        <span style="display: inline-block; width: 6px; height: 6px; background: var(--accent-primary); border-radius: 50%; animation: pulse-dot 1.4s infinite ease-in-out;"></span>
+                        <span style="display: inline-block; width: 6px; height: 6px; background: var(--accent-primary); border-radius: 50%; animation: pulse-dot 1.4s infinite ease-in-out 0.2s;"></span>
+                        <span style="display: inline-block; width: 6px; height: 6px; background: var(--accent-primary); border-radius: 50%; animation: pulse-dot 1.4s infinite ease-in-out 0.4s;"></span>
+                        <span style="margin-left: 4px;">AI is thinking and analyzing dashboard state...</span>
+                    </div>
+
+                    <!-- Chat Input Panel -->
+                    <div style="padding: 16px 20px; border-top: 1px solid var(--border-color); display: flex; gap: 10px; background: rgba(0,0,0,0.02); flex-shrink: 0;">
+                        <textarea id="ai-chat-input" placeholder="Type a message or request a data extraction..." style="flex: 1; min-height: 44px; max-height: 120px; height: 44px; padding: 12px 16px; border-radius: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.85rem; outline: none; transition: all 0.2s; resize: none; line-height: 1.4;" onfocus="this.style.borderColor='var(--accent-primary)'; this.style.boxShadow='0 0 0 2px rgba(59,130,246,0.1)'" onblur="this.style.borderColor='var(--border-color)'; this.style.boxShadow='none'" onkeydown="handleAiInputKeydown(event)"></textarea>
+                        <button onclick="submitAiAgentMessage()" class="btn-primary" style="width: auto; padding: 0 20px; border-radius: 8px; background: var(--accent-primary); border: none; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='var(--accent-secondary)'" onmouseout="this.style.background='var(--accent-primary)'">
+                            <span>Send</span>
+                            <i data-lucide="send" style="width: 14px;"></i>
+                        </button>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+    `;
+
+    window.triggerPresetPrompt = (promptText) => {
+        const input = document.getElementById('ai-chat-input');
+        if (input) {
+            input.value = promptText;
+            input.focus();
+            window.submitAiAgentMessage();
+        }
+    };
+
+    window.saveGeminiApiKey = async (btn) => {
+        const input = document.getElementById('gemini-api-key-input');
+        if (!input) return;
+
+        const newKey = input.value.trim();
+        if (!newKey) {
+            alert('Please enter a valid API Key.');
+            return;
+        }
+
+        const originalText = btn.innerHTML;
+        btn.innerHTML = `<span style="display:inline-block; width:12px; height:12px; border:2px solid #fff; border-radius:50%; border-top-color:transparent; animation:spin 1s infinite linear; margin-right:6px;"></span> Saving`;
+        btn.disabled = true;
+
+        try {
+            app.state.aiConfig = app.state.aiConfig || {};
+            app.state.aiConfig.geminiApiKey = newKey;
+            await app.saveState();
+            
+            alert('Gemini API Key saved and synced successfully!');
+            app.updateDashboard();
+        } catch (err) {
+            alert('Failed to save API Key: ' + err.message);
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    };
+
+    window.clearAiChat = () => {
+        app.aiChatHistory = [];
+        app.updateDashboard();
+    };
+
+    window.handleAiInputKeydown = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            window.submitAiAgentMessage();
+        }
+    };
+
+    window.submitAiAgentMessage = async () => {
+        const input = document.getElementById('ai-chat-input');
+        if (!input) return;
+
+        const text = input.value.trim();
+        if (!text) return;
+
+        app.aiChatHistory.push({ role: 'user', text: text });
+        input.value = '';
+        
+        app.updateDashboard();
+
+        const container = document.getElementById('ai-chat-messages');
+        if (container) container.scrollTop = container.scrollHeight;
+
+        const typing = document.getElementById('ai-chat-typing');
+        if (typing) typing.style.display = 'flex';
+
+        try {
+            const response = await fetch('/api/ai-agent', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: text,
+                    history: app.aiChatHistory.slice(0, -1)
+                })
+            });
+
+            const result = await response.json();
+            
+            if (result.error) {
+                app.aiChatHistory.push({ role: 'model', text: `⚠️ <b>Error:</b> ${result.error}` });
+            } else {
+                app.aiChatHistory.push({ role: 'model', text: result.response });
+            }
+        } catch (e) {
+            app.aiChatHistory.push({ role: 'model', text: `⚠️ <b>Connection Error:</b> Failed to reach AI Agent endpoint. (${e.message})` });
+        } finally {
+            if (typing) typing.style.display = 'none';
+            app.updateDashboard();
+            
+            setTimeout(() => {
+                const freshContainer = document.getElementById('ai-chat-messages');
+                if (freshContainer) freshContainer.scrollTop = freshContainer.scrollHeight;
+            }, 100);
+        }
+    };
+
+    if (!document.getElementById('ai-agent-styles')) {
+        const style = document.createElement('style');
+        style.id = 'ai-agent-styles';
+        style.innerHTML = `
+            @keyframes pulse {
+                0% { opacity: 0.6; }
+                50% { opacity: 1; }
+                100% { opacity: 0.6; }
+            }
+            @keyframes pulse-dot {
+                0%, 100% { transform: scale(0.6); opacity: 0.4; }
+                50% { transform: scale(1); opacity: 1; }
+            }
+            .insight-prompt-btn {
+                padding: 10px 14px;
+                border-radius: 8px;
+                background: var(--bg-primary);
+                border: 1px solid var(--border-color);
+                cursor: pointer;
+                transition: all 0.2s ease-in-out;
+                text-align: left;
+            }
+            .insight-prompt-btn:hover {
+                border-color: var(--accent-primary);
+                background: rgba(59, 130, 246, 0.05);
+                transform: translateX(4px);
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    if (window.lucide) window.lucide.createIcons();
+    
+    setTimeout(() => {
+        const msgList = document.getElementById('ai-chat-messages');
+        if (msgList) msgList.scrollTop = msgList.scrollHeight;
+    }, 100);
 };
