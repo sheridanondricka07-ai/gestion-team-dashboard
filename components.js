@@ -130,7 +130,7 @@ function renderTopBar(app) {
                 <button onclick="showAddServerModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary);">+ Server</button>
                 <button onclick="showAddRPModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto;">+ RP</button>
             ` : ''}
-            ${app.state.currentView === 'rp-inventory' ? `
+            ${app.state.currentView === 'rp-inventory' && app.state.currentUser.role === 'admin' ? `
                 <button onclick="showImportRPInventoryModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary);"><i data-lucide="upload" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Bulk Import</button>
                 <button onclick="showAddRPInventoryItemModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto;"><i data-lucide="plus" style="width:12px; vertical-align:middle; margin-right:4px;"></i> New RP</button>
             ` : ''}
@@ -3683,6 +3683,7 @@ window.renderAiAgent = (app, container) => {
 };
 
 function renderRPsInventory(app, container) {
+    const isAdmin = app.state.currentUser && app.state.currentUser.role === 'admin';
     if (app.state.rpSearch === undefined) app.state.rpSearch = '';
     if (app.state.rpFilterServer === undefined) app.state.rpFilterServer = 'all';
     if (app.state.rpFilterSpfType === undefined) app.state.rpFilterSpfType = 'all';
@@ -3959,7 +3960,7 @@ function renderRPsInventory(app, container) {
                                 <th style="width: 120px;">TYPE</th>
                                 <th style="width: 120px;">RPtype</th>
                                 <th style="width: 100px; text-align: center;">Sent</th>
-                                <th style="width: 80px; text-align: right;">Actions</th>
+                                ${isAdmin ? `<th style="width: 80px; text-align: right;">Actions</th>` : ''}
                             </tr>
                         </thead>
                         <tbody>
@@ -3974,46 +3975,48 @@ function renderRPsInventory(app, container) {
                                     <td>${item.domainIncluded || '<span style="color: var(--text-secondary); opacity: 0.5;">---</span>'}</td>
                                     <td>${item.subdomainIncluded || '<span style="color: var(--text-secondary); opacity: 0.5;">---</span>'}</td>
                                     <td>
-                                        <select class="rp-cell-select" onchange="updateRPItemField('${item.id}', 'srv', this.value)">
+                                        <select class="rp-cell-select" ${isAdmin ? `onchange="updateRPItemField('${item.id}', 'srv', this.value)"` : 'disabled'}>
                                             <option value="">-- None --</option>
                                             <option value="SENT" ${item.srv === 'SENT' ? 'selected' : ''} style="color: var(--success); font-weight: bold;">SENT</option>
                                             ${uniqueServerNames.map(name => `<option value="${name}" ${item.srv === name ? 'selected' : ''}>${name}</option>`).join('')}
                                         </select>
                                     </td>
                                     <td>
-                                        <select class="rp-cell-select" onchange="updateRPItemField('${item.id}', 'spfType', this.value)">
+                                        <select class="rp-cell-select" ${isAdmin ? `onchange="updateRPItemField('${item.id}', 'spfType', this.value)"` : 'disabled'}>
                                             <option value="Include" ${item.spfType === 'Include' ? 'selected' : ''}>Include</option>
                                             <option value="Arecod" ${item.spfType === 'Arecod' ? 'selected' : ''}>Arecod</option>
                                         </select>
                                     </td>
                                     <td>
-                                        <select class="rp-cell-select" onchange="updateRPItemField('${item.id}', 'rpType', this.value)">
+                                        <select class="rp-cell-select" ${isAdmin ? `onchange="updateRPItemField('${item.id}', 'rpType', this.value)"` : 'disabled'}>
                                             <option value="intern" ${item.rpType === 'intern' ? 'selected' : ''}>intern</option>
                                             <option value="extern" ${item.rpType === 'extern' ? 'selected' : ''}>extern</option>
                                         </select>
                                     </td>
                                     <td style="text-align: center;">
                                         ${item.alreadySent ? `
-                                            <span class="rp-badge-sent" onclick="toggleRPSentState('${item.id}', false)" title="Click to mark unsent">
+                                            <span class="rp-badge-sent" ${isAdmin ? `onclick="toggleRPSentState('${item.id}', false)"` : 'style="cursor: default;"'} title="${isAdmin ? 'Click to mark unsent' : 'Sent'}">
                                                 <i data-lucide="check-circle" style="width: 12px;"></i> SENT
                                             </span>
                                         ` : `
-                                            <span class="rp-badge-unsent" onclick="toggleRPSentState('${item.id}', true)" title="Click to mark sent">
+                                            <span class="rp-badge-unsent" ${isAdmin ? `onclick="toggleRPSentState('${item.id}', true)"` : 'style="cursor: default;"'} title="${isAdmin ? 'Click to mark sent' : 'Unsent'}">
                                                 <i data-lucide="circle" style="width: 12px;"></i> UNSENT
                                             </span>
                                         `}
                                     </td>
+                                    ${isAdmin ? `
                                     <td style="text-align: right;">
                                         <button class="btn-action-delete" onclick="deleteRPInventoryItemPrompt('${item.id}', '${item.rpDomain}')">
                                             <i data-lucide="trash-2" style="width: 14px;"></i>
                                         </button>
                                     </td>
+                                    ` : ''}
                                 </tr>
                             `).join('')}
                             ${filteredItems.length === 0 ? `
                                 <tr>
-                                    <td colspan="8" style="padding: 60px; text-align: center; color: var(--text-secondary);">
-                                        No RPs found. Click <b>"New RP"</b> or <b>"Bulk Import"</b> to add data.
+                                    <td colspan="${isAdmin ? 8 : 7}" style="padding: 60px; text-align: center; color: var(--text-secondary);">
+                                        No RPs found.${isAdmin ? ' Click <b>"New RP"</b> or <b>"Bulk Import"</b> to add data.' : ''}
                                     </td>
                                 </tr>
                             ` : ''}
