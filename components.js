@@ -4200,8 +4200,7 @@ window.updateRPItemField = (id, field, value) => {
                 item.domainIncluded.trim().toLowerCase() === domInc &&
                 item.srv &&
                 item.srv !== '' &&
-                item.srv !== 'SENT' &&
-                item.srv !== value
+                item.srv !== 'SENT'
             );
             if (conflict) {
                 // Show styled warning modal
