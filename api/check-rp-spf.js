@@ -25,8 +25,8 @@ async function setFirebaseData(path, data) {
 }
 
 async function sendTelegram(message) {
-    const token = "8737550836:AAFK68Ig7xyW3KIvBhI5gpO1bGaPTwUimr0";
-    const chatId = "-5252005797";
+    const token = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
+    const chatId = "-4933333573";
     
     try {
         const controller = new AbortController();
@@ -317,14 +317,7 @@ export default async function handler(req, res) {
                 report += `\n\n`;
             }
 
-            if (warnings.length > 0) {
-                report += `<b>⚠️ Warnings (Could be OK):</b>\n`;
-                const warnLines = warnings.map(w => `• <b>${w.rpDomain}</b>: ${w.spfStatusDetail}`);
-                const displayLines = warnLines.slice(0, 30);
-                report += displayLines.join('\n');
-                if (warnLines.length > 30) report += `\n...and ${warnLines.length - 30} more.`;
-                report += `\n\n`;
-            }
+            // Do not add the "could be ok" warnings into the notification list, only "not ok" errors
 
             report += `<b>📊 Summary:</b>\n`;
             report += `✅ Total OK: ${summary.ok}\n`;
