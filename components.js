@@ -4132,7 +4132,16 @@ window.showImportRPInventoryModal = () => {
 
                 const items = json.map(row => {
                     const findKey = (prefixes) => {
-                        const key = Object.keys(row).find(k => prefixes.some(p => k.toLowerCase().replace(/\s/g, '').includes(p.toLowerCase())));
+                        let key = Object.keys(row).find(k => {
+                            const cleanK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+                            return prefixes.some(p => cleanK === p.toLowerCase().replace(/[^a-z0-9]/g, ''));
+                        });
+                        if (key) return row[key];
+
+                        key = Object.keys(row).find(k => {
+                            const cleanK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+                            return prefixes.some(p => cleanK.includes(p.toLowerCase().replace(/[^a-z0-9]/g, '')));
+                        });
                         return key ? row[key] : '';
                     };
 
@@ -4141,19 +4150,22 @@ window.showImportRPInventoryModal = () => {
                     const subdomainIncluded = findKey(['subdomainincluded', 'subdomain']);
                     const srv = findKey(['srv', 'server']);
                     const spfType = findKey(['type', 'spftype']);
-                    const rpTypeVal = findKey(['delivred', 'rptype', 'delivery']);
+                    const rpTypeVal = findKey(['rptype', 'delivred', 'delivery']);
 
                     let normSpfType = 'Include';
-                    if (spfType && (spfType.toString().toLowerCase().includes('arecod') || spfType.toString().toLowerCase().includes('a'))) {
-                        normSpfType = 'Arecod';
+                    if (spfType) {
+                        const val = spfType.toString().trim().toLowerCase();
+                        if (val.includes('arecod') || val.includes('arecord') || val.startsWith('a')) {
+                            normSpfType = 'Arecod';
+                        }
                     }
 
                     let normRpType = 'intern';
                     if (rpTypeVal) {
                         const val = rpTypeVal.toString().trim().toLowerCase();
-                        if (val === 'yes' || val === 'intern') {
+                        if (val.includes('intern') || val === 'yes') {
                             normRpType = 'intern';
-                        } else if (val === 'no' || val === 'extern') {
+                        } else if (val.includes('extern') || val === 'no') {
                             normRpType = 'extern';
                         }
                     }
