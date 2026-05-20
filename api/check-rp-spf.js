@@ -36,8 +36,67 @@ async function getSpfRecord(domain) {
     }
 }
 
-function verifySpfRecord(spfRecord, type, domainInc, subdomainInc) {
+function ipInCidr(ip, cidr) {
+    const [range, bitsStr] = cidr.split('/');
+    if (!bitsStr) {
+        return ip === range;
+    }
+    const bits = parseInt(bitsStr, 10);
+    if (isNaN(bits)) return ip === range;
+
+    const ipParts = ip.split('.').map(Number);
+    const rangeParts = range.split('.').map(Number);
+
+    if (ipParts.length !== 4 || rangeParts.length !== 4) return false;
+
+    const ipNum = ((ipParts[0] * 256 + ipParts[1]) * 256 + ipParts[2]) * 256 + ipParts[3];
+    const rangeNum = ((rangeParts[0] * 256 + rangeParts[1]) * 256 + rangeParts[2]) * 256 + rangeParts[3];
+    const mask = bits === 0 ? 0 : (0xFFFFFFFF << (32 - bits));
+
+    return (ipNum & mask) === (rangeNum & mask);
+}
+
+function verifySpfRecord(spfRecord, type, domainInc, subdomainInc, rpType, serverIps) {
     if (!spfRecord) return { ok: false, reason: 'No SPF Record' };
+
+    if (rpType === 'intern') {
+        if (!serverIps || serverIps.length === 0) {
+            return { ok: false, reason: 'No Server / IPs Attached' };
+        }
+
+        const terms = spfRecord.toLowerCase().split(/\s+/);
+        const ip4Cidrs = [];
+
+        for (let term of terms) {
+            // Strip qualifiers
+            if (['+', '-', '~', '?'].includes(term[0])) {
+                term = term.slice(1);
+            }
+            if (term.startsWith('ip4:')) {
+                ip4Cidrs.push(term.substring('ip4:'.length));
+            }
+        }
+
+        const missingIps = [];
+        for (const ip of serverIps) {
+            let covered = false;
+            for (const cidr of ip4Cidrs) {
+                if (ipInCidr(ip, cidr)) {
+                    covered = true;
+                    break;
+                }
+            }
+            if (!covered) {
+                missingIps.push(ip);
+            }
+        }
+
+        if (missingIps.length === 0) {
+            return { ok: true, reason: 'OK' };
+        } else {
+            return { ok: false, reason: `Missing Server IPs: ${missingIps.join(', ')}` };
+        }
+    }
     
     const dom = (domainInc || '').toLowerCase().trim();
     const sub = (subdomainInc || '').toLowerCase().trim();
@@ -95,6 +154,7 @@ function verifySpfRecord(spfRecord, type, domainInc, subdomainInc) {
 export default async function handler(req, res) {
     try {
         const rpInventory = await getFirebaseData('state/rpInventory') || [];
+        const servers = await getFirebaseData('state/servers') || [];
         
         if (rpInventory.length === 0) {
             return res.status(200).json({
@@ -121,12 +181,17 @@ export default async function handler(req, res) {
                 const rpDomain = (item.rpDomain || '').trim();
                 if (!rpDomain) return;
 
+                const attachedServer = servers.find(s => s.name === item.srv);
+                const serverIps = attachedServer ? (attachedServer.allIps || [attachedServer.mainIp || attachedServer.ip]).filter(Boolean) : [];
+
                 const spfRecord = await getSpfRecord(rpDomain);
                 const verification = verifySpfRecord(
                     spfRecord,
                     item.spfType || 'Include',
                     item.domainIncluded,
-                    item.subdomainIncluded
+                    item.subdomainIncluded,
+                    item.rpType || 'extern',
+                    serverIps
                 );
 
                 item.spfStatus = verification.ok ? 'OK' : 'ERROR';
