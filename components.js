@@ -97,6 +97,10 @@ function renderSidebar(app) {
                 <i data-lucide="bot"></i>
                 <span>AI Agent</span>
             </div>
+            <div class="nav-item ${view === 'rp-inventory' ? 'active' : ''}" onclick="app.setView('rp-inventory')">
+                <i data-lucide="globe"></i>
+                <span>RPs</span>
+            </div>
         </div>
         <div style="margin-top: auto;">
             <div style="padding: 12px; font-size: 0.7rem; color: var(--text-secondary); text-align: center; border-top: 1px solid var(--border-color); margin-bottom: 8px; opacity: 0.5;">
@@ -119,12 +123,16 @@ function renderTopBar(app) {
     const container = document.getElementById('top-bar');
     container.innerHTML = `
         <div style="display: flex; align-items: center; gap: var(--spacing-md);">
-            <h2 style="font-size: 1.1rem; font-weight: 600;">${app.state.currentView === 'drops' ? 'Drop Details' : (app.state.currentView.charAt(0).toUpperCase() + app.state.currentView.slice(1))}</h2>
+            <h2 style="font-size: 1.1rem; font-weight: 600;">${app.state.currentView === 'drops' ? 'Drop Details' : (app.state.currentView === 'rp-inventory' ? 'RPs' : app.state.currentView.charAt(0).toUpperCase() + app.state.currentView.slice(1))}</h2>
         </div>
         <div style="display: flex; align-items: center; gap: var(--spacing-md);">
             ${app.state.currentUser.role === 'admin' && app.state.currentView === 'management' ? `
                 <button onclick="showAddServerModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary);">+ Server</button>
                 <button onclick="showAddRPModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto;">+ RP</button>
+            ` : ''}
+            ${app.state.currentView === 'rp-inventory' ? `
+                <button onclick="showImportRPInventoryModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary);"><i data-lucide="upload" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Bulk Import</button>
+                <button onclick="showAddRPInventoryItemModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto;"><i data-lucide="plus" style="width:12px; vertical-align:middle; margin-right:4px;"></i> New RP</button>
             ` : ''}
             ${app.state.currentUser.role === 'admin' && app.state.currentView === 'team' ? `
                 <button onclick="showAddMailerModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto;">+ Mailer</button>
@@ -171,6 +179,8 @@ function renderView(app) {
         renderSpamhaus(app, container);
     } else if (view === 'ai-agent') {
         renderAiAgent(app, container);
+    } else if (view === 'rp-inventory') {
+        renderRPsInventory(app, container);
     }
 }
 
@@ -3670,4 +3680,611 @@ window.renderAiAgent = (app, container) => {
         const msgList = document.getElementById('ai-chat-messages');
         if (msgList) msgList.scrollTop = msgList.scrollHeight;
     }, 100);
+};
+
+function renderRPsInventory(app, container) {
+    if (app.state.rpSearch === undefined) app.state.rpSearch = '';
+    if (app.state.rpFilterServer === undefined) app.state.rpFilterServer = 'all';
+    if (app.state.rpFilterSpfType === undefined) app.state.rpFilterSpfType = 'all';
+    if (app.state.rpFilterRpType === undefined) app.state.rpFilterRpType = 'all';
+    if (app.state.rpFilterSent === undefined) app.state.rpFilterSent = 'all';
+
+    const items = app.getProcessedRPInventory() || [];
+
+    const totalCount = items.length;
+    const sentCount = items.filter(item => item.alreadySent).length;
+    const unsentCount = totalCount - sentCount;
+    const sentPct = totalCount > 0 ? Math.round((sentCount / totalCount) * 100) : 0;
+    const unsentPct = totalCount > 0 ? Math.round((unsentCount / totalCount) * 100) : 0;
+    const includeCount = items.filter(item => item.spfType === 'Include').length;
+    const arecodCount = totalCount - includeCount;
+
+    const search = app.state.rpSearch.trim().toLowerCase();
+    const filteredItems = items.filter(item => {
+        if (search) {
+            const domainMatch = (item.rpDomain || '').toLowerCase().includes(search);
+            const domIncMatch = (item.domainIncluded || '').toLowerCase().includes(search);
+            const subIncMatch = (item.subdomainIncluded || '').toLowerCase().includes(search);
+            const srvMatch = (item.srv || '').toLowerCase().includes(search);
+            if (!domainMatch && !domIncMatch && !subIncMatch && !srvMatch) return false;
+        }
+
+        if (app.state.rpFilterServer !== 'all') {
+            if (app.state.rpFilterServer === 'SENT') {
+                if (item.srv !== 'SENT') return false;
+            } else if (app.state.rpFilterServer === 'none') {
+                if (item.srv) return false;
+            } else {
+                if (item.srv !== app.state.rpFilterServer) return false;
+            }
+        }
+
+        if (app.state.rpFilterSpfType !== 'all') {
+            if (item.spfType !== app.state.rpFilterSpfType) return false;
+        }
+
+        if (app.state.rpFilterRpType !== 'all') {
+            if (item.rpType !== app.state.rpFilterRpType) return false;
+        }
+
+        if (app.state.rpFilterSent !== 'all') {
+            const isSent = !!item.alreadySent;
+            if (app.state.rpFilterSent === 'sent' && !isSent) return false;
+            if (app.state.rpFilterSent === 'unsent' && isSent) return false;
+        }
+
+        return true;
+    });
+
+    const serverNames = (app.state.servers || []).map(s => s.name).filter(Boolean);
+    const uniqueServerNames = [...new Set(serverNames)].sort();
+
+    container.innerHTML = `
+        <style>
+            .rps-inventory-container {
+                display: flex;
+                flex-direction: column;
+                gap: 24px;
+                padding: 4px 0 24px 0;
+            }
+            .rp-stats-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                gap: 20px;
+            }
+            .rp-stat-card {
+                padding: 16px 20px;
+                border-left: 4px solid var(--accent-primary);
+            }
+            .rp-filters-bar {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 16px;
+                align-items: center;
+                background: var(--bg-secondary);
+                padding: 16px;
+                border-radius: 12px;
+                border: 1px solid var(--border-color);
+            }
+            .rp-filter-group {
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+                min-width: 140px;
+            }
+            .rp-filter-group.search {
+                flex: 1;
+                min-width: 200px;
+            }
+            .rp-filter-label {
+                font-size: 0.7rem;
+                font-weight: 600;
+                color: var(--text-secondary);
+                text-transform: uppercase;
+            }
+            .rp-input, .rp-select {
+                padding: 8px 12px;
+                background: var(--bg-primary);
+                border: 1px solid var(--border-color);
+                border-radius: 6px;
+                color: var(--text-primary);
+                font-size: 0.8rem;
+                outline: none;
+                width: 100%;
+                transition: border-color 0.2s;
+            }
+            .rp-input:focus, .rp-select:focus {
+                border-color: var(--accent-primary);
+            }
+            .rp-table-card {
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-color);
+                border-radius: 12px;
+                overflow: hidden;
+            }
+            .rp-table-wrapper {
+                max-height: 600px;
+                overflow-y: auto;
+            }
+            .rp-table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 0.85rem;
+            }
+            .rp-table th {
+                background: var(--bg-tertiary);
+                padding: 14px 16px;
+                text-align: left;
+                font-weight: 600;
+                color: var(--text-secondary);
+                position: sticky;
+                top: 0;
+                z-index: 5;
+                border-bottom: 1px solid var(--border-color);
+            }
+            .rp-table td {
+                padding: 12px 16px;
+                border-bottom: 1px solid var(--border-color);
+                vertical-align: middle;
+            }
+            .rp-badge-sent {
+                background: rgba(16, 185, 129, 0.1);
+                color: var(--success);
+                padding: 4px 8px;
+                border-radius: 6px;
+                font-size: 0.75rem;
+                font-weight: 700;
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                cursor: pointer;
+                border: 1px solid rgba(16, 185, 129, 0.2);
+            }
+            .rp-badge-unsent {
+                background: rgba(255, 255, 255, 0.05);
+                color: var(--text-secondary);
+                padding: 4px 8px;
+                border-radius: 6px;
+                font-size: 0.75rem;
+                font-weight: 700;
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                cursor: pointer;
+                border: 1px solid var(--border-color);
+            }
+            .rp-badge-sent:hover, .rp-badge-unsent:hover {
+                transform: scale(1.05);
+            }
+            .rp-cell-select {
+                background: var(--bg-primary);
+                border: 1px solid var(--border-color);
+                border-radius: 6px;
+                padding: 6px 10px;
+                color: var(--text-primary);
+                font-size: 0.8rem;
+                cursor: pointer;
+                outline: none;
+                width: 100%;
+            }
+            .rp-cell-select:focus {
+                border-color: var(--accent-primary);
+            }
+            .btn-action-delete {
+                background: rgba(239, 68, 68, 0.1);
+                border: 1px solid rgba(239, 68, 68, 0.2);
+                color: #ef4444;
+                padding: 6px;
+                border-radius: 6px;
+                cursor: pointer;
+                transition: background 0.2s;
+            }
+            .btn-action-delete:hover {
+                background: rgba(239, 68, 68, 0.2);
+            }
+        </style>
+
+        <div class="rps-inventory-container">
+            <div class="rp-stats-grid">
+                <div class="card rp-stat-card">
+                    <h4 class="rp-filter-label" style="margin: 0;">Total RPs</h4>
+                    <p style="font-size: 1.8rem; font-weight: 800; margin: 8px 0 0;">${totalCount}</p>
+                </div>
+                <div class="card rp-stat-card" style="border-left-color: var(--success);">
+                    <h4 class="rp-filter-label" style="margin: 0;">Sent before</h4>
+                    <p style="font-size: 1.8rem; font-weight: 800; margin: 8px 0 0; color: var(--success);">${sentCount} <span style="font-size: 0.9rem; font-weight: 500; color: var(--text-secondary);">(${sentPct}%)</span></p>
+                </div>
+                <div class="card rp-stat-card" style="border-left-color: #f59e0b;">
+                    <h4 class="rp-filter-label" style="margin: 0;">Unsent</h4>
+                    <p style="font-size: 1.8rem; font-weight: 800; margin: 8px 0 0; color: #f59e0b;">${unsentCount} <span style="font-size: 0.9rem; font-weight: 500; color: var(--text-secondary);">(${unsentPct}%)</span></p>
+                </div>
+                <div class="card rp-stat-card" style="border-left-color: var(--accent-primary);">
+                    <h4 class="rp-filter-label" style="margin: 0;">SPF Include / Arecod</h4>
+                    <p style="font-size: 1.8rem; font-weight: 800; margin: 8px 0 0;">${includeCount} <span style="font-size: 1.2rem; font-weight: 400; color: var(--text-secondary);">/</span> ${arecodCount}</p>
+                </div>
+            </div>
+
+            <div class="rp-filters-bar">
+                <div class="rp-filter-group search">
+                    <span class="rp-filter-label">Search RPs</span>
+                    <div style="position: relative;">
+                        <input type="text" id="rp-search-input" class="rp-input" placeholder="Search RP, domain or server..." value="${app.state.rpSearch}">
+                        <i data-lucide="search" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); width: 14px; color: var(--text-secondary);"></i>
+                    </div>
+                </div>
+                <div class="rp-filter-group">
+                    <span class="rp-filter-label">Server</span>
+                    <select id="rp-filter-server" class="rp-select">
+                        <option value="all" ${app.state.rpFilterServer === 'all' ? 'selected' : ''}>All Servers</option>
+                        <option value="SENT" ${app.state.rpFilterServer === 'SENT' ? 'selected' : ''}>SENT (State)</option>
+                        <option value="none" ${app.state.rpFilterServer === 'none' ? 'selected' : ''}>Unassigned</option>
+                        ${uniqueServerNames.map(name => `<option value="${name}" ${app.state.rpFilterServer === name ? 'selected' : ''}>${name}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="rp-filter-group">
+                    <span class="rp-filter-label">SPF Type</span>
+                    <select id="rp-filter-spftype" class="rp-select">
+                        <option value="all" ${app.state.rpFilterSpfType === 'all' ? 'selected' : ''}>All Types</option>
+                        <option value="Include" ${app.state.rpFilterSpfType === 'Include' ? 'selected' : ''}>Include</option>
+                        <option value="Arecod" ${app.state.rpFilterSpfType === 'Arecod' ? 'selected' : ''}>Arecod</option>
+                    </select>
+                </div>
+                <div class="rp-filter-group">
+                    <span class="rp-filter-label">RPtype</span>
+                    <select id="rp-filter-rptype" class="rp-select">
+                        <option value="all" ${app.state.rpFilterRpType === 'all' ? 'selected' : ''}>All</option>
+                        <option value="intern" ${app.state.rpFilterRpType === 'intern' ? 'selected' : ''}>intern</option>
+                        <option value="extern" ${app.state.rpFilterRpType === 'extern' ? 'selected' : ''}>extern</option>
+                    </select>
+                </div>
+                <div class="rp-filter-group">
+                    <span class="rp-filter-label">Sent Mark</span>
+                    <select id="rp-filter-sent" class="rp-select">
+                        <option value="all" ${app.state.rpFilterSent === 'all' ? 'selected' : ''}>All</option>
+                        <option value="sent" ${app.state.rpFilterSent === 'sent' ? 'selected' : ''}>Sent</option>
+                        <option value="unsent" ${app.state.rpFilterSent === 'unsent' ? 'selected' : ''}>Unsent</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="rp-table-card">
+                <div class="rp-table-wrapper">
+                    <table class="rp-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 250px;">RPs</th>
+                                <th style="width: 200px;">Domain included</th>
+                                <th style="width: 250px;">SubDomain included</th>
+                                <th style="width: 160px;">SRV</th>
+                                <th style="width: 120px;">TYPE</th>
+                                <th style="width: 120px;">RPtype</th>
+                                <th style="width: 100px; text-align: center;">Sent</th>
+                                <th style="width: 80px; text-align: right;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${filteredItems.map(item => `
+                                <tr>
+                                    <td style="font-weight: 600; color: var(--text-primary);">
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <i data-lucide="globe" style="width: 14px; color: var(--accent-primary);"></i>
+                                            ${item.rpDomain}
+                                        </div>
+                                    </td>
+                                    <td>${item.domainIncluded || '<span style="color: var(--text-secondary); opacity: 0.5;">---</span>'}</td>
+                                    <td>${item.subdomainIncluded || '<span style="color: var(--text-secondary); opacity: 0.5;">---</span>'}</td>
+                                    <td>
+                                        <select class="rp-cell-select" onchange="updateRPItemField('${item.id}', 'srv', this.value)">
+                                            <option value="">-- None --</option>
+                                            <option value="SENT" ${item.srv === 'SENT' ? 'selected' : ''} style="color: var(--success); font-weight: bold;">SENT</option>
+                                            ${uniqueServerNames.map(name => `<option value="${name}" ${item.srv === name ? 'selected' : ''}>${name}</option>`).join('')}
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <select class="rp-cell-select" onchange="updateRPItemField('${item.id}', 'spfType', this.value)">
+                                            <option value="Include" ${item.spfType === 'Include' ? 'selected' : ''}>Include</option>
+                                            <option value="Arecod" ${item.spfType === 'Arecod' ? 'selected' : ''}>Arecod</option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <select class="rp-cell-select" onchange="updateRPItemField('${item.id}', 'rpType', this.value)">
+                                            <option value="intern" ${item.rpType === 'intern' ? 'selected' : ''}>intern</option>
+                                            <option value="extern" ${item.rpType === 'extern' ? 'selected' : ''}>extern</option>
+                                        </select>
+                                    </td>
+                                    <td style="text-align: center;">
+                                        ${item.alreadySent ? `
+                                            <span class="rp-badge-sent" onclick="toggleRPSentState('${item.id}', false)" title="Click to mark unsent">
+                                                <i data-lucide="check-circle" style="width: 12px;"></i> SENT
+                                            </span>
+                                        ` : `
+                                            <span class="rp-badge-unsent" onclick="toggleRPSentState('${item.id}', true)" title="Click to mark sent">
+                                                <i data-lucide="circle" style="width: 12px;"></i> UNSENT
+                                            </span>
+                                        `}
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <button class="btn-action-delete" onclick="deleteRPInventoryItemPrompt('${item.id}', '${item.rpDomain}')">
+                                            <i data-lucide="trash-2" style="width: 14px;"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                            ${filteredItems.length === 0 ? `
+                                <tr>
+                                    <td colspan="8" style="padding: 60px; text-align: center; color: var(--text-secondary);">
+                                        No RPs found. Click <b>"New RP"</b> or <b>"Bulk Import"</b> to add data.
+                                    </td>
+                                </tr>
+                            ` : ''}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('rp-search-input').addEventListener('input', (e) => {
+        app.state.rpSearch = e.target.value;
+        renderRPsInventory(app, container);
+    });
+    document.getElementById('rp-filter-server').addEventListener('change', (e) => {
+        app.state.rpFilterServer = e.target.value;
+        renderRPsInventory(app, container);
+    });
+    document.getElementById('rp-filter-spftype').addEventListener('change', (e) => {
+        app.state.rpFilterSpfType = e.target.value;
+        renderRPsInventory(app, container);
+    });
+    document.getElementById('rp-filter-rptype').addEventListener('change', (e) => {
+        app.state.rpFilterRpType = e.target.value;
+        renderRPsInventory(app, container);
+    });
+    document.getElementById('rp-filter-sent').addEventListener('change', (e) => {
+        app.state.rpFilterSent = e.target.value;
+        renderRPsInventory(app, container);
+    });
+
+    if (window.lucide) window.lucide.createIcons();
+}
+
+window.updateRPItemField = (id, field, value) => {
+    const updates = {};
+    updates[field] = value;
+    if (field === 'srv' && value === 'SENT') {
+        updates.alreadySent = true;
+    }
+    window.app.updateRPInventoryItem(id, updates).then(() => {
+        window.app.updateDashboard();
+    });
+};
+
+window.toggleRPSentState = (id, state) => {
+    window.app.updateRPInventoryItem(id, { alreadySent: state }).then(() => {
+        window.app.updateDashboard();
+    });
+};
+
+window.deleteRPInventoryItemPrompt = (id, domain) => {
+    if (confirm(`Are you sure you want to remove Return Path "${domain}" from inventory?`)) {
+        window.app.deleteRPInventoryItem(id).then(() => {
+            window.app.updateDashboard();
+        });
+    }
+};
+
+window.showImportRPInventoryModal = () => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+        <div class="modal" style="max-width: 500px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700;">Import RPs from Excel (.xlsx/.csv)</h3>
+                <span style="cursor: pointer; font-size: 1.2rem;" onclick="this.closest('.modal-overlay').remove()">&times;</span>
+            </div>
+            <div id="rp-import-dropzone" style="border: 2px dashed var(--border-color); border-radius: 8px; padding: 40px 20px; text-align: center; cursor: pointer; transition: border-color 0.2s;"
+                 onmouseover="this.style.borderColor='var(--accent-primary)'"
+                 onmouseout="this.style.borderColor='var(--border-color)'">
+                <i data-lucide="upload-cloud" style="width: 40px; height: 40px; color: var(--accent-primary); margin-bottom: 12px; display: inline-block;"></i>
+                <p style="margin: 0 0 8px; font-weight: 600; font-size: 0.9rem;">Drag & drop your Excel file here</p>
+                <p style="margin: 0; font-size: 0.75rem; color: var(--text-secondary);">or click to select file from computer</p>
+                <input type="file" id="rp-import-file-input" accept=".xlsx,.csv" style="display: none;">
+            </div>
+            <div style="margin-top: 16px; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4;">
+                <p style="font-weight: 600; margin-bottom: 4px; color: var(--text-primary);">Column header naming guidelines:</p>
+                <ul style="margin: 0; padding-left: 16px;">
+                    <li><b>RPs</b> (or ReturnPath, Domain)</li>
+                    <li><b>Domain included</b></li>
+                    <li><b>SubDomain included</b></li>
+                    <li><b>SRV</b> (or Server - values like s_wmn3_2208 or SENT)</li>
+                    <li><b>TYPE</b> (or spfType - values Include or Arecod)</li>
+                    <li><b>Delivred</b> (or RPtype - values intern or extern)</li>
+                </ul>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+                <button onclick="this.closest('.modal-overlay').remove()" class="btn-secondary" style="width: auto;">Cancel</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    if (window.lucide) window.lucide.createIcons();
+
+    const dropzone = document.getElementById('rp-import-dropzone');
+    const fileInput = document.getElementById('rp-import-file-input');
+
+    dropzone.addEventListener('click', () => fileInput.click());
+
+    const handleFile = (file) => {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const json = XLSX.utils.sheet_to_json(worksheet);
+
+                if (!json || json.length === 0) {
+                    alert("The uploaded sheet appears to be empty.");
+                    return;
+                }
+
+                const items = json.map(row => {
+                    const findKey = (prefixes) => {
+                        const key = Object.keys(row).find(k => prefixes.some(p => k.toLowerCase().replace(/\s/g, '').includes(p.toLowerCase())));
+                        return key ? row[key] : '';
+                    };
+
+                    const rpDomain = findKey(['rps', 'rpdomain', 'returnpath']);
+                    const domainIncluded = findKey(['domainincluded', 'domain']);
+                    const subdomainIncluded = findKey(['subdomainincluded', 'subdomain']);
+                    const srv = findKey(['srv', 'server']);
+                    const spfType = findKey(['type', 'spftype']);
+                    const rpTypeVal = findKey(['delivred', 'rptype', 'delivery']);
+
+                    let normSpfType = 'Include';
+                    if (spfType && (spfType.toString().toLowerCase().includes('arecod') || spfType.toString().toLowerCase().includes('a'))) {
+                        normSpfType = 'Arecod';
+                    }
+
+                    let normRpType = 'intern';
+                    if (rpTypeVal) {
+                        const val = rpTypeVal.toString().trim().toLowerCase();
+                        if (val === 'yes' || val === 'intern') {
+                            normRpType = 'intern';
+                        } else if (val === 'no' || val === 'extern') {
+                            normRpType = 'extern';
+                        }
+                    }
+
+                    const isSent = srv && srv.toString().trim().toLowerCase() === 'sent';
+
+                    return {
+                        rpDomain,
+                        domainIncluded,
+                        subdomainIncluded,
+                        srv,
+                        spfType: normSpfType,
+                        rpType: normRpType,
+                        alreadySent: isSent
+                    };
+                }).filter(item => item.rpDomain);
+
+                window.app.bulkImportRPInventory(items).then(() => {
+                    overlay.remove();
+                    alert(`Successfully imported ${items.length} RPs into inventory!`);
+                });
+            } catch (err) {
+                console.error(err);
+                alert("Failed to parse the Excel file. Please ensure it is a valid format.");
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    };
+
+    fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+    dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.style.borderColor = 'var(--accent-primary)';
+    });
+    dropzone.addEventListener('dragleave', () => {
+        dropzone.style.borderColor = 'var(--border-color)';
+    });
+    dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.style.borderColor = 'var(--border-color)';
+        handleFile(e.dataTransfer.files[0]);
+    });
+};
+
+window.showAddRPInventoryItemModal = () => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    
+    const serverNames = (window.app.state.servers || []).map(s => s.name).filter(Boolean);
+    const uniqueServerNames = [...new Set(serverNames)].sort();
+
+    overlay.innerHTML = `
+        <div class="modal" style="max-width: 450px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700;">Add New Return Path (RP)</h3>
+                <span style="cursor: pointer; font-size: 1.2rem;" onclick="this.closest('.modal-overlay').remove()">&times;</span>
+            </div>
+            <form id="rp-add-form" style="display: flex; flex-direction: column; gap: 16px;">
+                <div>
+                    <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase;">RP Domain *</label>
+                    <input type="text" id="add-rp-domain" required class="rp-input" placeholder="e.g. orchid-lifestyle.com">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase;">Domain included</label>
+                    <input type="text" id="add-rp-domain-inc" class="rp-input" placeholder="e.g. prohost-server.com">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase;">SubDomain included</label>
+                    <input type="text" id="add-rp-subdomain-inc" class="rp-input" placeholder="e.g. server.prohost-server.com">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div>
+                        <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase;">SRV</label>
+                        <select id="add-rp-srv" class="rp-select">
+                            <option value="">-- None --</option>
+                            <option value="SENT">SENT</option>
+                            ${uniqueServerNames.map(name => `<option value="${name}">${name}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase;">TYPE</label>
+                        <select id="add-rp-spftype" class="rp-select">
+                            <option value="Include">Include</option>
+                            <option value="Arecod">Arecod</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: center; margin-top: 8px;">
+                    <div>
+                        <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase;">RPtype</label>
+                        <select id="add-rp-rptype" class="rp-select">
+                            <option value="intern">intern</option>
+                            <option value="extern">extern</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; padding-top: 20px;">
+                        <input type="checkbox" id="add-rp-sent" style="cursor: pointer; width: 16px; height: 16px;">
+                        <label for="add-rp-sent" style="font-size: 0.8rem; font-weight: 600; cursor: pointer; user-select: none;">Already Sent</label>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px;">
+                    <button type="button" onclick="this.closest('.modal-overlay').remove()" class="btn-secondary" style="width: auto;">Cancel</button>
+                    <button type="submit" class="btn-primary" style="width: auto;">Add RP</button>
+                </div>
+            </form>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    if (window.lucide) window.lucide.createIcons();
+
+    document.getElementById('rp-add-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const rpDomain = document.getElementById('add-rp-domain').value.trim();
+        const domainIncluded = document.getElementById('add-rp-domain-inc').value.trim();
+        const subdomainIncluded = document.getElementById('add-rp-subdomain-inc').value.trim();
+        const srv = document.getElementById('add-rp-srv').value;
+        const spfType = document.getElementById('add-rp-spftype').value;
+        const rpType = document.getElementById('add-rp-rptype').value;
+        const alreadySent = document.getElementById('add-rp-sent').checked;
+
+        window.app.addRPInventoryItem({
+            rpDomain,
+            domainIncluded,
+            subdomainIncluded,
+            srv,
+            spfType,
+            rpType,
+            alreadySent: alreadySent || (srv === 'SENT')
+        }).then(() => {
+            overlay.remove();
+        });
+    });
 };

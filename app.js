@@ -46,6 +46,7 @@ class TeamApp {
             rps: [],
             tools: [],
             drops: [],
+            rpInventory: [],
             historyServers: [],
             statuses: {},
             spamhaus: {},
@@ -831,6 +832,90 @@ class TeamApp {
             throw e;
         }
     }
+    autoResolveRPServer(rpDomain) {
+        if (!rpDomain) return '';
+        const clean = rpDomain.trim().toLowerCase();
+        // 1. Search in active RPs state
+        const foundRp = (this.state.rps || []).find(r => (r.domain || '').trim().toLowerCase() === clean);
+        if (foundRp && foundRp.serverId) {
+            const foundSrv = (this.state.servers || []).find(s => s.id === foundRp.serverId);
+            if (foundSrv) return foundSrv.name;
+        }
+        // 2. Search in drops history
+        const foundDrop = (this.state.drops || []).find(d => (d.returnPath || '').trim().toLowerCase() === clean);
+        if (foundDrop && foundDrop.servers && foundDrop.servers !== '---') {
+            return foundDrop.servers;
+        }
+        return '';
+    }
+
+    autoResolveRPAreadySent(rpDomain) {
+        if (!rpDomain) return false;
+        const clean = rpDomain.trim().toLowerCase();
+        return (this.state.drops || []).some(d => (d.returnPath || '').trim().toLowerCase() === clean);
+    }
+
+    getProcessedRPInventory() {
+        const inventory = this.state.rpInventory || [];
+        return inventory.map(item => {
+            const resolvedSrv = item.srv || this.autoResolveRPServer(item.rpDomain) || '';
+            const resolvedSent = item.alreadySent || this.autoResolveRPAreadySent(item.rpDomain) || false;
+            return {
+                ...item,
+                srv: resolvedSrv,
+                alreadySent: resolvedSent
+            };
+        });
+    }
+
+    async addRPInventoryItem(data) {
+        if (!this.state.rpInventory) this.state.rpInventory = [];
+        const item = {
+            id: 'rpi_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+            rpDomain: (data.rpDomain || '').trim(),
+            domainIncluded: (data.domainIncluded || '').trim(),
+            subdomainIncluded: (data.subdomainIncluded || '').trim(),
+            srv: (data.srv || '').trim(),
+            spfType: (data.spfType || 'Include').trim(),
+            rpType: (data.rpType || 'intern').trim(),
+            alreadySent: !!data.alreadySent
+        };
+        this.state.rpInventory.push(item);
+        await this.saveState();
+    }
+
+    async deleteRPInventoryItem(id) {
+        if (!this.state.rpInventory) return;
+        this.state.rpInventory = this.state.rpInventory.filter(item => item.id !== id);
+        await this.saveState();
+    }
+
+    async updateRPInventoryItem(id, updates) {
+        if (!this.state.rpInventory) return;
+        const idx = this.state.rpInventory.findIndex(item => item.id === id);
+        if (idx !== -1) {
+            this.state.rpInventory[idx] = { ...this.state.rpInventory[idx], ...updates };
+            await this.saveState();
+        }
+    }
+
+    async bulkImportRPInventory(items) {
+        if (!this.state.rpInventory) this.state.rpInventory = [];
+        items.forEach(data => {
+            const item = {
+                id: 'rpi_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+                rpDomain: (data.rpDomain || '').trim(),
+                domainIncluded: (data.domainIncluded || '').trim(),
+                subdomainIncluded: (data.subdomainIncluded || '').trim(),
+                srv: (data.srv || '').trim(),
+                spfType: (data.spfType || 'Include').trim(),
+                rpType: (data.rpType || 'intern').trim(),
+                alreadySent: !!data.alreadySent
+            };
+            this.state.rpInventory.push(item);
+        });
+        await this.saveState();
+    }
 }
 
 // App is instantiated in window.onload at the top of the file
@@ -843,3 +928,5 @@ window.unassignRP = (id) => window.app.unassignRP(id);
 window.unassignServer = (id) => window.app.unassignServer(id);
 window.resetApp = () => window.app.resetApp();
 window.saveRPIps = (rpId, btn) => window.app.updateRPIps(rpId, Array.from(btn.closest('.modal').querySelectorAll('.ip-pill.selected')).map(el => el.dataset.ip)).then(() => btn.closest('.modal-overlay').remove());
+window.deleteRPInventoryItem = (id) => window.app.deleteRPInventoryItem(id);
+window.updateRPInventoryItem = (id, updates) => window.app.updateRPInventoryItem(id, updates);
