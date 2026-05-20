@@ -3460,44 +3460,17 @@ window.renderAiAgent = (app, container) => {
                         Real-time AI analyst trained on your server inventory, Spamhaus status, and drops performance.
                     </p>
                 </div>
-                ${hasKey ? `
-                    <div style="display: flex; align-items: center; gap: 8px; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2); padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; color: #22c55e; font-weight: 600;">
-                        <span style="display: inline-block; width: 8px; height: 8px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 8px #22c55e; animation: pulse 2s infinite;"></span>
-                        Gemini 2.5 Flash Active
-                    </div>
-                ` : `
-                    <div style="display: flex; align-items: center; gap: 8px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; color: #3b82f6; font-weight: 600;">
-                        <span style="display: inline-block; width: 8px; height: 8px; background: #3b82f6; border-radius: 50%; box-shadow: 0 0 8px #3b82f6; animation: pulse 2s infinite;"></span>
-                        Free Keyless AI Active
-                    </div>
-                `}
+                <div style="display: flex; align-items: center; gap: 8px; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2); padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; color: #22c55e; font-weight: 600;">
+                    <span style="display: inline-block; width: 8px; height: 8px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 8px #22c55e; animation: pulse 2s infinite;"></span>
+                    AI Engine Online
+                </div>
             </div>
 
             <!-- Two Column Chat Layout -->
             <div style="display: flex; gap: 20px; flex: 1; min-height: 0;">
                 
-                <!-- Left Sidebar: Configuration & Quick Prompts -->
+                <!-- Left Sidebar: Quick Prompts -->
                 <div style="width: 320px; display: flex; flex-direction: column; gap: 20px; flex-shrink: 0;">
-                    
-                    <!-- API Key Card -->
-                    <div class="card" style="padding: 20px; background: var(--bg-secondary); border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 12px;">
-                        <h4 style="margin: 0; font-size: 0.9rem; display: flex; align-items: center; gap: 8px;">
-                            <i data-lucide="key" style="width: 16px; color: var(--accent-primary);"></i>
-                            API Key Settings
-                        </h4>
-                        <p style="margin: 0; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4;">
-                            Configure your free Google Gemini API Key. Shared automatically with the entire team.
-                        </p>
-                        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 4px;">
-                            <input type="password" id="gemini-api-key-input" placeholder="${hasKey ? '••••••••••••••••' : 'Enter Gemini API Key...'}" style="width: 100%; padding: 8px 12px; border-radius: 6px; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); font-size: 0.8rem; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent-primary)'" onblur="this.style.borderColor='var(--border-color)'">
-                            <button onclick="saveGeminiApiKey(this)" class="btn-primary" style="width: 100%; padding: 8px 16px; font-size: 0.8rem; border-radius: 6px; background: var(--accent-primary); border: none; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;">
-                                <i data-lucide="save" style="width: 14px;"></i> Save Key
-                            </button>
-                        </div>
-                        <a href="https://aistudio.google.com/" target="_blank" style="font-size: 0.75rem; color: var(--accent-primary); text-decoration: none; display: flex; align-items: center; gap: 4px; font-weight: 500;">
-                            <i data-lucide="external-link" style="width: 12px;"></i> Get a free key in Google AI Studio
-                        </a>
-                    </div>
 
                     <!-- Quick Insights Panel -->
                     <div class="card" style="padding: 20px; background: var(--bg-secondary); border: 1px solid var(--border-color); flex: 1; display: flex; flex-direction: column; gap: 14px; overflow-y: auto;">
@@ -3604,35 +3577,6 @@ window.renderAiAgent = (app, container) => {
             input.value = promptText;
             input.focus();
             window.submitAiAgentMessage();
-        }
-    };
-
-    window.saveGeminiApiKey = async (btn) => {
-        const input = document.getElementById('gemini-api-key-input');
-        if (!input) return;
-
-        const newKey = input.value.trim();
-        if (!newKey) {
-            alert('Please enter a valid API Key.');
-            return;
-        }
-
-        const originalText = btn.innerHTML;
-        btn.innerHTML = `<span style="display:inline-block; width:12px; height:12px; border:2px solid #fff; border-radius:50%; border-top-color:transparent; animation:spin 1s infinite linear; margin-right:6px;"></span> Saving`;
-        btn.disabled = true;
-
-        try {
-            app.state.aiConfig = app.state.aiConfig || {};
-            app.state.aiConfig.geminiApiKey = newKey;
-            await app.saveState();
-            
-            alert('Gemini API Key saved and synced successfully!');
-            app.updateDashboard();
-        } catch (err) {
-            alert('Failed to save API Key: ' + err.message);
-        } finally {
-            btn.innerHTML = originalText;
-            btn.disabled = false;
         }
     };
 
