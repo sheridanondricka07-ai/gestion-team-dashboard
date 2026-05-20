@@ -4188,6 +4188,53 @@ function renderRPsInventory(app, container) {
 }
 
 window.updateRPItemField = (id, field, value) => {
+    // Domain Included conflict check when assigning a server
+    if (field === 'srv' && value && value !== '' && value !== 'SENT') {
+        const inventory = window.app.state.rpInventory || [];
+        const currentItem = inventory.find(item => item.id === id);
+        if (currentItem && currentItem.domainIncluded) {
+            const domInc = currentItem.domainIncluded.trim().toLowerCase();
+            const conflict = inventory.find(item =>
+                item.id !== id &&
+                item.domainIncluded &&
+                item.domainIncluded.trim().toLowerCase() === domInc &&
+                item.srv &&
+                item.srv !== '' &&
+                item.srv !== 'SENT' &&
+                item.srv !== value
+            );
+            if (conflict) {
+                // Show styled warning modal
+                const overlay = document.createElement('div');
+                overlay.className = 'modal-overlay';
+                overlay.style.zIndex = '10000';
+                overlay.innerHTML = `
+                    <div class="modal" style="max-width: 480px; text-align: center; padding: 32px;">
+                        <div style="background: rgba(239, 68, 68, 0.1); color: var(--error); width: 64px; height: 64px; border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                            <i data-lucide="alert-triangle" style="width: 32px;"></i>
+                        </div>
+                        <h2 style="margin: 0 0 12px;">Domain Conflict Detected</h2>
+                        <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 20px;">
+                            The included domain <b style="color: var(--accent-primary);">${currentItem.domainIncluded}</b> is already used by RP 
+                            <b style="color: var(--text-primary);">${conflict.rpDomain}</b> which is assigned to server 
+                            <b style="color: var(--error);">${conflict.srv}</b>.
+                        </p>
+                        <div style="background: var(--bg-tertiary); padding: 12px; border-radius: 8px; margin-bottom: 24px; font-size: 0.85rem; color: var(--text-secondary); text-align: left;">
+                            <b>⚠️ Why?</b> Two RPs sharing the same included domain should not be on different servers to avoid SPF conflicts.
+                        </div>
+                        <button onclick="this.closest('.modal-overlay').remove()" class="btn-primary" style="width: 100%;">Understood</button>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+                if (window.lucide) window.lucide.createIcons();
+
+                // Revert the dropdown to previous value
+                window.app.updateDashboard();
+                return;
+            }
+        }
+    }
+
     const updates = {};
     updates[field] = value;
     if (field === 'srv' && value === 'SENT') {
