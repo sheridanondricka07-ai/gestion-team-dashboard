@@ -3711,8 +3711,9 @@ function renderRPsInventory(app, container) {
     const includeCount = items.filter(item => item.spfType === 'Include').length;
     const arecodCount = totalCount - includeCount;
     const spfOkCount = items.filter(item => item.spfStatus === 'OK').length;
+    const spfWarningCount = items.filter(item => item.spfStatus === 'WARNING').length;
     const spfErrorCount = items.filter(item => item.spfStatus === 'ERROR').length;
-    const spfUnchecked = totalCount - spfOkCount - spfErrorCount;
+    const spfUnchecked = totalCount - spfOkCount - spfWarningCount - spfErrorCount;
 
     const search = app.state.rpSearch.trim().toLowerCase();
     const filteredItems = items.filter(item => {
@@ -3750,11 +3751,13 @@ function renderRPsInventory(app, container) {
 
         if (app.state.rpFilterSpfStatus !== 'all') {
             if (app.state.rpFilterSpfStatus === 'OK') {
-                if (item.spfStatus !== 'OK') return false;
+                if (item.spfStatus !== 'OK' && item.spfStatus !== 'WARNING') return false;
+            } else if (app.state.rpFilterSpfStatus === 'WARNING') {
+                if (item.spfStatus !== 'WARNING') return false;
             } else if (app.state.rpFilterSpfStatus === 'ERROR') {
                 if (item.spfStatus !== 'ERROR') return false;
             } else if (app.state.rpFilterSpfStatus === 'none') {
-                if (item.spfStatus === 'OK' || item.spfStatus === 'ERROR') return false;
+                if (item.spfStatus === 'OK' || item.spfStatus === 'WARNING' || item.spfStatus === 'ERROR') return false;
             }
         }
 
@@ -3931,6 +3934,18 @@ function renderRPsInventory(app, container) {
                 gap: 4px;
                 border: 1px solid rgba(239, 68, 68, 0.2);
             }
+            .rp-status-warning {
+                background: rgba(245, 158, 11, 0.1);
+                color: #f59e0b;
+                padding: 4px 8px;
+                border-radius: 6px;
+                font-size: 0.75rem;
+                font-weight: 700;
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                border: 1px solid rgba(245, 158, 11, 0.2);
+            }
             .rp-status-unknown {
                 background: rgba(255, 255, 255, 0.05);
                 color: var(--text-secondary);
@@ -3980,10 +3995,11 @@ function renderRPsInventory(app, container) {
                     <h4 class="rp-filter-label" style="margin: 0;">SPF Include / Arecod</h4>
                     <p style="font-size: 1.8rem; font-weight: 800; margin: 8px 0 0;">${includeCount} <span style="font-size: 1.2rem; font-weight: 400; color: var(--text-secondary);">/</span> ${arecodCount}</p>
                 </div>
-                <div class="card rp-stat-card" style="border-left-color: ${spfErrorCount > 0 ? '#ef4444' : 'var(--success)'};">
+                <div class="card rp-stat-card" style="border-left-color: ${spfErrorCount > 0 ? '#ef4444' : (spfWarningCount > 0 ? '#f59e0b' : 'var(--success)')};">
                     <h4 class="rp-filter-label" style="margin: 0;">SPF Health</h4>
                     <p style="font-size: 1.2rem; font-weight: 800; margin: 8px 0 0;">
                         <span style="color: var(--success);">${spfOkCount} OK</span>
+                        ${spfWarningCount > 0 ? `<span style="font-size: 0.9rem; color: var(--text-secondary);"> / </span><span style="color: #f59e0b;">${spfWarningCount} WARN</span>` : ''}
                         <span style="font-size: 0.9rem; color: var(--text-secondary);"> / </span>
                         <span style="color: #ef4444;">${spfErrorCount} ERR</span>
                         ${spfUnchecked > 0 ? `<span style="font-size: 0.75rem; color: var(--text-secondary);"> (${spfUnchecked} unchecked)</span>` : ''}
@@ -4028,7 +4044,8 @@ function renderRPsInventory(app, container) {
                     <span class="rp-filter-label">SPF Status</span>
                     <select id="rp-filter-spfstatus" class="rp-select">
                         <option value="all" ${app.state.rpFilterSpfStatus === 'all' ? 'selected' : ''}>All</option>
-                        <option value="OK" ${app.state.rpFilterSpfStatus === 'OK' ? 'selected' : ''}>OK</option>
+                        <option value="OK" ${app.state.rpFilterSpfStatus === 'OK' ? 'selected' : ''}>OK / Could be OK</option>
+                        <option value="WARNING" ${app.state.rpFilterSpfStatus === 'WARNING' ? 'selected' : ''}>Could be OK (Only)</option>
                         <option value="ERROR" ${app.state.rpFilterSpfStatus === 'ERROR' ? 'selected' : ''}>NOT OK</option>
                         <option value="none" ${app.state.rpFilterSpfStatus === 'none' ? 'selected' : ''}>Unchecked</option>
                     </select>
@@ -4094,6 +4111,10 @@ function renderRPsInventory(app, container) {
                                             <span class="rp-status-ok" title="SPF Record Valid. Checked at: ${item.spfCheckedAt ? new Date(item.spfCheckedAt).toLocaleString() : 'N/A'}">
                                                 <i data-lucide="check" style="width: 12px; vertical-align: middle;"></i> OK
                                             </span>
+                                        ` : (item.spfStatus === 'WARNING' ? `
+                                            <span class="rp-status-warning" title="${item.spfStatusDetail || 'Multiple SPF Records'}. Checked at: ${item.spfCheckedAt ? new Date(item.spfCheckedAt).toLocaleString() : 'N/A'}">
+                                                <i data-lucide="alert-circle" style="width: 12px; vertical-align: middle;"></i> Could be OK
+                                            </span>
                                         ` : (item.spfStatus === 'ERROR' ? `
                                             <span class="rp-status-error" title="${item.spfStatusDetail || 'Invalid SPF'}. Checked at: ${item.spfCheckedAt ? new Date(item.spfCheckedAt).toLocaleString() : 'N/A'}">
                                                 <i data-lucide="alert-triangle" style="width: 12px; vertical-align: middle;"></i> NOT OK
@@ -4102,7 +4123,7 @@ function renderRPsInventory(app, container) {
                                             <span class="rp-status-unknown" title="Not checked yet">
                                                 <i data-lucide="help-circle" style="width: 12px; vertical-align: middle;"></i> Unchecked
                                             </span>
-                                        `)}
+                                        `))}
                                     </td>
                                     <td style="text-align: center;">
                                         ${item.alreadySent ? `

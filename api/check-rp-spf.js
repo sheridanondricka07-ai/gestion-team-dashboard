@@ -27,10 +27,12 @@ async function setFirebaseData(path, data) {
 async function getSpfRecord(domain) {
     try {
         const records = await dns.resolveTxt(domain);
-        const spfRecord = records
+        const spfRecords = records
             .map(chunks => chunks.join(''))
-            .find(record => record.toLowerCase().startsWith('v=spf1'));
-        return spfRecord || null;
+            .filter(record => record.toLowerCase().startsWith('v=spf1'));
+        if (spfRecords.length === 0) return null;
+        if (spfRecords.length === 1) return spfRecords[0];
+        return spfRecords;
     } catch (err) {
         return null;
     }
@@ -58,6 +60,35 @@ function ipInCidr(ip, cidr) {
 
 function verifySpfRecord(spfRecord, type, domainInc, subdomainInc, rpType, serverIps, rpDomain) {
     if (!spfRecord) return { ok: false, reason: 'No SPF Record' };
+
+    if (Array.isArray(spfRecord)) {
+        let passRecord = null;
+        let failReasons = [];
+
+        for (const record of spfRecord) {
+            const verification = verifySpfRecord(
+                record,
+                type,
+                domainInc,
+                subdomainInc,
+                rpType,
+                serverIps,
+                rpDomain
+            );
+            if (verification.ok === true) {
+                passRecord = record;
+                break;
+            } else {
+                failReasons.push(verification.reason);
+            }
+        }
+
+        if (passRecord) {
+            return { ok: 'warning', reason: 'Multiple SPF records found, but target is valid in one of them.' };
+        } else {
+            return { ok: false, reason: `Multiple SPF records found, and none are valid. Reasons: ${failReasons.join(' | ')}` };
+        }
+    }
 
     const rpDom = (rpDomain || '').toLowerCase().trim();
     const dom = (domainInc || '').toLowerCase().trim();
@@ -200,7 +231,11 @@ export default async function handler(req, res) {
                     rpDomain
                 );
 
-                item.spfStatus = verification.ok ? 'OK' : 'ERROR';
+                if (verification.ok === 'warning') {
+                    item.spfStatus = 'WARNING';
+                } else {
+                    item.spfStatus = verification.ok ? 'OK' : 'ERROR';
+                }
                 item.spfStatusDetail = verification.reason;
                 item.spfCheckedAt = checkedAt;
 
