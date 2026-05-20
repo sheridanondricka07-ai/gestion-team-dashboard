@@ -61,7 +61,7 @@ function renderSidebar(app) {
             <div class="nav-label">Main</div>
             <div class="nav-item ${view === 'overview' ? 'active' : ''}" onclick="app.setView('overview')">
                 <i data-lucide="layout-dashboard"></i>
-                <span>Overview</span>
+                <span>Dashboard</span>
             </div>
             <div class="nav-item ${view === 'management' ? 'active' : ''}" onclick="app.setView('management')">
                 <i data-lucide="settings"></i>
@@ -707,7 +707,7 @@ function renderOverview(app, container) {
     const lastMonth = thisMonth === 0 ? 11 : thisMonth - 1;
     const lastMonthYear = thisMonth === 0 ? thisYear - 1 : thisYear;
 
-    const myDrops = isAdmin ? (drops || []) : (drops || []).filter(d => d.mailerName === currentUser.name);
+    const myDrops = drops || [];
 
     // Calculate Standard Stats
     const stats = myDrops.reduce((acc, d) => {
@@ -810,8 +810,7 @@ function renderOverview(app, container) {
 
     const periodLabel = (window._revStartDate || window._revEndDate) ? 'Selected Period' : 'All Time';
 
-    // Mailer Leaderboard
-    const leaderboard = isAdmin ? (mailers || []).filter(m => m.role === 'mailer').map(m => {
+    const leaderboard = (mailers || []).filter(m => m.role === 'mailer').map(m => {
         const rev = (drops || []).filter(d => {
             if (d.mailerName !== m.name) return false;
             if (window._revStartDate || window._revEndDate) {
@@ -827,7 +826,7 @@ function renderOverview(app, container) {
             }
         }).reduce((sum, d) => sum + (d.rev || 0), 0);
         return { name: m.name, rev };
-    }).sort((a, b) => b.rev - a.rev) : [];
+    }).sort((a, b) => b.rev - a.rev);
 
     const leaderboardTitle = (window._revStartDate || window._revEndDate) ? 'Mailers (Filtered)' : 'Top Mailers (Month)';
     window._revPreset = window._revPreset || 'all';
@@ -904,7 +903,7 @@ function renderOverview(app, container) {
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: ${isAdmin ? '2fr 1fr' : '1fr'}; gap: 24px; margin-bottom: 24px;">
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-bottom: 24px;">
                 <div class="card" style="padding: 20px;">
                     <h3 style="margin: 0 0 20px 0; font-size: 1rem; display: flex; align-items: center; gap: 10px;">
                         <i data-lucide="bar-chart-3" style="width: 18px; color: var(--accent-primary);"></i>
@@ -924,7 +923,6 @@ function renderOverview(app, container) {
                     </div>
                 </div>
 
-                ${isAdmin ? `
                 <div class="card" style="padding: 20px; max-height: 250px; overflow-y: auto;">
                     <h3 style="margin: 0 0 20px 0; font-size: 1rem; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; background: var(--bg-secondary); padding-bottom: 10px; z-index: 5;">
                         <i data-lucide="trophy" style="width: 18px; color: #f59e0b;"></i>
@@ -948,7 +946,6 @@ function renderOverview(app, container) {
                         ${leaderboard.length === 0 ? '<p style="text-align: center; color: var(--text-secondary); font-size: 0.85rem;">No data yet for this period</p>' : ''}
                     </div>
                 </div>
-                ` : ''}
             </div>
 
             <!-- Performance Analytics & Charting Section -->
@@ -958,7 +955,6 @@ function renderOverview(app, container) {
             
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 24px; margin-bottom: 24px;">
                 <!-- Column 1: Mailer Revenue Share (Chart) -->
-                ${isAdmin ? `
                 <div class="card" style="padding: 20px; max-height: 400px; overflow-y: auto;">
                     <h3 style="margin: 0 0 20px 0; font-size: 1rem; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; background: var(--bg-secondary); padding-bottom: 10px; z-index: 5;">
                         <i data-lucide="bar-chart-3" style="width: 18px; color: var(--accent-primary);"></i>
@@ -983,13 +979,12 @@ function renderOverview(app, container) {
                         ${mailerStatsList.length === 0 ? '<p style="text-align: center; color: var(--text-secondary); font-size: 0.85rem; padding: 40px 0;">No data found for this period</p>' : ''}
                     </div>
                 </div>
-                ` : ''}
 
                 <!-- Column 2: Offer Performance -->
                 <div class="card" style="padding: 20px; max-height: 400px; overflow-y: auto;">
                     <h3 style="margin: 0 0 20px 0; font-size: 1rem; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; background: var(--bg-secondary); padding-bottom: 10px; z-index: 5;">
                         <i data-lucide="shopping-bag" style="width: 18px; color: #10b981;"></i>
-                        Top Offers ${isAdmin ? '' : '(Your Performance)'}
+                        Top Offers
                     </h3>
                     <div style="display: flex; flex-direction: column; gap: 14px;">
                         ${offerStatsList.map((o, idx) => {
@@ -2496,7 +2491,7 @@ window.renderDropDetails = (app, container) => {
     const isAdmin = currentUser.role === 'admin';
     
     // Filter drops if not admin
-    let myDrops = isAdmin ? (drops || []) : (drops || []).filter(d => d.mailerName === currentUser.name);
+    let myDrops = drops || [];
 
     // Apply Search Filter
     const search = (app.state.dropSearch || '').toLowerCase().trim();
@@ -2579,8 +2574,7 @@ window.renderDropDetails = (app, container) => {
                             <tr style="text-align: left; background: var(--bg-tertiary); position: sticky; top: 0; z-index: 5;">
                                 <th style="padding: 16px 12px; cursor: pointer; width: 140px;" onclick="app.setDropSort('timestamp')">
                                     Date & Time ${key === 'timestamp' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}
-                                </th>
-                                ${isAdmin ? `<th style="padding: 16px 12px; cursor: pointer; width: 160px;" onclick="app.setDropSort('mailerName')">Mailer ${key === 'mailerName' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>` : ''}
+                                             <th style="padding: 16px 12px; cursor: pointer; width: 160px;" onclick="app.setDropSort('mailerName')">Mailer ${key === 'mailerName' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
                                 <th style="padding: 16px 12px; cursor: pointer; width: 300px;" onclick="app.setDropSort('offer')">Offer ${key === 'offer' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
                                 <th style="padding: 16px 12px; cursor: pointer; width: 120px;" onclick="app.setDropSort('deployIds')">Deploys ${key === 'deployIds' ? `<i data-lucide="chevron-${order === 'desc' ? 'down' : 'up'}" style="width: 14px; vertical-align: middle;"></i>` : ''}</th>
                                 <th style="padding: 16px 12px; width: 160px;">Details</th>
@@ -2601,7 +2595,6 @@ window.renderDropDetails = (app, container) => {
                                         <div style="font-weight: 600; color: var(--text-primary);">${d.displayDate ? d.displayDate.split(',')[0] : '---'}</div>
                                         <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">${d.displayDate ? (d.displayDate.split(',')[1] || '') : ''}</div>
                                     </td>
-                                    ${isAdmin ? `
                                     <td style="padding: 16px 12px;">
                                         <div style="background: rgba(59, 130, 246, 0.1); padding: 8px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2);">
                                             <div style="color: var(--accent-primary); font-weight: 700; font-size: 0.75rem;">ID: ${ (() => {
@@ -2612,7 +2605,7 @@ window.renderDropDetails = (app, container) => {
                                             })() }</div>
                                             <div style="font-size: 0.8rem; margin-top: 2px; color: var(--text-primary);">${d.mailerName}</div>
                                         </div>
-                                    </td>` : ''}
+                                    </td>
                                     <td style="padding: 16px 12px;">
                                         <div style="font-weight: 600; line-height: 1.4; color: var(--text-primary);">${d.offer || '---'}</div>
                                     </td>
@@ -2642,7 +2635,7 @@ window.renderDropDetails = (app, container) => {
                                     </td>
                                 </tr>
                             `).join('')}
-                            ${sortedDrops.length === 0 ? `<tr><td colspan="${isAdmin ? 11 : 10}" style="padding: 60px; text-align: center; color: var(--text-secondary);">No drop records yet. Click "+ New Drop" to begin tracking.</td></tr>` : ''}
+                            ${sortedDrops.length === 0 ? `<tr><td colspan="13" style="padding: 60px; text-align: center; color: var(--text-secondary);">No drop records yet. Click "+ New Drop" to begin tracking.</td></tr>` : ''}
                         </tbody>
                     </table>
                 </div>
