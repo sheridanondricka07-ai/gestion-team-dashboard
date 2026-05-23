@@ -3730,6 +3730,20 @@ function renderRPsInventory(app, container) {
                 if (item.srv !== 'SENT') return false;
             } else if (app.state.rpFilterServer === 'none') {
                 if (item.srv) return false;
+            } else if (app.state.rpFilterServer === 'available') {
+                if (item.srv && item.srv !== '') return false;
+                if (item.domainIncluded) {
+                    const domInc = item.domainIncluded.trim().toLowerCase();
+                    const conflict = items.find(other => 
+                        other.id !== item.id && 
+                        other.domainIncluded && 
+                        other.domainIncluded.trim().toLowerCase() === domInc && 
+                        other.srv && 
+                        other.srv !== '' && 
+                        other.srv !== 'SENT'
+                    );
+                    if (conflict) return false;
+                }
             } else {
                 if (item.srv !== app.state.rpFilterServer) return false;
             }
@@ -4021,6 +4035,7 @@ function renderRPsInventory(app, container) {
                         <option value="all" ${app.state.rpFilterServer === 'all' ? 'selected' : ''}>All Servers</option>
                         <option value="SENT" ${app.state.rpFilterServer === 'SENT' ? 'selected' : ''}>SENT (State)</option>
                         <option value="none" ${app.state.rpFilterServer === 'none' ? 'selected' : ''}>Unassigned</option>
+                        <option value="available" ${app.state.rpFilterServer === 'available' ? 'selected' : ''}>Available Only</option>
                         ${uniqueServerNames.map(name => `<option value="${name}" ${app.state.rpFilterServer === name ? 'selected' : ''}>${name}</option>`).join('')}
                     </select>
                 </div>
@@ -4077,12 +4092,31 @@ function renderRPsInventory(app, container) {
                             </tr>
                         </thead>
                         <tbody>
-                            ${filteredItems.map(item => `
+                            ${filteredItems.map(item => {
+                                let isUnavailable = false;
+                                if (!item.srv || item.srv === '') {
+                                    if (item.domainIncluded) {
+                                        const domInc = item.domainIncluded.trim().toLowerCase();
+                                        const conflict = items.find(other => 
+                                            other.id !== item.id && 
+                                            other.domainIncluded && 
+                                            other.domainIncluded.trim().toLowerCase() === domInc && 
+                                            other.srv && 
+                                            other.srv !== '' && 
+                                            other.srv !== 'SENT'
+                                        );
+                                        if (conflict) isUnavailable = true;
+                                    }
+                                }
+                                return `
                                 <tr>
                                     <td style="font-weight: 600; color: var(--text-primary);">
-                                        <div style="display: flex; align-items: center; gap: 8px;">
-                                            <i data-lucide="globe" style="width: 14px; color: var(--accent-primary);"></i>
-                                            ${item.rpDomain}
+                                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                            <div style="display: flex; align-items: center; gap: 8px;">
+                                                <i data-lucide="globe" style="width: 14px; color: var(--accent-primary);"></i>
+                                                ${item.rpDomain}
+                                            </div>
+                                            ${isUnavailable ? `<span style="font-size: 0.65rem; background: rgba(239,68,68,0.1); color: #ef4444; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(239,68,68,0.2);" title="Domain included is already assigned to another server">Unavailable</span>` : ''}
                                         </div>
                                     </td>
                                     <td>${item.domainIncluded || '<span style="color: var(--text-secondary); opacity: 0.5;">---</span>'}</td>
