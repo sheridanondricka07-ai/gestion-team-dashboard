@@ -86,6 +86,13 @@ function ipInCidr(ip, cidr) {
 function verifySpfRecord(spfRecord, type, domainInc, subdomainInc, rpType, serverIps, rpDomain) {
     if (!spfRecord) return { ok: false, reason: 'No SPF Record' };
 
+    const rpDom = (rpDomain || '').toLowerCase().trim();
+    const dom = (domainInc || '').toLowerCase().trim();
+
+    if (rpDom && dom && rpDom === dom) {
+        return { ok: true, reason: 'OK' };
+    }
+
     if (Array.isArray(spfRecord)) {
         let passRecord = null;
         let failReasons = [];
@@ -113,13 +120,6 @@ function verifySpfRecord(spfRecord, type, domainInc, subdomainInc, rpType, serve
         } else {
             return { ok: false, reason: `Multiple SPF records found, and none are valid. Reasons: ${failReasons.join(' | ')}` };
         }
-    }
-
-    const rpDom = (rpDomain || '').toLowerCase().trim();
-    const dom = (domainInc || '').toLowerCase().trim();
-
-    if (rpDom && dom && rpDom === dom) {
-        return { ok: true, reason: 'OK' };
     }
 
     if (rpType === 'intern') {
