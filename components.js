@@ -4178,7 +4178,7 @@ function renderRPsInventory(app, container) {
                                     </td>
                                     ` : ''}
                                 </tr>
-                            `).join('')}
+                            `; }).join('')}
                             ${filteredItems.length === 0 ? `
                                 <tr>
                                     <td colspan="${isAdmin ? 9 : 8}" style="padding: 60px; text-align: center; color: var(--text-secondary);">
