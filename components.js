@@ -2312,7 +2312,7 @@ function renderSpamhaus(app, container) {
     const summary = historyData.summary || { total: 0, listed: 0, clean: 0 };
     
     const spamhausProgress = app.state.spamhausProgress || { status: 'idle', current: 0, total: 0 };
-    const isRunning = spamhausProgress && spamhausProgress.status === 'scanning';
+    const isRunning = spamhausProgress && (spamhausProgress.status === 'scanning' || spamhausProgress.status === 'running');
     
     // TAB MIGRATION: Ensure old tab names default to new ones
     if (!app.state.spamhausTab || app.state.spamhausTab === 'rdns' || app.state.spamhausTab === 'vmta') {
@@ -2965,16 +2965,37 @@ window.triggerManualSpamhausCheck = (btn) => {
             <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 24px;">
                 Your Spamhaus scanner is now fully automated. It runs every day at <strong>09:00 AM (Moroccan Time)</strong> for 100% accuracy.
             </p>
-            <div style="background: var(--bg-tertiary); padding: 16px; border-radius: 8px; margin-bottom: 24px; text-align: left; font-size: 0.85rem;">
-                <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">Need an instant refresh?</div>
-                <div style="color: var(--text-secondary); font-family: monospace; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px;">python check_spamhaus_local.py</div>
-                <p style="margin: 8px 0 0; font-size: 0.75rem;">Run this command in your project folder to update the dashboard immediately.</p>
-            </div>
-            <button onclick="this.closest('.modal-overlay').remove()" class="btn-primary" style="width: 100%;">Got it!</button>
+            <button id="modal-spamhaus-scan-btn" onclick="window.startManualSpamhausScan(this)" class="btn-primary" style="width: 100%; margin-bottom: 12px;">Manual Scan</button>
+            <button onclick="this.closest('.modal-overlay').remove()" class="btn-secondary" style="width: 100%; background: transparent; border: 1px solid var(--border-color); color: var(--text-primary);">Got it!</button>
         </div>
     `;
     document.body.appendChild(overlay);
     if (window.lucide) window.lucide.createIcons();
+};
+
+window.startManualSpamhausScan = async (btn) => {
+    const originalText = btn.innerText;
+    btn.disabled = true;
+    btn.innerText = 'Starting Scan...';
+    try {
+        const resp = await fetch('/api/check-spamhaus', { method: 'POST' });
+        if (resp.ok) {
+            btn.innerText = 'Scan Started!';
+            btn.style.background = 'var(--success)';
+            setTimeout(() => {
+                const overlay = btn.closest('.modal-overlay');
+                if (overlay) overlay.remove();
+            }, 1200);
+        } else {
+            alert('Failed to start scan: ' + resp.statusText);
+            btn.disabled = false;
+            btn.innerText = originalText;
+        }
+    } catch (e) {
+        alert('Error starting scan: ' + e.message);
+        btn.disabled = false;
+        btn.innerText = originalText;
+    }
 };
 
 window.copySpamhausIps = (type) => {
