@@ -84,14 +84,14 @@ function ipInCidr(ip, cidr) {
 }
 
 function verifySpfRecord(spfRecord, type, domainInc, subdomainInc, rpType, serverIps, rpDomain) {
-    if (!spfRecord) return { ok: false, reason: 'No SPF Record' };
-
     const rpDom = (rpDomain || '').toLowerCase().trim();
     const dom = (domainInc || '').toLowerCase().trim();
 
     if (rpDom && dom && rpDom === dom) {
         return { ok: true, reason: 'OK' };
     }
+
+    if (!spfRecord) return { ok: false, reason: 'No SPF Record' };
 
     if (Array.isArray(spfRecord)) {
         let passRecord = null;
