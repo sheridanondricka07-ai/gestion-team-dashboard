@@ -587,7 +587,27 @@ class TeamApp {
                         const newSpfProgress = JSON.stringify(cloudData.rpSpfProgress || {});
                         const spfProgressChanged = oldSpfProgress !== newSpfProgress;
                         
-                        this.state = { ...this.state, ...cloudData, currentUser, currentView, dbConnected: true };
+                        // Preserve local UI filters during Firebase sync
+                        const rpFilterServer = this.state.rpFilterServer || 'all';
+                        const rpFilterSpfType = this.state.rpFilterSpfType || 'all';
+                        const rpFilterRpType = this.state.rpFilterRpType || 'all';
+                        const rpFilterSent = this.state.rpFilterSent || 'all';
+                        const rpFilterSpfStatus = this.state.rpFilterSpfStatus || 'all';
+                        const rpSearch = typeof this.state.rpSearch !== 'undefined' ? this.state.rpSearch : '';
+                        
+                        this.state = { 
+                            ...this.state, 
+                            ...cloudData, 
+                            currentUser, 
+                            currentView, 
+                            dbConnected: true,
+                            rpFilterServer,
+                            rpFilterSpfType,
+                            rpFilterRpType,
+                            rpFilterSent,
+                            rpFilterSpfStatus,
+                            rpSearch
+                        };
                         // SAFETY: Firebase may return null for these — always ensure safe defaults
                         if (!this.state.spamhausProgress) this.state.spamhausProgress = { status: 'idle', current: 0, total: 0 };
                         if (!this.state.rpSpfProgress) this.state.rpSpfProgress = { status: 'idle', current: 0, total: 0 };
@@ -705,9 +725,22 @@ class TeamApp {
             const toSave = { ...this.state };
             delete toSave.currentUser;
             delete toSave.dbConnected;
+            delete toSave.rpFilterServer;
+            delete toSave.rpFilterSpfType;
+            delete toSave.rpFilterRpType;
+            delete toSave.rpFilterSent;
+            delete toSave.rpFilterSpfStatus;
+            delete toSave.rpSearch;
             await window.db.ref('state').set(toSave);
         } else {
-            localStorage.setItem('team_management_state', JSON.stringify(this.state));
+            const toSave = { ...this.state };
+            delete toSave.rpFilterServer;
+            delete toSave.rpFilterSpfType;
+            delete toSave.rpFilterRpType;
+            delete toSave.rpFilterSent;
+            delete toSave.rpFilterSpfStatus;
+            delete toSave.rpSearch;
+            localStorage.setItem('team_management_state', JSON.stringify(toSave));
             this.updateDashboard();
         }
     }
