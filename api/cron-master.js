@@ -94,6 +94,7 @@ export default async function handler(req, res) {
             // Note: We use a full URL here. In Vercel, we can use the VERCEL_URL env var.
             const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
             const triggerResp = await fetch(`${baseUrl}/api/check-spamhaus`, {
+                method: 'POST',
                 headers: { 'x-vercel-cron': 'true' }
             });
             const triggerData = await triggerResp.json().catch(() => ({}));
@@ -272,6 +273,7 @@ export default async function handler(req, res) {
         try {
             const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
             const triggerResp = await fetch(`${baseUrl}/api/check-rp-spf`, {
+                method: 'POST',
                 headers: { 'x-vercel-cron': 'true' }
             });
             const triggerData = await triggerResp.json().catch(() => ({}));
