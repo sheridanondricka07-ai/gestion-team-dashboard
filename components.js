@@ -4112,9 +4112,9 @@ function renderRPsInventory(app, container) {
                                 <tr>
                                     <td style="font-weight: 600; color: var(--text-primary);">
                                         <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                                            <div style="display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0;">
+                                            <div style="display: flex; align-items: center; gap: 6px;">
                                                 <i data-lucide="globe" style="width: 14px; flex-shrink: 0; color: var(--accent-primary);"></i>
-                                                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.rpDomain}</span>
+                                                ${item.rpDomain}
                                                 <button onclick="navigator.clipboard.writeText('${item.rpDomain}');this.innerHTML='<i data-lucide=\\'check\\' style=\\'width:11px;color:var(--success)\\'></i>';lucide.createIcons();setTimeout(()=>{this.innerHTML='<i data-lucide=\\'copy\\' style=\\'width:11px\\'></i>';lucide.createIcons();},1200)" style="background:none;border:none;padding:2px;cursor:pointer;color:var(--text-secondary);opacity:0.4;flex-shrink:0;display:inline-flex;align-items:center;transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.4'" title="Copy RP"><i data-lucide="copy" style="width:11px"></i></button>
                                             </div>
                                             ${isUnavailable ? `<span style="font-size: 0.65rem; background: rgba(239,68,68,0.1); color: #ef4444; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(239,68,68,0.2);" title="Domain included is already assigned to another server">Unavailable</span>` : ''}
