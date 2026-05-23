@@ -3711,9 +3711,16 @@ window.renderAiAgent = (app, container) => {
 };
 
 function renderRPsInventory(app, container) {
+    const existingDropdown = document.getElementById('rp-server-dropdown-options');
+    const scrollPos = existingDropdown ? existingDropdown.scrollTop : 0;
+
     const isAdmin = app.state.currentUser && app.state.currentUser.role === 'admin';
     if (app.state.rpSearch === undefined) app.state.rpSearch = '';
-    if (app.state.rpFilterServer === undefined) app.state.rpFilterServer = 'all';
+    if (app.state.rpFilterServer === undefined) {
+        app.state.rpFilterServer = ['all'];
+    } else if (!Array.isArray(app.state.rpFilterServer)) {
+        app.state.rpFilterServer = [app.state.rpFilterServer];
+    }
     if (app.state.rpFilterSpfType === undefined) app.state.rpFilterSpfType = 'all';
     if (app.state.rpFilterRpType === undefined) app.state.rpFilterRpType = 'all';
     if (app.state.rpFilterSent === undefined) app.state.rpFilterSent = 'all';
@@ -3746,28 +3753,34 @@ function renderRPsInventory(app, container) {
             if (!domainMatch && !domIncMatch && !subIncMatch && !srvMatch) return false;
         }
 
-        if (app.state.rpFilterServer !== 'all') {
-            if (app.state.rpFilterServer === 'SENT') {
-                if (item.srv !== 'SENT') return false;
-            } else if (app.state.rpFilterServer === 'none') {
-                if (item.srv) return false;
-            } else if (app.state.rpFilterServer === 'available') {
-                if (item.srv && item.srv !== '') return false;
-                if (item.domainIncluded) {
-                    const domInc = item.domainIncluded.trim().toLowerCase();
-                    const conflict = items.find(other => 
-                        other.id !== item.id && 
-                        other.domainIncluded && 
-                        other.domainIncluded.trim().toLowerCase() === domInc && 
-                        other.srv && 
-                        other.srv !== '' && 
-                        other.srv !== 'SENT'
-                    );
-                    if (conflict) return false;
+        if (!app.state.rpFilterServer.includes('all')) {
+            let matched = false;
+            for (const val of app.state.rpFilterServer) {
+                if (val === 'SENT') {
+                    if (item.srv === 'SENT') { matched = true; break; }
+                } else if (val === 'none') {
+                    if (!item.srv) { matched = true; break; }
+                } else if (val === 'available') {
+                    if (item.srv && item.srv !== '') continue;
+                    let hasConflict = false;
+                    if (item.domainIncluded) {
+                        const domInc = item.domainIncluded.trim().toLowerCase();
+                        const conflict = items.find(other => 
+                            other.id !== item.id && 
+                            other.domainIncluded && 
+                            other.domainIncluded.trim().toLowerCase() === domInc && 
+                            other.srv && 
+                            other.srv !== '' && 
+                            other.srv !== 'SENT'
+                        );
+                        if (conflict) hasConflict = true;
+                    }
+                    if (!hasConflict) { matched = true; break; }
+                } else {
+                    if (item.srv === val) { matched = true; break; }
                 }
-            } else {
-                if (item.srv !== app.state.rpFilterServer) return false;
             }
+            if (!matched) return false;
         }
 
         if (app.state.rpFilterSpfType !== 'all') {
@@ -3802,8 +3815,34 @@ function renderRPsInventory(app, container) {
     const serverNames = (app.state.servers || []).map(s => s.name).filter(Boolean);
     const uniqueServerNames = [...new Set(serverNames)].sort();
 
+    let selectedText = 'All Servers';
+    if (!app.state.rpFilterServer.includes('all') && app.state.rpFilterServer.length > 0) {
+        const displayNames = app.state.rpFilterServer.map(val => {
+            if (val === 'SENT') return 'SENT (State)';
+            if (val === 'none') return 'Unassigned';
+            if (val === 'available') return 'Available Only';
+            return val;
+        });
+        const joined = displayNames.join(', ');
+        selectedText = joined.length > 20 ? `${app.state.rpFilterServer.length} Selected` : joined;
+    }
+
     container.innerHTML = `
         <style>
+            .option-hover:hover {
+                background: rgba(255,255,255,0.05);
+            }
+            .multiselect-options::-webkit-scrollbar {
+                width: 6px;
+            }
+            .multiselect-options::-webkit-scrollbar-track {
+                background: rgba(0,0,0,0.1);
+                border-radius: 4px;
+            }
+            .multiselect-options::-webkit-scrollbar-thumb {
+                background: rgba(255,255,255,0.2);
+                border-radius: 4px;
+            }
             .rps-inventory-container {
                 display: flex;
                 flex-direction: column;
@@ -4050,15 +4089,39 @@ function renderRPsInventory(app, container) {
                         <i data-lucide="search" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); width: 14px; color: var(--text-secondary);"></i>
                     </div>
                 </div>
-                <div class="rp-filter-group">
+                <div class="rp-filter-group" style="position: relative;">
                     <span class="rp-filter-label">Server</span>
-                    <select id="rp-filter-server" class="rp-select">
-                        <option value="all" ${app.state.rpFilterServer === 'all' ? 'selected' : ''}>All Servers</option>
-                        <option value="SENT" ${app.state.rpFilterServer === 'SENT' ? 'selected' : ''}>SENT (State)</option>
-                        <option value="none" ${app.state.rpFilterServer === 'none' ? 'selected' : ''}>Unassigned</option>
-                        <option value="available" ${app.state.rpFilterServer === 'available' ? 'selected' : ''}>Available Only</option>
-                        ${uniqueServerNames.map(name => `<option value="${name}" ${app.state.rpFilterServer === name ? 'selected' : ''}>${name}</option>`).join('')}
-                    </select>
+                    <div id="rp-server-multiselect" class="rp-select" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; min-width: 160px; position: relative; user-select: none;">
+                        <span class="selected-servers-text" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;">
+                            ${selectedText}
+                        </span>
+                        <i data-lucide="chevron-down" style="width: 14px;"></i>
+                    </div>
+                    <div id="rp-server-dropdown-options" class="multiselect-options" style="display: ${app.state.rpFilterServerDropdownOpen ? 'block' : 'none'}; position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; margin-top: 4px; max-height: 250px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.3); padding: 8px;">
+                        <label style="display: flex; align-items: center; gap: 8px; padding: 6px 8px; cursor: pointer; border-radius: 4px;" class="option-hover">
+                            <input type="checkbox" value="all" ${app.state.rpFilterServer.includes('all') ? 'checked' : ''} class="rp-server-checkbox">
+                            <span>All Servers</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; padding: 6px 8px; cursor: pointer; border-radius: 4px;" class="option-hover">
+                            <input type="checkbox" value="SENT" ${app.state.rpFilterServer.includes('SENT') ? 'checked' : ''} class="rp-server-checkbox">
+                            <span>SENT (State)</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; padding: 6px 8px; cursor: pointer; border-radius: 4px;" class="option-hover">
+                            <input type="checkbox" value="none" ${app.state.rpFilterServer.includes('none') ? 'checked' : ''} class="rp-server-checkbox">
+                            <span>Unassigned</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; padding: 6px 8px; cursor: pointer; border-radius: 4px;" class="option-hover">
+                            <input type="checkbox" value="available" ${app.state.rpFilterServer.includes('available') ? 'checked' : ''} class="rp-server-checkbox">
+                            <span>Available Only</span>
+                        </label>
+                        <div style="border-top: 1px solid var(--border-color); margin: 6px 0;"></div>
+                        ${uniqueServerNames.map(name => `
+                            <label style="display: flex; align-items: center; gap: 8px; padding: 6px 8px; cursor: pointer; border-radius: 4px;" class="option-hover">
+                                <input type="checkbox" value="${name}" ${app.state.rpFilterServer.includes(name) ? 'checked' : ''} class="rp-server-checkbox">
+                                <span>${name}</span>
+                            </label>
+                        `).join('')}
+                    </div>
                 </div>
                 <div class="rp-filter-group">
                     <span class="rp-filter-label">SPF Type</span>
@@ -4219,9 +4282,69 @@ function renderRPsInventory(app, container) {
         app.state.rpSearch = e.target.value;
         renderRPsInventory(app, container);
     });
-    document.getElementById('rp-filter-server').addEventListener('change', (e) => {
-        app.state.rpFilterServer = e.target.value;
-        renderRPsInventory(app, container);
+    // Restore scroll position of the multiselect dropdown
+    const newDropdown = document.getElementById('rp-server-dropdown-options');
+    if (newDropdown) {
+        newDropdown.scrollTop = scrollPos;
+    }
+
+    // Toggle dropdown open/close
+    const multiselectTrigger = document.getElementById('rp-server-multiselect');
+    if (multiselectTrigger) {
+        multiselectTrigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            app.state.rpFilterServerDropdownOpen = !app.state.rpFilterServerDropdownOpen;
+            renderRPsInventory(app, container);
+        });
+    }
+
+    // Close dropdown when clicking outside
+    const outsideClickListener = (e) => {
+        const dropdown = document.getElementById('rp-server-dropdown-options');
+        const trigger = document.getElementById('rp-server-multiselect');
+        if (dropdown && trigger && !dropdown.contains(e.target) && !trigger.contains(e.target)) {
+            if (app.state.rpFilterServerDropdownOpen) {
+                app.state.rpFilterServerDropdownOpen = false;
+                document.removeEventListener('click', outsideClickListener);
+                renderRPsInventory(app, container);
+            }
+        }
+    };
+    if (app.state.rpFilterServerDropdownOpen) {
+        document.addEventListener('click', outsideClickListener);
+    }
+
+    // Checkbox change listener
+    const checkboxes = container.querySelectorAll('.rp-server-checkbox');
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', (e) => {
+            const val = e.target.value;
+            const isChecked = e.target.checked;
+            
+            let current = [...(app.state.rpFilterServer || [])];
+            
+            if (val === 'all') {
+                if (isChecked) {
+                    current = ['all'];
+                } else {
+                    current = [];
+                }
+            } else {
+                current = current.filter(x => x !== 'all');
+                if (isChecked) {
+                    if (!current.includes(val)) current.push(val);
+                } else {
+                    current = current.filter(x => x !== val);
+                }
+            }
+            
+            if (current.length === 0) {
+                current = ['all'];
+            }
+            
+            app.state.rpFilterServer = current;
+            renderRPsInventory(app, container);
+        });
     });
     document.getElementById('rp-filter-spftype').addEventListener('change', (e) => {
         app.state.rpFilterSpfType = e.target.value;

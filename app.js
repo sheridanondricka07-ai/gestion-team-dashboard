@@ -588,7 +588,7 @@ class TeamApp {
                         const spfProgressChanged = oldSpfProgress !== newSpfProgress;
                         
                         // Preserve local UI filters during Firebase sync
-                        const rpFilterServer = this.state.rpFilterServer || 'all';
+                        const rpFilterServer = this.state.rpFilterServer || ['all'];
                         const rpFilterSpfType = this.state.rpFilterSpfType || 'all';
                         const rpFilterRpType = this.state.rpFilterRpType || 'all';
                         const rpFilterSent = this.state.rpFilterSent || 'all';
