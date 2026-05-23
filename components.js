@@ -4080,9 +4080,9 @@ function renderRPsInventory(app, container) {
                     <table class="rp-table">
                         <thead>
                             <tr>
-                                <th style="width: 250px;">RPs</th>
-                                <th style="width: 200px;">Domain included</th>
-                                <th style="width: 250px;">SubDomain included</th>
+                                <th style="width: 250px;"><div style="display:flex;align-items:center;gap:6px;">RPs<button id="rp-copy-all-rps" style="background:none;border:none;padding:2px;cursor:pointer;color:var(--text-secondary);opacity:0.5;display:inline-flex;align-items:center;transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'" title="Copy all filtered RPs"><i data-lucide="copy" style="width:12px"></i></button></div></th>
+                                <th style="width: 200px;"><div style="display:flex;align-items:center;gap:6px;">Domain included<button id="rp-copy-all-domains" style="background:none;border:none;padding:2px;cursor:pointer;color:var(--text-secondary);opacity:0.5;display:inline-flex;align-items:center;transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'" title="Copy all filtered domains"><i data-lucide="copy" style="width:12px"></i></button></div></th>
+                                <th style="width: 250px;"><div style="display:flex;align-items:center;gap:6px;">SubDomain included<button id="rp-copy-all-subdomains" style="background:none;border:none;padding:2px;cursor:pointer;color:var(--text-secondary);opacity:0.5;display:inline-flex;align-items:center;transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'" title="Copy all filtered subdomains"><i data-lucide="copy" style="width:12px"></i></button></div></th>
                                 <th style="width: 160px;">SRV</th>
                                 <th style="width: 120px;">TYPE</th>
                                 <th style="width: 120px;">RPtype</th>
@@ -4111,16 +4111,17 @@ function renderRPsInventory(app, container) {
                                 return `
                                 <tr>
                                     <td style="font-weight: 600; color: var(--text-primary);">
-                                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                                            <div style="display: flex; align-items: center; gap: 8px;">
-                                                <i data-lucide="globe" style="width: 14px; color: var(--accent-primary);"></i>
-                                                ${item.rpDomain}
+                                        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                            <div style="display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0;">
+                                                <i data-lucide="globe" style="width: 14px; flex-shrink: 0; color: var(--accent-primary);"></i>
+                                                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.rpDomain}</span>
+                                                <button onclick="navigator.clipboard.writeText('${item.rpDomain}');this.innerHTML='<i data-lucide=\\'check\\' style=\\'width:11px;color:var(--success)\\'></i>';lucide.createIcons();setTimeout(()=>{this.innerHTML='<i data-lucide=\\'copy\\' style=\\'width:11px\\'></i>';lucide.createIcons();},1200)" style="background:none;border:none;padding:2px;cursor:pointer;color:var(--text-secondary);opacity:0.4;flex-shrink:0;display:inline-flex;align-items:center;transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.4'" title="Copy RP"><i data-lucide="copy" style="width:11px"></i></button>
                                             </div>
                                             ${isUnavailable ? `<span style="font-size: 0.65rem; background: rgba(239,68,68,0.1); color: #ef4444; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(239,68,68,0.2);" title="Domain included is already assigned to another server">Unavailable</span>` : ''}
                                         </div>
                                     </td>
-                                    <td>${item.domainIncluded || '<span style="color: var(--text-secondary); opacity: 0.5;">---</span>'}</td>
-                                    <td>${item.subdomainIncluded || '<span style="color: var(--text-secondary); opacity: 0.5;">---</span>'}</td>
+                                    <td>${item.domainIncluded ? `<div style="display:flex;align-items:center;gap:6px;"><span>${item.domainIncluded}</span><button onclick="navigator.clipboard.writeText('${item.domainIncluded}');this.innerHTML='<i data-lucide=\\'check\\' style=\\'width:11px;color:var(--success)\\'></i>';lucide.createIcons();setTimeout(()=>{this.innerHTML='<i data-lucide=\\'copy\\' style=\\'width:11px\\'></i>';lucide.createIcons();},1200)" style="background:none;border:none;padding:2px;cursor:pointer;color:var(--text-secondary);opacity:0.4;flex-shrink:0;display:inline-flex;align-items:center;transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.4'" title="Copy Domain"><i data-lucide="copy" style="width:11px"></i></button></div>` : '<span style="color: var(--text-secondary); opacity: 0.5;">---</span>'}</td>
+                                    <td>${item.subdomainIncluded ? `<div style="display:flex;align-items:center;gap:6px;"><span>${item.subdomainIncluded}</span><button onclick="navigator.clipboard.writeText('${item.subdomainIncluded}');this.innerHTML='<i data-lucide=\\'check\\' style=\\'width:11px;color:var(--success)\\'></i>';lucide.createIcons();setTimeout(()=>{this.innerHTML='<i data-lucide=\\'copy\\' style=\\'width:11px\\'></i>';lucide.createIcons();},1200)" style="background:none;border:none;padding:2px;cursor:pointer;color:var(--text-secondary);opacity:0.4;flex-shrink:0;display:inline-flex;align-items:center;transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.4'" title="Copy SubDomain"><i data-lucide="copy" style="width:11px"></i></button></div>` : '<span style="color: var(--text-secondary); opacity: 0.5;">---</span>'}</td>
                                     <td>
                                         <select class="rp-cell-select" ${isAdmin ? `onchange="updateRPItemField('${item.id}', 'srv', this.value)"` : 'disabled'}>
                                             <option value="">-- None --</option>
@@ -4217,6 +4218,24 @@ function renderRPsInventory(app, container) {
         app.state.rpFilterSpfStatus = e.target.value;
         renderRPsInventory(app, container);
     });
+
+    // Copy All header buttons
+    const copyAllBtn = (btnId, getData) => {
+        const btn = document.getElementById(btnId);
+        if (btn) {
+            btn.addEventListener('click', () => {
+                const text = getData().filter(Boolean).join('\n');
+                if (!text) return;
+                navigator.clipboard.writeText(text);
+                btn.innerHTML = '<i data-lucide="check" style="width:12px;color:var(--success)"></i>';
+                if (window.lucide) window.lucide.createIcons();
+                setTimeout(() => { btn.innerHTML = '<i data-lucide="copy" style="width:12px"></i>'; if (window.lucide) window.lucide.createIcons(); }, 1500);
+            });
+        }
+    };
+    copyAllBtn('rp-copy-all-rps', () => filteredItems.map(i => i.rpDomain));
+    copyAllBtn('rp-copy-all-domains', () => filteredItems.map(i => i.domainIncluded));
+    copyAllBtn('rp-copy-all-subdomains', () => filteredItems.map(i => i.subdomainIncluded));
 
     if (window.lucide) window.lucide.createIcons();
 }
