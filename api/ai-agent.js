@@ -40,19 +40,23 @@ export default async function handler(req, res) {
         let totalVmtaOk = 0;
         let totalVmtaErrors = 0;
 
-        // Track VMTA/PTR extension breakdown
-        const vmtaExtensionCounts = {};
-        const vmtaExtensionIps = {};
+        // Track VMTA extension (TLD) breakdown from actual VMTA domains (not PTR)
+        const vmtaTldCounts = {};       // e.g. { ".com": 15, ".pw": 8, ".uk": 4 }
+        const vmtaDomainCounts = {};    // e.g. { "fbcw.tw": 1, "feth.pw": 1 }
+        let totalVmtaAssigned = 0;
+        let totalVmtaUnassigned = 0;
 
         const formattedServers = servers.map(s => {
             if (!s) return null;
             totalServers++;
             const ips = s.allIps || [];
+            const vmtaMap = s.vmtaMap || {};
             const ipStatuses = ips.map(ip => {
                 totalIps++;
                 const safeIp = ip.replace(/\./g, '_');
                 const sh = spamhaus[safeIp] || { status: 'clean' };
                 const vm = vmtaResults[safeIp] || { status: 'OK', ptr: 'N/A' };
+                const vmtaDomain = vmtaMap[safeIp] || null;
                 
                 if (sh.status === 'listed') totalListedSpamhaus++;
                 if (vm.status !== 'OK') {
@@ -61,28 +65,40 @@ export default async function handler(req, res) {
                     totalVmtaOk++;
                 }
 
-                // Extract VMTA extension from PTR record
-                const ptr = vm.ptr || 'N/A';
-                if (ptr && ptr !== 'N/A' && ptr !== 'No PTR record' && ptr !== 'NXDOMAIN / No PTR') {
-                    // Extract the domain extension (e.g. "smtp.example.com" -> "example.com")
-                    const parts = ptr.split('.');
+                // Extract VMTA TLD and domain from actual VMTA column data
+                if (vmtaDomain && vmtaDomain !== '---') {
+                    totalVmtaAssigned++;
+                    const parts = vmtaDomain.split('.');
                     if (parts.length >= 2) {
-                        const ext = parts.slice(-2).join('.');
-                        vmtaExtensionCounts[ext] = (vmtaExtensionCounts[ext] || 0) + 1;
-                        if (!vmtaExtensionIps[ext]) vmtaExtensionIps[ext] = [];
-                        vmtaExtensionIps[ext].push(ip);
+                        // TLD breakdown (e.g. ".com", ".pw", ".uk", ".tw")
+                        const tld = '.' + parts[parts.length - 1];
+                        vmtaTldCounts[tld] = (vmtaTldCounts[tld] || 0) + 1;
+                        
+                        // Domain breakdown (e.g. "fbcw.tw", "feth.pw")
+                        const domain = parts.slice(-2).join('.');
+                        vmtaDomainCounts[domain] = (vmtaDomainCounts[domain] || 0) + 1;
                     }
+                } else {
+                    totalVmtaUnassigned++;
                 }
-                
-                return `${ip} (PTR: ${ptr}, Spamhaus: ${sh.status === 'listed' ? `LISTED on ${sh.list}` : 'clean'}, VMTA Status: ${vm.status})`;
+
+                const ptr = vm.ptr || 'N/A';
+                return `${ip} (VMTA: ${vmtaDomain || 'N/A'}, PTR: ${ptr}, Spamhaus: ${sh.status === 'listed' ? `LISTED on ${sh.list}` : 'clean'})`;
             }).join(', ');
             return `- Name: ${s.name}, Main IP: ${s.ip || 'N/A'}, Status: ${s.status || 'active'}, IPs: [${ipStatuses}]`;
         }).filter(Boolean).join('\n');
 
-        // Build VMTA extension breakdown string
-        const extensionBreakdown = Object.entries(vmtaExtensionCounts)
+        // Build VMTA TLD breakdown string
+        const tldBreakdown = Object.entries(vmtaTldCounts)
             .sort((a, b) => b[1] - a[1])
-            .map(([ext, count]) => `- ${ext}: ${count} IPs`)
+            .map(([tld, count]) => `- ${tld}: ${count} IPs`)
+            .join('\n');
+
+        // Build VMTA domain breakdown string (top 30)
+        const domainBreakdown = Object.entries(vmtaDomainCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 30)
+            .map(([domain, count]) => `- ${domain}: ${count} IPs`)
             .join('\n');
 
         const formattedDrops = drops.slice(-50).map(d => {
@@ -106,10 +122,16 @@ SUMMARY STATISTICS (EXACT PRE-COMPUTED COUNTS — USE THESE, DO NOT RECOUNT):
 - Total IPs Currently Listed on Spamhaus: ${totalListedSpamhaus}
 - Total IPs with PTR OK: ${totalVmtaOk}
 - Total IPs with PTR Errors: ${totalVmtaErrors}
+- Total IPs with Assigned VMTA: ${totalVmtaAssigned}
+- Total IPs with Unassigned/Empty VMTA: ${totalVmtaUnassigned}
 
-VMTA/PTR EXTENSION BREAKDOWN (PRE-COMPUTED — USE THESE EXACT NUMBERS):
+VMTA TLD BREAKDOWN (PRE-COMPUTED — USE THESE EXACT NUMBERS):
 ------------------
-${extensionBreakdown || 'No VMTA/PTR extensions detected.'}
+${tldBreakdown || 'No VMTA TLD extensions detected.'}
+
+VMTA DOMAIN BREAKDOWN (PRE-COMPUTED — USE THESE EXACT NUMBERS):
+------------------
+${domainBreakdown || 'No VMTA domains detected.'}
 
 CURRENT REAL-TIME CONTEXT DATA:
 ------------------
@@ -118,7 +140,7 @@ TODAY'S DATE/TIME: ${new Date().toLocaleString()}
 MAILERS/TEAM MEMBERS:
 ${formattedMailers || 'No mailers registered.'}
 
-SERVERS & IP INFRASTRUCTURE (WITH PTR, SPAMHAUS & VMTA STATUS):
+SERVERS & IP INFRASTRUCTURE (WITH PTR, SPAMHAUS & VMTA MAPPING):
 ${formattedServers || 'No servers configured.'}
 
 RECENT DROP REVENUE & PERFORMANCE DATA (Last 50 drops):
@@ -129,7 +151,7 @@ GUIDELINES:
 1. Always base your analysis directly on the provided context data. When asked about counts, totals, or breakdowns, USE THE PRE-COMPUTED STATISTICS ABOVE. Do not try to recount from the raw data — use the exact numbers provided.
 2. Format your response cleanly using HTML tags for maximum compatibility with the chat window (e.g. <b>, <i>, <ul>, <li>, <pre>, <code>, <br>). Do not use markdown headers (like #, ##) in the HTML output; use bold text or styled headers instead.
 3. Be professional, direct, and actionable. Provide statistical summaries or warnings if you notice listed IPs or low-performing drops.
-4. If the user asks about VMTA extensions, PTR domains, or domain breakdowns, reference the VMTA/PTR EXTENSION BREAKDOWN section above.
+4. If the user asks about VMTA extensions, VMTA TLDs, VMTA domains, or domain breakdowns, reference the VMTA TLD BREAKDOWN and VMTA DOMAIN BREAKDOWN sections above.
 5. If the user asks you to perform a task outside of analyzing/extracting this data, guide them back to server administration or performance analytics.`;
 
         let responseText = '';
