@@ -230,41 +230,48 @@ export default async function handler(req, res) {
         await setFirebaseData('state/spamhausLastUpdate', new Date().toLocaleString());
         await updateFirebaseData('state/spamhausProgress', { status: 'idle' });
         
+        let listedCount = 0;
+        let cleanCount = 0;
+        const newlyListed = [];
+        const newlyCleaned = [];
+
+        // Fetch yesterday's history for comparison
+        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const yesterdayKey = yesterday.toISOString().split('T')[0];
+        const yesterdayData = await getFirebaseData(`state/spamhausHistory/${yesterdayKey}`) || {};
+        const yesterdayResults = yesterdayData.results || {};
+
+        for (const ip of uniqueIps) {
+            const safeIp = ip.replace(/\./g, '_');
+            const res = finalResults[safeIp] || {};
+            const prev = yesterdayResults[safeIp] || {};
+            if (res.status === 'listed') {
+                listedCount++;
+                if (prev.status !== 'listed') {
+                    newlyListed.push(ip);
+                }
+            } else {
+                cleanCount++;
+                if (prev.status === 'listed') {
+                    newlyCleaned.push(ip);
+                }
+            }
+        }
+
         const dateKey = new Date().toISOString().split('T')[0];
         await setFirebaseData(`state/spamhausHistory/${dateKey}`, {
-            timestamp: timestamp,
-            results: finalResults
+            timestamp: Date.now(),
+            results: finalResults,
+            summary: {
+                total: uniqueIps.length,
+                listed: listedCount,
+                clean: cleanCount,
+                timestamp: Date.now()
+            }
         });
 
         // Build and send Telegram report
         try {
-            let listedCount = 0;
-            let cleanCount = 0;
-            const newlyListed = [];
-            const newlyCleaned = [];
-
-            // Fetch yesterday's history for comparison
-            const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
-            const yesterdayKey = yesterday.toISOString().split('T')[0];
-            const yesterdayData = await getFirebaseData(`state/spamhausHistory/${yesterdayKey}`) || {};
-            const yesterdayResults = yesterdayData.results || {};
-
-            for (const ip of uniqueIps) {
-                const safeIp = ip.replace(/\./g, '_');
-                const res = finalResults[safeIp] || {};
-                const prev = yesterdayResults[safeIp] || {};
-                if (res.status === 'listed') {
-                    listedCount++;
-                    if (prev.status !== 'listed') {
-                        newlyListed.push(ip);
-                    }
-                } else {
-                    cleanCount++;
-                    if (prev.status === 'listed') {
-                        newlyCleaned.push(ip);
-                    }
-                }
-            }
 
             let tg_msg = `🛡️ <b>Spamhaus Report</b>\n`;
             tg_msg += `📅 <i>${new Date().toLocaleString()}</i>\n\n`;
