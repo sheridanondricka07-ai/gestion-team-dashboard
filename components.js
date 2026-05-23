@@ -2963,7 +2963,7 @@ window.triggerManualSpamhausCheck = (btn) => {
             </div>
             <h2 style="margin: 0 0 12px 0;">Automated Scanning Active</h2>
             <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 24px;">
-                Your Spamhaus scanner is now fully automated. It runs every day at <strong>09:00 AM (Moroccan Time)</strong> for 100% accuracy.
+                Your Spamhaus scanner is now fully automated. It runs 3 times daily (at <strong>01:00 AM</strong>, <strong>09:00 AM</strong>, and <strong>05:00 PM</strong> Moroccan Time) for 100% accuracy.
             </p>
             <button id="modal-spamhaus-scan-btn" onclick="window.startManualSpamhausScan(this)" class="btn-primary" style="width: 100%; margin-bottom: 12px;">Manual Scan</button>
             <button onclick="this.closest('.modal-overlay').remove()" class="btn-secondary" style="width: 100%; background: transparent; border: 1px solid var(--border-color); color: var(--text-primary);">Got it!</button>
