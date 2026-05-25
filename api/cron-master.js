@@ -85,6 +85,7 @@ export default async function handler(req, res) {
     const runVmta = task === 'all' || task === 'vmta' || task === 'rdns' || (!task && hour % 3 === 0);
     const runGmail = task === 'all' || task === 'gmail' || (!task && [12, 18].includes(hour));
     const runSpf = task === 'all' || task === 'spf' || (!task && [2, 10, 18].includes(hour));
+    const runGmailStatus = task === 'all' || task === 'gmail-status' || (!task && hour === 9);
 
     // 1. Trigger Spamhaus Check
     if (runSpamhaus) {
@@ -285,6 +286,192 @@ export default async function handler(req, res) {
             }
         } catch (e) {
             console.error('SPF Trigger Error:', e);
+        }
+    }
+
+    // 5. Automated Gmail IP Placement Status Sync (Daily at 10:30 AM Morocco Time / 09:30 UTC)
+    if (runGmailStatus) {
+        console.log('Running Automated Gmail IP Placement Status Sync...');
+        try {
+            const gmail = await getFirebaseData('state/gmail');
+            const servers = await getFirebaseData('state/servers') || [];
+            
+            if (gmail && gmail.email && gmail.password && servers.length > 0) {
+                const imap = require('imap-simple');
+                const config = {
+                    imap: {
+                        user: gmail.email,
+                        password: gmail.password,
+                        host: 'imap.gmail.com', port: 993, tls: true,
+                        authTimeout: 15000, tlsOptions: { rejectUnauthorized: false }
+                    }
+                };
+
+                let targetIps = [];
+                servers.forEach(s => { if (s && s.allIps) targetIps = targetIps.concat(s.allIps); });
+
+                const resultsObj = {}; // { [ip]: { folder: 'INBOX'|'SPAM', returnPath: '...', headerRdns: '...' } }
+                
+                if (targetIps.length > 0) {
+                    const connection = await imap.connect(config);
+                    const boxes = ['INBOX', '[Gmail]/Spam'];
+                    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+
+                    for (const boxName of boxes) {
+                        try {
+                            await connection.openBox(boxName);
+                            const searchCriteria = [['SINCE', new Date()]];
+                            const messages = await connection.search(searchCriteria, { bodies: ['HEADER'], markSeen: false });
+                            const sorted = messages.sort((a, b) => b.attributes.uid - a.attributes.uid).slice(0, 500);
+
+                            for (const msg of sorted) {
+                                if (new Date(msg.attributes.date) < twoHoursAgo) continue;
+                                
+                                const headers = msg.parts.find(p => p.which === 'HEADER').body;
+                                const headerKeys = Object.keys(headers);
+                                const getHeader = (name) => {
+                                    const key = headerKeys.find(k => k.toLowerCase() === name.toLowerCase());
+                                    return (headers[key] || [])[0] || '';
+                                };
+
+                                const returnPath = getHeader('return-path').replace(/[<>]/g, '').trim();
+                                const receivedHeaders = headers.received || [];
+                                const receivedList = Array.isArray(receivedHeaders) ? receivedHeaders : [receivedHeaders];
+
+                                for (const rh of receivedList) {
+                                    if (rh.includes('by mx.google.com')) {
+                                        const match = rh.match(/from\s+([^\s\(\)]+)\s+\([^\)]*?\[(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\]\)/i);
+                                        if (match) {
+                                            const headerRdns = match[1].toLowerCase().trim();
+                                            const ip = match[2];
+                                            if (targetIps.includes(ip)) {
+                                                const folder = boxName.toLowerCase().includes('spam') ? 'SPAM' : 'INBOX';
+                                                if (!resultsObj[ip] || (resultsObj[ip].folder === 'SPAM' && folder === 'INBOX')) {
+                                                    resultsObj[ip] = { folder, returnPath, headerRdns };
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.error(`Error scanning box ${boxName}:`, e);
+                        }
+                    }
+                    connection.end();
+                }
+
+                const foundIpsCount = Object.keys(resultsObj).length;
+                const formattedDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+                if (foundIpsCount === 0) {
+                    // Update database to fill all as DOWN
+                    const statuses = await getFirebaseData('state/statuses') || {};
+                    const today = new Date().toISOString().split('T')[0];
+                    targetIps.forEach(ip => {
+                        const safeIp = ip.replace(/\./g, '_');
+                        if (!statuses[safeIp]) statuses[safeIp] = {};
+                        statuses[safeIp][today] = 'down';
+                    });
+                    await setFirebaseData('state/statuses', statuses);
+
+                    // Send Telegram Warning
+                    const telegramMessage = `⚠️ <b>Daily Gmail IP Delivery Sync: IPs Not Found</b>\n` +
+                                            `📅 <b>Date:</b> ${formattedDate}\n` +
+                                            `⏰ <b>Time:</b> 10:30 AM (Morocco Time)\n\n` +
+                                            `🔴 <b>No IPs Found:</b> No delivery data or IP headers were matched in your recent emails (last 2 hours).\n` +
+                                            `<i>All target IPs have been marked as DOWN in the dashboard. Please verify test email delivery.</i>`;
+                    await sendTelegram(telegramMessage);
+
+                    results.gmailStatusSyncTriggered = true;
+                    results.gmailStatusStats = { totalChecked: targetIps.length, rdnsCount: 0, rpTestCount: 0, spamCount: 0, downCount: targetIps.length };
+                } else {
+                    // Resolve PTR domains from vmtaResults
+                    const vmtaResults = await getFirebaseData('state/vmtaResults') || {};
+                    const rdnsMap = {};
+                    Object.entries(vmtaResults).forEach(([safeIp, data]) => {
+                        rdnsMap[safeIp] = (data.ptr || '').toLowerCase().trim();
+                    });
+
+                    // Update statuses in Firebase
+                    const statuses = await getFirebaseData('state/statuses') || {};
+                    const today = new Date().toISOString().split('T')[0];
+
+                    let rdnsCount = 0;
+                    let rpTestCount = 0;
+                    let spamCount = 0;
+                    let downCount = 0;
+
+                    targetIps.forEach(ip => {
+                        const safeIp = ip.replace(/\./g, '_');
+                        if (!statuses[safeIp]) statuses[safeIp] = {};
+
+                        const info = resultsObj[ip];
+                        if (info) {
+                            const stateRdns = (rdnsMap[safeIp] || '').toLowerCase().trim();
+                            const headerRdns = (info.headerRdns || '').toLowerCase().trim();
+                            const targetRdns = stateRdns || headerRdns;
+
+                            const rpFull = (info.returnPath || '').toLowerCase().trim();
+                            const rpDomain = rpFull.includes('@') ? rpFull.split('@')[1] : rpFull;
+
+                            const folder = info.folder;
+                            let newStatusId = 'none';
+
+                            if (folder === 'INBOX') {
+                                const isMatch = (targetRdns && (rpFull.includes(targetRdns) || targetRdns.includes(rpDomain)));
+                                newStatusId = isMatch ? 'rdns' : 'rp_test';
+                            } else if (folder === 'SPAM') {
+                                newStatusId = 'spam';
+                            }
+
+                            // Priority override rules
+                            const currentStatusId = statuses[safeIp][today] || 'none';
+                            let shouldApply = false;
+                            if (newStatusId === 'rdns') {
+                                shouldApply = true;
+                            } else if (newStatusId === 'rp_test') {
+                                if (currentStatusId !== 'rdns') shouldApply = true;
+                            } else if (newStatusId === 'spam') {
+                                if (currentStatusId === 'none' || currentStatusId === 'spam' || currentStatusId === 'down') shouldApply = true;
+                            }
+
+                            if (shouldApply) {
+                                statuses[safeIp][today] = newStatusId;
+                            }
+                        } else {
+                            statuses[safeIp][today] = 'down';
+                        }
+
+                        // Final counts
+                        const finalStatus = statuses[safeIp][today];
+                        if (finalStatus === 'rdns') rdnsCount++;
+                        else if (finalStatus === 'rp_test') rpTestCount++;
+                        else if (finalStatus === 'spam') spamCount++;
+                        else if (finalStatus === 'down') downCount++;
+                    });
+
+                    await setFirebaseData('state/statuses', statuses);
+
+                    // Send Telegram Success Report
+                    const telegramMessage = `📥 <b>Daily Gmail IP Delivery Sync</b>\n` +
+                                            `📅 <b>Date:</b> ${formattedDate}\n` +
+                                            `⏰ <b>Time:</b> 10:30 AM (Morocco Time)\n\n` +
+                                            `📊 <b>STATUS SUMMARY:</b>\n` +
+                                            `• <b>Total Checked:</b> <code>${targetIps.length}</code> IPs\n` +
+                                            `• 🟢 <b>RDNS (Inbox Match):</b> <code>${rdnsCount}</code> IPs\n` +
+                                            `• 🟢 <b>RP TEST (Inbox Unmatched):</b> <code>${rpTestCount}</code> IPs\n` +
+                                            `• 🔴 <b>SPAM:</b> <code>${spamCount}</code> IPs\n` +
+                                            `• 🟠 <b>Not Received (DOWN):</b> <code>${downCount}</code> IPs\n\n` +
+                                            `⚙️ <i>All IP statuses successfully updated and filled in the dashboard.</i>`;
+                    await sendTelegram(telegramMessage);
+
+                    results.gmailStatusSyncTriggered = true;
+                    results.gmailStatusStats = { totalChecked: targetIps.length, rdnsCount, rpTestCount, spamCount, downCount };
+                }
+            }
+        } catch (e) {
+            console.error('Automated Gmail IP Status Sync Error:', e);
         }
     }
 

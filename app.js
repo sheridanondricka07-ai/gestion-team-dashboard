@@ -310,6 +310,10 @@ class TeamApp {
     async addRP(rpData) {
         const domains = rpData.domain.split('\n').map(d => d.trim()).filter(d => d !== '');
         domains.forEach(domain => {
+            const cleanDomain = domain.toLowerCase();
+            const exists = (this.state.rps || []).some(r => (r.domain || '').trim().toLowerCase() === cleanDomain) ||
+                           (this.state.rpInventory || []).some(item => (item.rpDomain || '').trim().toLowerCase() === cleanDomain);
+            if (exists) return; // Skip if already exists
             const newRP = {
                 id: 'rp' + Math.random().toString(36).substr(2, 9),
                 domain: domain,
@@ -534,6 +538,11 @@ class TeamApp {
 
     async deleteRP(rpId) {
         this.showConfirm("Permanently delete this RP?", async () => {
+            const rp = this.state.rps.find(r => r.id === rpId);
+            if (rp) {
+                const domain = (rp.domain || '').trim().toLowerCase();
+                this.state.rpInventory = (this.state.rpInventory || []).filter(item => (item.rpDomain || '').trim().toLowerCase() !== domain);
+            }
             this.state.rps = this.state.rps.filter(r => r.id !== rpId);
             await this.saveState();
         });
@@ -647,8 +656,9 @@ class TeamApp {
                             });
                         }
                         
-                        if (patched) {
-                            console.log("Auto-patched missing Mailer IDs in mailers and drops. Saving back to Firebase...");
+                        const synced = this.syncRpsAndInventory();
+                        if (patched || synced) {
+                            console.log("Auto-patched or synced RPs. Saving back to Firebase...");
                             this.saveState();
                         }
                         
@@ -721,6 +731,7 @@ class TeamApp {
     }
 
     async saveState() {
+        this.syncRpsAndInventory();
         if (this.state.dbConnected) {
             const toSave = { ...this.state };
             delete toSave.currentUser;
@@ -904,7 +915,112 @@ class TeamApp {
     autoResolveRPAreadySent(rpDomain) {
         if (!rpDomain) return false;
         const clean = rpDomain.trim().toLowerCase();
-        return (this.state.drops || []).some(d => (d.returnPath || '').trim().toLowerCase() === clean);
+        
+        // 1. Direct match on returnPath in drops
+        const directMatch = (this.state.drops || []).some(d => {
+            const rp = (d.returnPath || '').trim().toLowerCase();
+            return rp === clean || rp.includes(clean) || clean.includes(rp);
+        });
+        if (directMatch) return true;
+
+        // 2. IP/Server-based match: Find if the RP is attached to a server, and that server (or its IPs) has sent a drop
+        const rp = (this.state.rps || []).find(r => (r.domain || '').trim().toLowerCase() === clean);
+        if (rp && rp.serverId) {
+            const srv = (this.state.servers || []).find(s => s.id === rp.serverId);
+            if (srv) {
+                const srvIps = srv.allIps || [];
+                const srvName = srv.name.toLowerCase();
+                const serverSent = (this.state.drops || []).some(d => {
+                    const dSrvs = (d.servers || '').toLowerCase();
+                    if (dSrvs.includes(srvName)) return true;
+                    
+                    const dIps = (d.ips || '').split(/[\s,\n]+/).map(ip => ip.trim()).filter(Boolean);
+                    return srvIps.some(ip => dIps.includes(ip));
+                });
+                if (serverSent) return true;
+            }
+        }
+        return false;
+    }
+
+    syncRpsAndInventory() {
+        if (!this.state.rps) this.state.rps = [];
+        if (!this.state.rpInventory) this.state.rpInventory = [];
+
+        let stateChanged = false;
+
+        // 1. Ensure all RPs in state.rps exist in state.rpInventory
+        this.state.rps.forEach(rp => {
+            const domain = (rp.domain || '').trim().toLowerCase();
+            if (!domain) return;
+            const existsInInv = this.state.rpInventory.some(item => (item.rpDomain || '').trim().toLowerCase() === domain);
+            if (!existsInInv) {
+                let srvName = '';
+                if (rp.serverId) {
+                    const srv = (this.state.servers || []).find(s => s.id === rp.serverId);
+                    if (srv) srvName = srv.name;
+                }
+                this.state.rpInventory.push({
+                    id: 'rpi_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+                    rpDomain: rp.domain,
+                    domainIncluded: '',
+                    subdomainIncluded: '',
+                    srv: srvName,
+                    spfType: 'Include',
+                    rpType: 'intern',
+                    alreadySent: false
+                });
+                stateChanged = true;
+            }
+        });
+
+        // 2. Ensure all RPs in state.rpInventory exist in state.rps
+        this.state.rpInventory.forEach(item => {
+            const domain = (item.rpDomain || '').trim().toLowerCase();
+            if (!domain) return;
+            const existsInRps = this.state.rps.some(rp => (rp.domain || '').trim().toLowerCase() === domain);
+            if (!existsInRps) {
+                let serverId = null;
+                let mailerId = null;
+                if (item.srv) {
+                    const srv = (this.state.servers || []).find(s => s.name === item.srv);
+                    if (srv) {
+                        serverId = srv.id;
+                        mailerId = srv.mailerId;
+                    }
+                }
+                this.state.rps.push({
+                    id: 'rp' + Math.random().toString(36).substr(2, 9),
+                    domain: item.rpDomain,
+                    serverId: serverId,
+                    mailerId: mailerId,
+                    status: serverId ? 'active' : 'stock',
+                    assignedIps: []
+                });
+                stateChanged = true;
+            }
+        });
+
+        // 3. Keep server assignments in sync
+        this.state.rps.forEach(rp => {
+            const domain = (rp.domain || '').trim().toLowerCase();
+            if (!domain) return;
+            const invItem = this.state.rpInventory.find(item => (item.rpDomain || '').trim().toLowerCase() === domain);
+            if (invItem) {
+                let srvName = '';
+                if (rp.serverId) {
+                    const srv = (this.state.servers || []).find(s => s.id === rp.serverId);
+                    if (srv) srvName = srv.name;
+                }
+                
+                if (invItem.srv !== srvName) {
+                    invItem.srv = srvName;
+                    stateChanged = true;
+                }
+            }
+        });
+
+        return stateChanged;
     }
 
     getProcessedRPInventory() {
@@ -922,9 +1038,17 @@ class TeamApp {
 
     async addRPInventoryItem(data) {
         if (!this.state.rpInventory) this.state.rpInventory = [];
+        const domain = (data.rpDomain || '').trim();
+        const cleanDomain = domain.toLowerCase();
+        const exists = (this.state.rps || []).some(r => (r.domain || '').trim().toLowerCase() === cleanDomain) ||
+                       (this.state.rpInventory || []).some(item => (item.rpDomain || '').trim().toLowerCase() === cleanDomain);
+        if (exists) {
+            alert('This RP domain is already added!');
+            return;
+        }
         const item = {
             id: 'rpi_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-            rpDomain: (data.rpDomain || '').trim(),
+            rpDomain: domain,
             domainIncluded: (data.domainIncluded || '').trim(),
             subdomainIncluded: (data.subdomainIncluded || '').trim(),
             srv: (data.srv || '').trim(),
@@ -938,6 +1062,11 @@ class TeamApp {
 
     async deleteRPInventoryItem(id) {
         if (!this.state.rpInventory) return;
+        const item = this.state.rpInventory.find(it => it.id === id);
+        if (item) {
+            const domain = (item.rpDomain || '').trim().toLowerCase();
+            this.state.rps = (this.state.rps || []).filter(rp => (rp.domain || '').trim().toLowerCase() !== domain);
+        }
         this.state.rpInventory = this.state.rpInventory.filter(item => item.id !== id);
         await this.saveState();
     }
@@ -953,10 +1082,19 @@ class TeamApp {
 
     async bulkImportRPInventory(items) {
         if (!this.state.rpInventory) this.state.rpInventory = [];
+        let skippedCount = 0;
         items.forEach(data => {
+            const domain = (data.rpDomain || '').trim();
+            const cleanDomain = domain.toLowerCase();
+            const exists = (this.state.rps || []).some(r => (r.domain || '').trim().toLowerCase() === cleanDomain) ||
+                           (this.state.rpInventory || []).some(item => (item.rpDomain || '').trim().toLowerCase() === cleanDomain);
+            if (exists) {
+                skippedCount++;
+                return; // Skip duplicate
+            }
             const item = {
                 id: 'rpi_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-                rpDomain: (data.rpDomain || '').trim(),
+                rpDomain: domain,
                 domainIncluded: (data.domainIncluded || '').trim(),
                 subdomainIncluded: (data.subdomainIncluded || '').trim(),
                 srv: (data.srv || '').trim(),
@@ -967,6 +1105,9 @@ class TeamApp {
             this.state.rpInventory.push(item);
         });
         await this.saveState();
+        if (skippedCount > 0) {
+            alert(`Import complete! Skipped ${skippedCount} duplicate RPs.`);
+        }
     }
 
     async triggerRPSpfCheck() {
