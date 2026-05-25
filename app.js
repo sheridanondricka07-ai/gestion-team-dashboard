@@ -309,11 +309,32 @@ class TeamApp {
 
     async addRP(rpData) {
         const domains = rpData.domain.split('\n').map(d => d.trim()).filter(d => d !== '');
+        const alerts = [];
+        const added = [];
+
         domains.forEach(domain => {
             const cleanDomain = domain.toLowerCase();
-            const exists = (this.state.rps || []).some(r => (r.domain || '').trim().toLowerCase() === cleanDomain) ||
-                           (this.state.rpInventory || []).some(item => (item.rpDomain || '').trim().toLowerCase() === cleanDomain);
-            if (exists) return; // Skip if already exists
+            const existingRp = (this.state.rps || []).find(r => (r.domain || '').trim().toLowerCase() === cleanDomain);
+            const existingInv = (this.state.rpInventory || []).find(item => (item.rpDomain || '').trim().toLowerCase() === cleanDomain);
+            
+            if (existingRp || existingInv) {
+                let affectedServer = '';
+                if (existingRp && existingRp.serverId) {
+                    const srv = (this.state.servers || []).find(s => s.id === existingRp.serverId);
+                    if (srv) affectedServer = srv.name;
+                }
+                if (!affectedServer && existingInv && existingInv.srv) {
+                    affectedServer = existingInv.srv;
+                }
+
+                if (affectedServer) {
+                    alerts.push(`• "${domain}" is already affected to Server: ${affectedServer}`);
+                } else {
+                    alerts.push(`• "${domain}" is already added (in stock)`);
+                }
+                return;
+            }
+
             const newRP = {
                 id: 'rp' + Math.random().toString(36).substr(2, 9),
                 domain: domain,
@@ -323,8 +344,16 @@ class TeamApp {
                 assignedIps: []
             };
             this.state.rps.push(newRP);
+            added.push(domain);
         });
-        await this.saveState();
+
+        if (alerts.length > 0) {
+            alert(`Duplicate RP Notice:\n\n${alerts.join('\n')}`);
+        }
+
+        if (added.length > 0) {
+            await this.saveState();
+        }
     }
 
     async addMailer(data) {
@@ -1040,12 +1069,28 @@ class TeamApp {
         if (!this.state.rpInventory) this.state.rpInventory = [];
         const domain = (data.rpDomain || '').trim();
         const cleanDomain = domain.toLowerCase();
-        const exists = (this.state.rps || []).some(r => (r.domain || '').trim().toLowerCase() === cleanDomain) ||
-                       (this.state.rpInventory || []).some(item => (item.rpDomain || '').trim().toLowerCase() === cleanDomain);
-        if (exists) {
-            alert('This RP domain is already added!');
+        
+        const existingRp = (this.state.rps || []).find(r => (r.domain || '').trim().toLowerCase() === cleanDomain);
+        const existingInv = (this.state.rpInventory || []).find(item => (item.rpDomain || '').trim().toLowerCase() === cleanDomain);
+        
+        if (existingRp || existingInv) {
+            let affectedServer = '';
+            if (existingRp && existingRp.serverId) {
+                const srv = (this.state.servers || []).find(s => s.id === existingRp.serverId);
+                if (srv) affectedServer = srv.name;
+            }
+            if (!affectedServer && existingInv && existingInv.srv) {
+                affectedServer = existingInv.srv;
+            }
+
+            if (affectedServer) {
+                alert(`The RP "${domain}" is already added and affected to Server: ${affectedServer}`);
+            } else {
+                alert(`The RP "${domain}" is already added.`);
+            }
             return;
         }
+
         const item = {
             id: 'rpi_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
             rpDomain: domain,
@@ -1082,16 +1127,34 @@ class TeamApp {
 
     async bulkImportRPInventory(items) {
         if (!this.state.rpInventory) this.state.rpInventory = [];
-        let skippedCount = 0;
+        const alerts = [];
+        let addedCount = 0;
+
         items.forEach(data => {
             const domain = (data.rpDomain || '').trim();
             const cleanDomain = domain.toLowerCase();
-            const exists = (this.state.rps || []).some(r => (r.domain || '').trim().toLowerCase() === cleanDomain) ||
-                           (this.state.rpInventory || []).some(item => (item.rpDomain || '').trim().toLowerCase() === cleanDomain);
-            if (exists) {
-                skippedCount++;
-                return; // Skip duplicate
+            
+            const existingRp = (this.state.rps || []).find(r => (r.domain || '').trim().toLowerCase() === cleanDomain);
+            const existingInv = (this.state.rpInventory || []).find(item => (item.rpDomain || '').trim().toLowerCase() === cleanDomain);
+            
+            if (existingRp || existingInv) {
+                let affectedServer = '';
+                if (existingRp && existingRp.serverId) {
+                    const srv = (this.state.servers || []).find(s => s.id === existingRp.serverId);
+                    if (srv) affectedServer = srv.name;
+                }
+                if (!affectedServer && existingInv && existingInv.srv) {
+                    affectedServer = existingInv.srv;
+                }
+
+                if (affectedServer) {
+                    alerts.push(`• "${domain}" (Affected to Server: ${affectedServer})`);
+                } else {
+                    alerts.push(`• "${domain}" (Already added / in stock)`);
+                }
+                return;
             }
+
             const item = {
                 id: 'rpi_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
                 rpDomain: domain,
@@ -1103,10 +1166,17 @@ class TeamApp {
                 alreadySent: !!data.alreadySent
             };
             this.state.rpInventory.push(item);
+            addedCount++;
         });
-        await this.saveState();
-        if (skippedCount > 0) {
-            alert(`Import complete! Skipped ${skippedCount} duplicate RPs.`);
+
+        if (addedCount > 0) {
+            await this.saveState();
+        }
+
+        if (alerts.length > 0) {
+            alert(`Bulk Import Notice: Imported ${addedCount} RPs.\nSkipped the following duplicate RPs:\n\n${alerts.join('\n')}`);
+        } else if (addedCount > 0) {
+            alert(`Import complete! Successfully imported ${addedCount} RPs.`);
         }
     }
 
