@@ -1,3 +1,30 @@
+window.withFocusPreservation = function(fn) {
+    const activeElement = document.activeElement;
+    const activeId = activeElement ? activeElement.id : null;
+    let start = null;
+    let end = null;
+    if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
+        try {
+            start = activeElement.selectionStart;
+            end = activeElement.selectionEnd;
+        } catch(e) {}
+    }
+
+    fn();
+
+    if (activeId) {
+        const el = document.getElementById(activeId);
+        if (el) {
+            el.focus();
+            if (start !== null && end !== null && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) {
+                try {
+                    el.setSelectionRange(start, end);
+                } catch(e) {}
+            }
+        }
+    }
+};
+
 function renderLogin(app) {
     const container = document.getElementById('login-screen');
     container.innerHTML = `
@@ -122,7 +149,7 @@ function renderSidebar(app) {
 function renderTopBar(app) {
     const container = document.getElementById('top-bar');
     const rpSpfProgress = app.state.rpSpfProgress || { status: 'idle', current: 0, total: 0 };
-    const isSpfRunning = rpSpfProgress.status === 'running' && (Date.now() - (rpSpfProgress.timestamp || 0) < 120000);
+    const isSpfRunning = rpSpfProgress.status === 'running' && (Date.now() - (rpSpfProgress.timestamp || 0) < 30000);
     const checking = app.state.rpSpfChecking || isSpfRunning;
 
     container.innerHTML = `
@@ -3758,6 +3785,12 @@ window.renderAiAgent = (app, container) => {
 };
 
 function renderRPsInventory(app, container) {
+    window.withFocusPreservation(() => {
+        _renderRPsInventory(app, container);
+    });
+}
+
+function _renderRPsInventory(app, container) {
     const existingDropdown = document.getElementById('rp-server-dropdown-options');
     const scrollPos = existingDropdown ? existingDropdown.scrollTop : 0;
 
@@ -3774,7 +3807,7 @@ function renderRPsInventory(app, container) {
     if (app.state.rpFilterSpfStatus === undefined) app.state.rpFilterSpfStatus = 'all';
 
     const rpSpfProgress = app.state.rpSpfProgress || { status: 'idle', current: 0, total: 0 };
-    const isSpfRunning = rpSpfProgress.status === 'running' && (Date.now() - (rpSpfProgress.timestamp || 0) < 120000);
+    const isSpfRunning = rpSpfProgress.status === 'running' && (Date.now() - (rpSpfProgress.timestamp || 0) < 30000);
 
     const items = app.getProcessedRPInventory() || [];
 
@@ -3952,8 +3985,7 @@ function renderRPsInventory(app, container) {
                 overflow: hidden;
             }
             .rp-table-wrapper {
-                max-height: 600px;
-                overflow-y: auto;
+                overflow-x: auto;
             }
             .rp-table {
                 width: 100%;

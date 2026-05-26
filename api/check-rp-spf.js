@@ -51,7 +51,12 @@ async function sendTelegram(message) {
 
 async function getSpfRecord(domain) {
     try {
-        const records = await dns.resolveTxt(domain);
+        const dnsPromise = dns.resolveTxt(domain);
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('DNS Timeout')), 1500)
+        );
+        const records = await Promise.race([dnsPromise, timeoutPromise]);
+
         const spfRecords = records
             .map(chunks => chunks.join(''))
             .filter(record => record.toLowerCase().startsWith('v=spf1'));
