@@ -310,9 +310,15 @@ export default async function handler(req, res) {
                 let targetIps = [];
                 servers.forEach(s => { if (s && s.allIps) targetIps = targetIps.concat(s.allIps); });
 
-                const resultsObj = {}; // { [ip]: { folder: 'INBOX'|'SPAM', returnPath: '...', headerRdns: '...' } }
+                const resultsObj = {}; // { [ip]: { folder: 'INBOX'|'SPAM', returnPath: '...', headerRdns: '...', status: '...' } }
                 
                 if (targetIps.length > 0) {
+                    const vmtaResults = await getFirebaseData('state/vmtaResults') || {};
+                    const rdnsMap = {};
+                    Object.entries(vmtaResults).forEach(([safeIp, data]) => {
+                        rdnsMap[safeIp] = (data.ptr || '').toLowerCase().trim();
+                    });
+
                     const connection = await imap.connect(config);
                     const boxes = ['INBOX', '[Gmail]/Spam'];
                     const oneHourAgo = new Date(Date.now() - 1 * 60 * 60 * 1000);
@@ -346,8 +352,35 @@ export default async function handler(req, res) {
                                             const ip = match[2];
                                             if (targetIps.includes(ip)) {
                                                 const folder = boxName.toLowerCase().includes('spam') ? 'SPAM' : 'INBOX';
-                                                if (!resultsObj[ip] || (resultsObj[ip].folder === 'SPAM' && folder === 'INBOX')) {
-                                                    resultsObj[ip] = { folder, returnPath, headerRdns };
+                                                
+                                                const safeIp = ip.replace(/\./g, '_');
+                                                const stateRdns = (rdnsMap[safeIp] || '').toLowerCase().trim();
+                                                const targetRdns = stateRdns || headerRdns;
+                                                const rpFull = returnPath.toLowerCase().trim();
+                                                const rpDomain = rpFull.includes('@') ? rpFull.split('@')[1] : rpFull;
+
+                                                let statusVal = 'none';
+                                                if (folder === 'INBOX') {
+                                                    const isMatch = (targetRdns && (rpFull.includes(targetRdns) || targetRdns.includes(rpDomain)));
+                                                    statusVal = isMatch ? 'rdns' : 'rp_test';
+                                                } else if (folder === 'SPAM') {
+                                                    statusVal = 'spam';
+                                                }
+
+                                                const priority = { 'rdns': 3, 'rp_test': 2, 'spam': 1, 'none': 0 };
+                                                const existing = resultsObj[ip];
+                                                let replace = false;
+                                                if (!existing) {
+                                                    replace = true;
+                                                } else {
+                                                    const existingStatus = existing.status || 'none';
+                                                    if (priority[statusVal] > priority[existingStatus]) {
+                                                        replace = true;
+                                                    }
+                                                }
+
+                                                if (replace) {
+                                                    resultsObj[ip] = { folder, returnPath, headerRdns, status: statusVal };
                                                 }
                                             }
                                         }
