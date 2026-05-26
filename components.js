@@ -165,6 +165,9 @@ function renderTopBar(app) {
                 <button onclick="window.app.triggerRPSpfCheck()" ${checking ? 'disabled' : ''} style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--accent-primary); border: none; color: white;">
                     ${checking ? 'Checking...' : '<i data-lucide="refresh-cw" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Check SPF'}
                 </button>
+                <button onclick="window.app.bulkAutoDetectRPSpf()" ${app.state.rpAutoDetecting ? 'disabled' : ''} style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: #8B5CF6; border: none; color: white;">
+                    ${app.state.rpAutoDetecting ? '<i data-lucide="loader" class="spin" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Detecting ' + (app.state.rpAutoDetectProgress ? app.state.rpAutoDetectProgress.current + '/' + app.state.rpAutoDetectProgress.total : '...') : '<i data-lucide="scan" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Auto-Detect All'}
+                </button>
                 <button onclick="showImportRPInventoryModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary);"><i data-lucide="upload" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Bulk Import</button>
                 <button onclick="showAddRPInventoryItemModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto;"><i data-lucide="plus" style="width:12px; vertical-align:middle; margin-right:4px;"></i> New RP</button>
             ` : ''}
@@ -4688,7 +4691,13 @@ window.showAddRPInventoryItemModal = () => {
             <form id="rp-add-form" style="display: flex; flex-direction: column; gap: 16px;">
                 <div>
                     <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase;">RP Domain *</label>
-                    <input type="text" id="add-rp-domain" required class="rp-input" placeholder="e.g. orchid-lifestyle.com">
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="add-rp-domain" required class="rp-input" placeholder="e.g. orchid-lifestyle.com" style="flex:1;">
+                        <button type="button" id="rp-auto-detect-btn" style="padding: 6px 14px; font-size: 0.75rem; background: #8B5CF6; border: none; color: white; border-radius: 6px; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 4px;">
+                            <i data-lucide="scan" style="width:12px;"></i> Auto-Detect
+                        </button>
+                    </div>
+                    <div id="rp-auto-detect-status" style="font-size: 0.7rem; margin-top: 4px; min-height: 16px;"></div>
                 </div>
                 <div>
                     <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase;">Domain included</label>
@@ -4759,5 +4768,39 @@ window.showAddRPInventoryItemModal = () => {
         }).then(() => {
             overlay.remove();
         });
+    });
+
+    // Auto-detect button handler
+    document.getElementById('rp-auto-detect-btn').addEventListener('click', async () => {
+        const domain = document.getElementById('add-rp-domain').value.trim();
+        const statusEl = document.getElementById('rp-auto-detect-status');
+        const btn = document.getElementById('rp-auto-detect-btn');
+        if (!domain) {
+            statusEl.innerHTML = '<span style="color:var(--error);">Enter a domain first.</span>';
+            return;
+        }
+        btn.disabled = true;
+        btn.innerHTML = '<i data-lucide="loader" class="spin" style="width:12px;"></i> Scanning...';
+        if (window.lucide) window.lucide.createIcons();
+        statusEl.innerHTML = '<span style="color:var(--text-secondary);">Looking up SPF record...</span>';
+        try {
+            const resp = await fetch('/api/extract-spf-info?domain=' + encodeURIComponent(domain));
+            const data = await resp.json();
+            if (data && data.success && data.found) {
+                document.getElementById('add-rp-domain-inc').value = data.domainIncluded || '';
+                document.getElementById('add-rp-subdomain-inc').value = data.subdomainIncluded || '';
+                if (data.server) document.getElementById('add-rp-srv').value = data.server;
+                if (data.spfType) document.getElementById('add-rp-spftype').value = data.spfType;
+                if (data.rpType) document.getElementById('add-rp-rptype').value = data.rpType;
+                statusEl.innerHTML = '<span style="color:var(--success);">✓ Found! Server: ' + (data.server || 'N/A') + ' | Type: ' + (data.rpType || '') + ' | via ' + (data.matchedVia || '') + '</span>';
+            } else {
+                statusEl.innerHTML = '<span style="color:var(--warning);">No matching infrastructure found in SPF.</span>';
+            }
+        } catch (err) {
+            statusEl.innerHTML = '<span style="color:var(--error);">Error: ' + err.message + '</span>';
+        }
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="scan" style="width:12px;"></i> Auto-Detect';
+        if (window.lucide) window.lucide.createIcons();
     });
 };

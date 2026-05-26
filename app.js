@@ -1242,6 +1242,69 @@ class TeamApp {
             this.updateDashboard();
         }
     }
+
+    async autoDetectSingleRP(rpId) {
+        const item = (this.state.rpInventory || []).find(i => i.id === rpId);
+        if (!item || !item.rpDomain) return null;
+        try {
+            const resp = await fetch('/api/extract-spf-info?domain=' + encodeURIComponent(item.rpDomain));
+            const data = await resp.json();
+            if (data && data.success && data.found) {
+                item.domainIncluded = data.domainIncluded || '';
+                item.subdomainIncluded = data.subdomainIncluded || '';
+                if (data.server) item.srv = data.server;
+                if (data.spfType) item.spfType = data.spfType;
+                if (data.rpType) item.rpType = data.rpType;
+                return data;
+            }
+            return data;
+        } catch (e) {
+            console.error('Auto-detect error for', item.rpDomain, e);
+            return null;
+        }
+    }
+
+    async bulkAutoDetectRPSpf() {
+        const items = (this.state.rpInventory || []).filter(i =>
+            i.rpDomain && (!i.domainIncluded || i.domainIncluded === '---' || i.domainIncluded === '')
+        );
+        if (items.length === 0) {
+            alert('All RPs already have Domain Included filled.');
+            return;
+        }
+        this.state.rpAutoDetecting = true;
+        this.state.rpAutoDetectProgress = { current: 0, total: items.length };
+        this.updateDashboard();
+
+        let filled = 0;
+        const batchSize = 5;
+        for (let i = 0; i < items.length; i += batchSize) {
+            const batch = items.slice(i, i + batchSize);
+            await Promise.all(batch.map(async (item) => {
+                try {
+                    const resp = await fetch('/api/extract-spf-info?domain=' + encodeURIComponent(item.rpDomain));
+                    const data = await resp.json();
+                    if (data && data.success && data.found) {
+                        item.domainIncluded = data.domainIncluded || '';
+                        item.subdomainIncluded = data.subdomainIncluded || '';
+                        if (data.server) item.srv = data.server;
+                        if (data.spfType) item.spfType = data.spfType;
+                        if (data.rpType) item.rpType = data.rpType;
+                        filled++;
+                    }
+                } catch (e) {
+                    console.error('Bulk detect error:', item.rpDomain, e);
+                }
+            }));
+            this.state.rpAutoDetectProgress.current = Math.min(i + batchSize, items.length);
+            this.updateDashboard();
+        }
+
+        this.state.rpAutoDetecting = false;
+        this.saveState();
+        this.updateDashboard();
+        alert(`Auto-detect complete!\n${filled} of ${items.length} RPs filled.`);
+    }
 }
 
 // App is instantiated in window.onload at the top of the file

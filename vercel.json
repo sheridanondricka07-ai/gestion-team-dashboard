@@ -20,6 +20,9 @@
     },
     "api/check-rp-spf.js": {
       "maxDuration": 60
+    },
+    "api/extract-spf-info.js": {
+      "maxDuration": 30
     }
   },
   "rewrites": [
