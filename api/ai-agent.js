@@ -270,27 +270,54 @@ GUIDELINES:
             });
 
             const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+            
+            let apiResponse;
+            let retries = 4;
+            let delay = 1500;
+            let errData = {};
 
-            const apiResponse = await fetch(geminiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    contents: contents,
-                    systemInstruction: {
-                        parts: [{ text: systemPrompt }]
-                    },
-                    generationConfig: {
-                        temperature: 0.2,
-                        maxOutputTokens: 2500
+            for (let i = 0; i < retries; i++) {
+                try {
+                    apiResponse = await fetch(geminiUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            contents: contents,
+                            systemInstruction: {
+                                parts: [{ text: systemPrompt }]
+                            },
+                            generationConfig: {
+                                temperature: 0.2,
+                                maxOutputTokens: 2500
+                            }
+                        })
+                    });
+
+                    if (apiResponse.ok) {
+                        break; // Success! Exit retry loop
                     }
-                })
-            });
 
-            if (!apiResponse.ok) {
-                const errData = await apiResponse.json().catch(() => ({}));
-                console.error('Gemini API Error:', errData);
+                    errData = await apiResponse.json().catch(() => ({}));
+                    console.warn(`Gemini API attempt ${i + 1} failed:`, errData);
+                    
+                    // Stop retrying if it's a permanent error (like invalid API key)
+                    if (apiResponse.status === 400 && errData.error?.message?.toLowerCase().includes('key')) {
+                        break;
+                    }
+                } catch (e) {
+                    console.error(`Gemini API attempt ${i + 1} threw error:`, e);
+                    errData = { error: { message: e.message } };
+                }
+
+                if (i < retries - 1) {
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    delay *= 1.5; // Exponential backoff
+                }
+            }
+
+            if (!apiResponse || !apiResponse.ok) {
                 return res.status(200).json({
                     response: `⚠️ <b>Error communicating with Gemini API.</b><br>Please verify that your API key is correct and valid. Developer message: <i>${errData.error?.message || 'Unknown error'}</i>`
                 });
