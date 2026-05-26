@@ -24,7 +24,7 @@ export default async function handler(req, res) {
     try {
         const connection = await imap.connect(config);
         const results = {}; // { [ip]: { folder: 'INBOX'|'SPAM', returnPath: '...' } }
-        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+        const oneHourAgo = new Date(Date.now() - 1 * 60 * 60 * 1000);
         
         const boxes = ['INBOX', '[Gmail]/Spam'];
 
@@ -40,13 +40,13 @@ export default async function handler(req, res) {
                 };
 
                 const messages = await connection.search(searchCriteria, fetchOptions);
-                const sortedMessages = messages.sort((a, b) => b.attributes.uid - a.attributes.uid).slice(0, 500);
+                const sortedMessages = messages.sort((a, b) => b.attributes.uid - a.attributes.uid);
 
                 for (const msg of sortedMessages) {
                     const headerPart = msg.parts.find(part => part.which === 'HEADER');
                     const msgDate = new Date(msg.attributes.date);
 
-                    if (msgDate < twoHoursAgo) continue;
+                    if (msgDate < oneHourAgo) break;
 
                     const headers = headerPart.body;
                     

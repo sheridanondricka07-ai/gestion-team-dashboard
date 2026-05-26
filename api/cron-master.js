@@ -38,8 +38,8 @@ async function updateFirebaseData(path, data) {
 }
 
 async function sendTelegram(message) {
-    const token = "8737550836:AAFK68Ig7xyW3KIvBhI5gpO1bGaPTwUimr0";
-    const chatId = "-5252005797";
+    const token = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
+    const chatId = "-4933333573";
     
     try {
         const controller = new AbortController();
@@ -315,17 +315,17 @@ export default async function handler(req, res) {
                 if (targetIps.length > 0) {
                     const connection = await imap.connect(config);
                     const boxes = ['INBOX', '[Gmail]/Spam'];
-                    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+                    const oneHourAgo = new Date(Date.now() - 1 * 60 * 60 * 1000);
 
                     for (const boxName of boxes) {
                         try {
                             await connection.openBox(boxName);
                             const searchCriteria = [['SINCE', new Date()]];
                             const messages = await connection.search(searchCriteria, { bodies: ['HEADER'], markSeen: false });
-                            const sorted = messages.sort((a, b) => b.attributes.uid - a.attributes.uid).slice(0, 500);
+                            const sorted = messages.sort((a, b) => b.attributes.uid - a.attributes.uid);
 
                             for (const msg of sorted) {
-                                if (new Date(msg.attributes.date) < twoHoursAgo) continue;
+                                if (new Date(msg.attributes.date) < oneHourAgo) break;
                                 
                                 const headers = msg.parts.find(p => p.which === 'HEADER').body;
                                 const headerKeys = Object.keys(headers);
@@ -379,7 +379,7 @@ export default async function handler(req, res) {
                     const telegramMessage = `⚠️ <b>Daily Gmail IP Delivery Sync: IPs Not Found</b>\n` +
                                             `📅 <b>Date:</b> ${formattedDate}\n` +
                                             `⏰ <b>Time:</b> 10:30 AM (Morocco Time)\n\n` +
-                                            `🔴 <b>No IPs Found:</b> No delivery data or IP headers were matched in your recent emails (last 2 hours).\n` +
+                                            `🔴 <b>No IPs Found:</b> No delivery data or IP headers were matched in your recent emails (last hour).\n` +
                                             `<i>All target IPs have been marked as DOWN in the dashboard. Please verify test email delivery.</i>`;
                     await sendTelegram(telegramMessage);
 
