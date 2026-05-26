@@ -402,7 +402,7 @@ class TeamApp {
 
     detectServers(ipString) {
         if (!ipString || ipString === '---') return 'Unknown Server';
-        const dropIps = ipString.split(/[\s,]+/).filter(ip => ip.trim());
+        const dropIps = ipString.split(/[\s,|]+/).filter(ip => ip.trim());
         const detected = [];
         if (this.state.servers) {
             this.state.servers.forEach(srv => {
