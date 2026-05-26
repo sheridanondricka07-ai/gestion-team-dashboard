@@ -413,6 +413,24 @@ class TeamApp {
         return detected.length > 0 ? detected.join(', ') : 'Unknown Server';
     }
 
+    extractOfferId(offerStr) {
+        if (!offerStr) return '';
+        const cleanStr = offerStr.trim();
+        // 1. Check for digits in parentheses at start, e.g. (9654)
+        const parenMatch = cleanStr.match(/^\((\d+)\)/);
+        if (parenMatch) return parenMatch[1];
+
+        // 2. Check for starting digits followed by space, pipe, or other non-digit separator, e.g. 17008 | or 32953
+        const prefixMatch = cleanStr.match(/^(\d+)\s*(?:\||\s|$)/);
+        if (prefixMatch) return prefixMatch[1];
+
+        // 3. Fallback: search for any sequence of 4-6 digits in the string
+        const fallbackMatch = cleanStr.match(/\b(\d{4,6})\b/);
+        if (fallbackMatch) return fallbackMatch[1];
+
+        return '';
+    }
+
     async addDrop(dropData) {
         const now = new Date();
         const rev = parseFloat(dropData.rev) || 0;
@@ -426,6 +444,7 @@ class TeamApp {
             id: 'drop_' + Date.now(),
             entity: dropData.entity || 'WMN3',
             offer: dropData.offer,
+            offerId: this.extractOfferId(dropData.offer),
             date: now.toISOString(),
             displayDate: now.toLocaleString(),
             deployIds: dropData.deployIds,
@@ -462,9 +481,12 @@ class TeamApp {
             const cpm = totalOut > 0 ? (rev * 1000) / totalOut : 0;
             const epc = clicks > 0 ? rev / clicks : 0;
 
+            const offer = updates.offer !== undefined ? updates.offer : current.offer;
+
             this.state.drops[index] = { 
                 ...current, 
                 ...updates,
+                offerId: this.extractOfferId(offer),
                 totalOut, rev, clicks, cpm, epc,
                 servers: updates.ips ? this.detectServers(updates.ips) : current.servers
             };
@@ -670,7 +692,7 @@ class TeamApp {
                             });
                         }
                         
-                        // Also patch existing drops that show "N/A"
+                        // Also patch existing drops that show "N/A" or lack offerId
                         if (this.state.drops && Array.isArray(this.state.drops)) {
                             this.state.drops.forEach(d => {
                                 const cleanName = (d.mailerName || '').trim();
@@ -680,6 +702,10 @@ class TeamApp {
                                 }
                                 if (!d.servers) {
                                     d.servers = this.detectServers(d.ips);
+                                    patched = true;
+                                }
+                                if (d.offer && !d.offerId) {
+                                    d.offerId = this.extractOfferId(d.offer);
                                     patched = true;
                                 }
                             });

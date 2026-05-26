@@ -1,5 +1,17 @@
 const DB_URL = "https://gestion-team-c-default-rtdb.firebaseio.com";
 
+function extractOfferId(offerStr) {
+    if (!offerStr) return '';
+    const cleanStr = offerStr.trim();
+    const parenMatch = cleanStr.match(/^\((\d+)\)/);
+    if (parenMatch) return parenMatch[1];
+    const prefixMatch = cleanStr.match(/^(\d+)\s*(?:\||\s|$)/);
+    if (prefixMatch) return prefixMatch[1];
+    const fallbackMatch = cleanStr.match(/\b(\d{4,6})\b/);
+    if (fallbackMatch) return fallbackMatch[1];
+    return '';
+}
+
 async function getFirebaseData(path) {
     try {
         const resp = await fetch(`${DB_URL}/${path}.json`);
@@ -101,9 +113,47 @@ export default async function handler(req, res) {
             .map(([domain, count]) => `- ${domain}: ${count} IPs`)
             .join('\n');
 
+        // Pre-compute offer stats across ALL drops
+        const offerStats = {};
+        drops.forEach(d => {
+            if (!d || !d.offer) return;
+            const offerStr = d.offer;
+            const oId = d.offerId || extractOfferId(offerStr);
+            const key = oId || offerStr;
+            
+            if (!offerStats[key]) {
+                offerStats[key] = {
+                    id: oId || 'N/A',
+                    name: offerStr,
+                    totalRev: 0,
+                    totalClicks: 0,
+                    totalOut: 0,
+                    count: 0
+                };
+            }
+            
+            offerStats[key].totalRev += parseFloat(d.rev || 0);
+            offerStats[key].totalClicks += parseFloat(d.clicks || 0);
+            offerStats[key].totalOut += parseFloat(d.totalOut || 0);
+            offerStats[key].count += 1;
+            
+            // Keep the cleanest name (with ID or longest name)
+            if (offerStr.length > offerStats[key].name.length) {
+                offerStats[key].name = offerStr;
+            }
+        });
+
+        const sortedOffers = Object.values(offerStats).sort((a, b) => b.totalRev - a.totalRev);
+        
+        const topOffersBreakdown = sortedOffers.slice(0, 20).map((o, idx) => {
+            const epc = o.totalClicks > 0 ? (o.totalRev / o.totalClicks).toFixed(2) : '0.00';
+            const cpm = o.totalOut > 0 ? ((o.totalRev * 1000) / o.totalOut).toFixed(2) : '0.00';
+            return `- Rank ${idx + 1}: [ID: ${o.id}] "${o.name}" - Total Rev: $${o.totalRev.toLocaleString('en-US', { minimumFractionDigits: 2 })} | Drops: ${o.count} | EPC: $${epc} | CPM: $${cpm}`;
+        }).join('\n');
+
         const formattedDrops = drops.slice(-50).map(d => {
             if (!d) return null;
-            return `- Date: ${d.date}, Mailer: ${d.mailerName}, Offer: ${d.offer}, EPC: $${d.epc || 0}, CPM: $${d.cpm || 0}, Rev: $${d.rev || 0}`;
+            return `- Date: ${d.date}, Mailer: ${d.mailerName}, Offer: ${d.offer}, OfferID: ${d.offerId || extractOfferId(d.offer)}, EPC: $${d.epc || 0}, CPM: $${d.cpm || 0}, Rev: $${d.rev || 0}`;
         }).filter(Boolean).join('\n');
 
         const formattedMailers = mailers.map(m => {
@@ -133,6 +183,10 @@ VMTA DOMAIN BREAKDOWN (PRE-COMPUTED — USE THESE EXACT NUMBERS):
 ------------------
 ${domainBreakdown || 'No VMTA domains detected.'}
 
+TOP PERFORMING OFFERS (PRE-COMPUTED BY REVENUE — USE THESE FOR TOP OFFERS / ANALYTICS):
+------------------
+${topOffersBreakdown || 'No top offer statistics computed.'}
+
 CURRENT REAL-TIME CONTEXT DATA:
 ------------------
 TODAY'S DATE/TIME: ${new Date().toLocaleString()}
@@ -152,7 +206,8 @@ GUIDELINES:
 2. Format your response cleanly using HTML tags for maximum compatibility with the chat window (e.g. <b>, <i>, <ul>, <li>, <pre>, <code>, <br>). Do not use markdown headers (like #, ##) in the HTML output; use bold text or styled headers instead.
 3. Be professional, direct, and actionable. Provide statistical summaries or warnings if you notice listed IPs or low-performing drops.
 4. If the user asks about VMTA extensions, VMTA TLDs, VMTA domains, or domain breakdowns, reference the VMTA TLD BREAKDOWN and VMTA DOMAIN BREAKDOWN sections above.
-5. If the user asks you to perform a task outside of analyzing/extracting this data, guide them back to server administration or performance analytics.`;
+5. If the user asks for the "top offer" or offer analytics, look at the TOP PERFORMING OFFERS section above. Explain the rank, name, ID, total revenue, drops, EPC, and CPM.
+6. If the user asks you to perform a task outside of analyzing/extracting this data, guide them back to server administration or performance analytics.`;
 
         let responseText = '';
 
