@@ -4118,7 +4118,7 @@ function _renderRPsInventory(app, container) {
 
         <div class="rps-inventory-container">
             ${isSpfRunning ? `
-                <div id="rp-spf-progress-container" class="card" style="padding: 16px 20px; background: var(--bg-secondary); border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px; animation: fadeIn 0.3s ease;">
+                <div id="rp-spf-progress-container" class="card" style="padding: 16px 20px; background: var(--bg-secondary); border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px; animation: fadeIn 0.3s ease; margin-bottom: 16px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; font-weight: 600;">
                         <span style="display: flex; align-items: center; gap: 8px;">
                             <i data-lucide="refresh-cw" class="rotating" style="width: 14px; color: var(--accent-primary);"></i>
@@ -4130,6 +4130,23 @@ function _renderRPsInventory(app, container) {
                     </div>
                     <div class="progress-container progress-active" style="margin: 4px 0 0 0; height: 8px;">
                         <div class="progress-bar" style="width: ${Math.round((rpSpfProgress.current / rpSpfProgress.total) * 100)}%; height: 100%;"></div>
+                    </div>
+                </div>
+            ` : ''}
+
+            ${app.state.rpAutoDetecting ? `
+                <div id="rp-autodetect-progress-container" class="card" style="padding: 16px 20px; background: var(--bg-secondary); border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px; animation: fadeIn 0.3s ease; margin-bottom: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; font-weight: 600;">
+                        <span style="display: flex; align-items: center; gap: 8px;">
+                            <i data-lucide="scan" class="rotating" style="width: 14px; color: #8B5CF6;"></i>
+                            Auto-Detecting SPF Records...
+                        </span>
+                        <span id="rp-autodetect-progress-text" style="color: var(--text-secondary);">
+                            ${Math.round(((app.state.rpAutoDetectProgress ? app.state.rpAutoDetectProgress.current : 0) / (app.state.rpAutoDetectProgress ? app.state.rpAutoDetectProgress.total : 1)) * 100)}% (${app.state.rpAutoDetectProgress ? app.state.rpAutoDetectProgress.current : 0}/${app.state.rpAutoDetectProgress ? app.state.rpAutoDetectProgress.total : 0})
+                        </span>
+                    </div>
+                    <div class="progress-container progress-active" style="margin: 4px 0 0 0; height: 8px; background: rgba(139, 92, 246, 0.1);">
+                        <div class="progress-bar" style="width: ${Math.round(((app.state.rpAutoDetectProgress ? app.state.rpAutoDetectProgress.current : 0) / (app.state.rpAutoDetectProgress ? app.state.rpAutoDetectProgress.total : 1)) * 100)}%; height: 100%; background: #8B5CF6;"></div>
                     </div>
                 </div>
             ` : ''}
