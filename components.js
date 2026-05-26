@@ -3483,6 +3483,47 @@ window.renderAiAgent = (app, container) => {
         app.aiChatHistory = [];
     }
 
+    // Preserve textarea focus and typed content by only updating messages list when already rendered
+    const existingInput = document.getElementById('ai-chat-input');
+    if (existingInput) {
+        const messagesDiv = document.getElementById('ai-chat-messages');
+        if (messagesDiv) {
+            const currentMessagesHTML = app.aiChatHistory.length === 0 ? `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; max-width: 400px; margin: 0 auto; gap: 16px; opacity: 0.85;">
+                    <div style="background: rgba(59, 130, 246, 0.1); color: var(--accent-primary); width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(59,130,246,0.15);">
+                        <i data-lucide="bot" style="width: 28px;"></i>
+                    </div>
+                    <div>
+                        <h5 style="margin: 0 0 6px 0; font-size: 0.95rem;">Ask your AI Assistant</h5>
+                        <p style="margin: 0; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5;">
+                            I have read your current dashboard data. Ask me to find blacklisted IPs, compute average EPCs, summarize top offers, or audit servers!
+                        </p>
+                    </div>
+                </div>
+            ` : app.aiChatHistory.map(msg => `
+                <div style="display: flex; justify-content: ${msg.role === 'user' ? 'flex-end' : 'flex-start'};">
+                    <div style="max-width: 80%; padding: 12px 16px; border-radius: 12px; font-size: 0.85rem; line-height: 1.5; ${msg.role === 'user' 
+                        ? 'background: linear-gradient(135deg, var(--accent-primary) 0%, #2563eb 100%); color: #fff; border-bottom-right-radius: 2px; box-shadow: 0 4px 12px rgba(59,130,246,0.2);' 
+                        : 'background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); border-bottom-left-radius: 2px;'
+                    }">
+                        ${msg.text}
+                    </div>
+                </div>
+            `).join('');
+
+            // Normalize whitespace comparison
+            const normExisting = messagesDiv.innerHTML.replace(/\s+/g, ' ').trim();
+            const normNew = currentMessagesHTML.replace(/\s+/g, ' ').trim();
+
+            if (normExisting !== normNew) {
+                messagesDiv.innerHTML = currentMessagesHTML;
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                if (window.lucide) window.lucide.createIcons();
+            }
+        }
+        return;
+    }
+
     container.innerHTML = `
         <div style="padding: 24px; display: flex; flex-direction: column; height: calc(100vh - 64px); max-height: calc(100vh - 64px); overflow: hidden; gap: 20px;">
             
