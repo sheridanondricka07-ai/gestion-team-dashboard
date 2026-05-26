@@ -778,15 +778,21 @@ function renderOverview(app, container) {
         });
     }
 
-    // Offer Statistics
+    // Offer Statistics — group by offerId so same-offer drops consolidate
     const offerStatsMap = {};
     activeRangeDrops.forEach(d => {
         const offerName = d.offer || 'Unknown Offer';
-        if (!offerStatsMap[offerName]) {
-            offerStatsMap[offerName] = { name: offerName, rev: 0, count: 0 };
+        const oId = d.offerId || (window.app ? window.app.extractOfferId(offerName) : '');
+        const key = oId || offerName; // fallback to full name if no ID extracted
+        if (!offerStatsMap[key]) {
+            offerStatsMap[key] = { name: offerName, offerId: oId, rev: 0, count: 0 };
         }
-        offerStatsMap[offerName].rev += d.rev || 0;
-        offerStatsMap[offerName].count++;
+        offerStatsMap[key].rev += d.rev || 0;
+        offerStatsMap[key].count++;
+        // Keep the longest/most descriptive offer name for display
+        if (offerName.length > offerStatsMap[key].name.length) {
+            offerStatsMap[key].name = offerName;
+        }
     });
     const offerStatsList = Object.values(offerStatsMap).sort((a, b) => b.rev - a.rev);
 
