@@ -744,7 +744,7 @@ class TeamApp {
                         }
                         
                         this.updateDashboard();
-                        if (!this.state.currentUser) renderLogin(this);
+                        if (!this.state.currentUser && !document.getElementById('login-form')) renderLogin(this);
 
                         if (!this.hasCheckedCancellations) {
                             this.hasCheckedCancellations = true;
