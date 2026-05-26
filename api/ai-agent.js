@@ -151,9 +151,42 @@ export default async function handler(req, res) {
             return `- Rank ${idx + 1}: [ID: ${o.id}] "${o.name}" - Total Rev: $${o.totalRev.toLocaleString('en-US', { minimumFractionDigits: 2 })} | Drops: ${o.count} | EPC: $${epc} | CPM: $${cpm}`;
         }).join('\n');
 
+        // Pre-compute server stats across ALL drops
+        const serverStats = {};
+        drops.forEach(d => {
+            if (!d) return;
+            const serverStr = d.servers || 'Unknown Server';
+            // Split comma-separated server list
+            const servList = serverStr.split(',').map(s => s.trim()).filter(Boolean);
+            
+            servList.forEach(sName => {
+                if (!serverStats[sName]) {
+                    serverStats[sName] = {
+                        name: sName,
+                        totalRev: 0,
+                        totalClicks: 0,
+                        totalOut: 0,
+                        count: 0
+                    };
+                }
+                serverStats[sName].totalRev += parseFloat(d.rev || 0);
+                serverStats[sName].totalClicks += parseFloat(d.clicks || 0);
+                serverStats[sName].totalOut += parseFloat(d.totalOut || 0);
+                serverStats[sName].count += 1;
+            });
+        });
+
+        const sortedServers = Object.values(serverStats).sort((a, b) => b.totalRev - a.totalRev);
+        
+        const topServersBreakdown = sortedServers.map((s, idx) => {
+            const epc = s.totalClicks > 0 ? (s.totalRev / s.totalClicks).toFixed(2) : '0.00';
+            const cpm = s.totalOut > 0 ? ((s.totalRev * 1000) / s.totalOut).toFixed(2) : '0.00';
+            return `- Rank ${idx + 1}: Server "${s.name}" - Total Rev: $${s.totalRev.toLocaleString('en-US', { minimumFractionDigits: 2 })} | Drops: ${s.count} | EPC: $${epc} | CPM: $${cpm}`;
+        }).join('\n');
+
         const formattedDrops = drops.slice(-50).map(d => {
             if (!d) return null;
-            return `- Date: ${d.date}, Mailer: ${d.mailerName}, Offer: ${d.offer}, OfferID: ${d.offerId || extractOfferId(d.offer)}, EPC: $${d.epc || 0}, CPM: $${d.cpm || 0}, Rev: $${d.rev || 0}`;
+            return `- Date: ${d.date}, Mailer: ${d.mailerName}, Server: ${d.servers || 'N/A'}, Offer: ${d.offer}, OfferID: ${d.offerId || extractOfferId(d.offer)}, EPC: $${d.epc || 0}, CPM: $${d.cpm || 0}, Rev: $${d.rev || 0}`;
         }).filter(Boolean).join('\n');
 
         const formattedMailers = mailers.map(m => {
@@ -187,6 +220,10 @@ TOP PERFORMING OFFERS (PRE-COMPUTED BY REVENUE — USE THESE FOR TOP OFFERS / AN
 ------------------
 ${topOffersBreakdown || 'No top offer statistics computed.'}
 
+TOP PERFORMING SERVERS (PRE-COMPUTED BY REVENUE — USE THESE FOR SERVER REVENUE / ANALYTICS):
+------------------
+${topServersBreakdown || 'No top server statistics computed.'}
+
 CURRENT REAL-TIME CONTEXT DATA:
 ------------------
 TODAY'S DATE/TIME: ${new Date().toLocaleString()}
@@ -207,7 +244,8 @@ GUIDELINES:
 3. Be professional, direct, and actionable. Provide statistical summaries or warnings if you notice listed IPs or low-performing drops.
 4. If the user asks about VMTA extensions, VMTA TLDs, VMTA domains, or domain breakdowns, reference the VMTA TLD BREAKDOWN and VMTA DOMAIN BREAKDOWN sections above.
 5. If the user asks for the "top offer" or offer analytics, look at the TOP PERFORMING OFFERS section above. Explain the rank, name, ID, total revenue, drops, EPC, and CPM.
-6. If the user asks you to perform a task outside of analyzing/extracting this data, guide them back to server administration or performance analytics.`;
+6. If the user asks for the "top server", "server revenue", or server performance analytics, look at the TOP PERFORMING SERVERS section above. Explain the rank, name, total revenue, drops, EPC, and CPM.
+7. If the user asks you to perform a task outside of analyzing/extracting this data, guide them back to server administration or performance analytics.`;
 
         let responseText = '';
 
