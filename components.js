@@ -2059,13 +2059,18 @@ function renderStatus(app, container) {
                             ${filteredServers.map((srv, srvIdx) => {
                                 const srvIps = srv.filteredIps || [];
                                 const rowBg = srvIdx % 2 === 0 ? 'var(--bg-secondary)' : 'var(--bg-primary)';
+                                const isCancel = srv.markedForCancel === true;
+                                const finalSrvBg = isCancel ? 'rgba(249, 115, 22, 0.12)' : rowBg;
+                                const finalSrvColor = isCancel ? '#f97316' : 'inherit';
+                                const finalSrvBorderLeft = isCancel ? '4px solid #f97316' : '';
+                                const finalSrvPaddingLeft = isCancel ? '8px' : '12px';
                                 return srvIps.map((ip, idx) => {
                                     const isLastRow = idx === srvIps.length - 1;
                                     const borderBottom = isLastRow ? '3px solid var(--border-color)' : '1px solid var(--border-color)';
                                     
                                     return `
                                     <tr style="border-bottom: ${borderBottom};">
-                                        ${idx === 0 ? `<td class="sticky-col-1" rowspan="${srvIps.length}" style="padding: 12px; font-weight: 700; border-right: 1px solid var(--border-color); background: ${rowBg}; vertical-align: top; border-bottom: 3px solid var(--border-color);">${srv.name}</td>` : ''}
+                                        ${idx === 0 ? `<td class="sticky-col-1" rowspan="${srvIps.length}" style="padding: 12px 12px 12px ${finalSrvPaddingLeft}; font-weight: 700; border-right: 1px solid var(--border-color); border-left: ${finalSrvBorderLeft}; background: ${finalSrvBg}; color: ${finalSrvColor}; vertical-align: top; border-bottom: 3px solid var(--border-color);">${srv.name}${isCancel ? '<div style="font-size: 0.55rem; background: rgba(249, 115, 22, 0.2); color: #f97316; padding: 2px 4px; border-radius: 4px; display: block; margin-top: 6px; font-weight: 800; border: 1px solid #f97316; width: max-content;">TO CANCEL</div>' : ''}</td>` : ''}
                                         <td class="sticky-col-2" style="padding: 12px; font-family: monospace; border-right: 1px solid var(--border-color); background: ${rowBg}; border-bottom: ${borderBottom};">
                                             <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
                                                 <span>${ip}</span>
