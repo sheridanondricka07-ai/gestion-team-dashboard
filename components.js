@@ -2015,15 +2015,15 @@ function renderStatus(app, container) {
             </div>
 
             <div class="card" style="padding: 0; overflow: hidden; border: 1px solid var(--border-color); background: var(--bg-secondary);">
-                <div id="status-scroll-container" style="overflow: auto; max-height: calc(100vh - 250px);">
-                    <table class="status-table" style="width: 100%; border-collapse: collapse; font-size: 0.75rem;">
-                        <thead style="position: sticky; top: 0; z-index: 10; background: var(--bg-tertiary);">
+                <div id="status-scroll-container">
+                    <table class="status-table">
+                        <thead>
                             ${STATUS_TYPES.filter(s => s.id !== 'none' && s.id !== 'bounce').map(s => {
                                 const isDown = s.id === 'down';
                                 const rowLabel = isDown ? 'DOWN + BOUNCE' : s.label;
                                 return `
                                 <tr style="font-size: 0.65rem;">
-                                    <th colspan="2" style="padding: 4px 12px; text-align: right; background: var(--bg-tertiary); border-bottom: 1px solid var(--border-color); color: ${s.color}; font-weight: 700; border-right: 1px solid var(--border-color); position: sticky; left: 0; z-index: 11;">${rowLabel}</th>
+                                    <th colspan="2" style="padding: 4px 12px; text-align: right; background: var(--bg-tertiary); border-bottom: 1px solid var(--border-color); color: ${s.color}; font-weight: 700; border-right: 1px solid var(--border-color);">${rowLabel}</th>
                                     ${days.map((day, dIdx) => {
                                         const count = isDown ? (dailyStats[dIdx]['down'] + dailyStats[dIdx]['bounce']) : (dailyStats[dIdx][s.id] || 0);
                                         return `<th style="padding: 4px; text-align: center; background: ${s.color}; color: white; border-bottom: 1px solid var(--border-color); border-right: 1px solid var(--border-color); font-weight: 800;">${count}</th>`;
@@ -2032,7 +2032,7 @@ function renderStatus(app, container) {
                                 `;
                             }).join('')}
                             <tr>
-                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color); border-right: 1px solid var(--border-color); position: sticky; left: 0; z-index: 11; background: var(--bg-tertiary); min-width: 120px;">
+                                <th class="sticky-col-1" style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color); border-right: 1px solid var(--border-color); background: var(--bg-tertiary);">
                                     <div style="display: flex; align-items: center; justify-content: space-between;">
                                         <span>Server (${totalServers})</span>
                                         <div data-ips="${filteredServers.map(s => s.name).join(',')}" onclick="window.copyIPsFromAttr(this)" style="cursor: pointer; padding: 4px; border-radius: 4px; display: flex;" title="Copy all shown Servers" onmouseover="this.style.background='var(--bg-primary)'" onmouseout="this.style.background='transparent'">
@@ -2040,7 +2040,7 @@ function renderStatus(app, container) {
                                         </div>
                                     </div>
                                 </th>
-                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color); border-right: 1px solid var(--border-color); position: sticky; left: 120px; z-index: 11; background: var(--bg-tertiary); width: 140px;">
+                                <th class="sticky-col-2" style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color); border-right: 1px solid var(--border-color); background: var(--bg-tertiary);">
                                     <div style="display: flex; align-items: center; justify-content: space-between;">
                                         <span>IP Address (${totalIps})</span>
                                         <div data-ips="${filteredServers.map(s => s.filteredIps).flat().join(',')}" onclick="window.copyIPsFromAttr(this)" style="cursor: pointer; padding: 4px; border-radius: 4px; display: flex;" title="Copy all shown IPs" onmouseover="this.style.background='var(--bg-primary)'" onmouseout="this.style.background='transparent'">
@@ -2051,7 +2051,7 @@ function renderStatus(app, container) {
                                 ${days.map(d => {
                                     const [y, m, day] = d.split('-');
                                     const isSelected = d === app.selectedFilterDate;
-                                    return `<th style="padding: 12px; text-align: center; border-bottom: 2px solid var(--border-color); min-width: 80px; font-weight: 700; border-right: 1px solid var(--border-color); ${isSelected ? 'background: var(--bg-primary); border-top: 2px solid var(--accent-primary);' : ''}"> ${day}/${m}</th>`;
+                                    return `<th style="padding: 12px; text-align: center; border-bottom: 2px solid var(--border-color); font-weight: 700; border-right: 1px solid var(--border-color); ${isSelected ? 'background: var(--bg-primary); border-top: 2px solid var(--accent-primary);' : ''}"> ${day}/${m}</th>`;
                                 }).join('')}
                             </tr>
                         </thead>
@@ -2065,8 +2065,8 @@ function renderStatus(app, container) {
                                     
                                     return `
                                     <tr style="border-bottom: ${borderBottom};">
-                                        ${idx === 0 ? `<td rowspan="${srvIps.length}" style="padding: 12px; font-weight: 700; border-right: 1px solid var(--border-color); position: sticky; left: 0; background: ${rowBg}; z-index: 4; vertical-align: top; border-bottom: 3px solid var(--border-color);">${srv.name}</td>` : ''}
-                                        <td style="padding: 12px; font-family: monospace; border-right: 1px solid var(--border-color); position: sticky; left: 120px; background: ${rowBg}; z-index: 4; border-bottom: ${borderBottom};">
+                                        ${idx === 0 ? `<td class="sticky-col-1" rowspan="${srvIps.length}" style="padding: 12px; font-weight: 700; border-right: 1px solid var(--border-color); background: ${rowBg}; vertical-align: top; border-bottom: 3px solid var(--border-color);">${srv.name}</td>` : ''}
+                                        <td class="sticky-col-2" style="padding: 12px; font-family: monospace; border-right: 1px solid var(--border-color); background: ${rowBg}; border-bottom: ${borderBottom};">
                                             <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
                                                 <span>${ip}</span>
                                                 ${(() => {
@@ -2090,10 +2090,7 @@ function renderStatus(app, container) {
                                                     style="background: ${currentStatus.id === 'none' ? (isSelected ? 'rgba(255,255,255,0.02)' : 'transparent') : currentStatus.color}; text-align: center; cursor: cell; transition: opacity 0.2s; color: ${currentStatus.id === 'none' ? 'var(--text-secondary)' : 'white'}; font-weight: 600; font-size: 0.65rem; border-right: 1px solid var(--border-color); border-bottom: ${borderBottom}; height: 40px; user-select: none; ${isSelected ? 'outline: 1px inset rgba(59, 130, 246, 0.2); outline-offset: -1px;' : ''}" 
                                                     onclick="openStatusMenu(event, '${ip}', '${date}', this)"
                                                     onmousedown="startCellDrag(event, '${ip}', '${date}', this)"
-                                                    onmouseenter="enterCellDrag(event, '${ip}', '${date}', this)"
-                                                    onmouseover="this.style.opacity='0.8'"
-                                                    onmouseout="this.style.opacity='1'"
-                                                    title="Click and drag to select cells, click to choose status">
+                                                    onmouseenter="enterCellDrag(event, '${ip}', '${date}', this)">
                                                     ${currentStatus.id !== 'none' ? currentStatus.label : ''}
                                                 </td>
                                             `;
