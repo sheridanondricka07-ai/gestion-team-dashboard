@@ -4408,12 +4408,12 @@ function _renderRPsInventory(app, container) {
                             <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Select Servers</label>
                             <div id="gen-servers-list" style="min-height: 120px; max-height: 200px; overflow-y: auto; padding: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; display: flex; flex-direction: column; gap: 4px;">
                                 ${(app.state.servers || []).map(srv => {
-                                    return \`
+                                    return `
                                     <label style="display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: background 0.15s;" onmouseover="this.style.background='var(--bg-tertiary)'" onmouseout="this.style.background='transparent'">
-                                        <input type="checkbox" class="gen-srv-checkbox" value="\${srv.name}" style="accent-color: var(--accent-primary); cursor: pointer;">
-                                        <span style="font-weight: 500;">\${srv.name}</span>
-                                        <span style="color: var(--text-secondary); font-size: 0.7rem; margin-left: auto;">\${(srv.allIps || []).length} IPs</span>
-                                    </label>\`;
+                                        <input type="checkbox" class="gen-srv-checkbox" value="${srv.name}" style="accent-color: var(--accent-primary); cursor: pointer;">
+                                        <span style="font-weight: 500;">${srv.name}</span>
+                                        <span style="color: var(--text-secondary); font-size: 0.7rem; margin-left: auto;">${(srv.allIps || []).length} IPs</span>
+                                    </label>`;
                                 }).join('')}
                             </div>
                             <div style="display: flex; gap: 8px;">
