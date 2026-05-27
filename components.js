@@ -4256,6 +4256,88 @@ function _renderRPsInventory(app, container) {
                 </div>
             </div>
 
+            <!-- Generate Records Section -->
+            <div class="card" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; margin-bottom: 8px;">
+                <div onclick="document.getElementById('gen-records-body').style.display = document.getElementById('gen-records-body').style.display === 'none' ? 'block' : 'none'; this.querySelector('.gen-chevron').style.transform = document.getElementById('gen-records-body').style.display === 'none' ? 'rotate(0deg)' : 'rotate(180deg)';"
+                     style="padding: 16px 20px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); transition: background 0.2s;"
+                     onmouseover="this.style.background='var(--bg-tertiary)'" onmouseout="this.style.background='transparent'">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div style="width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, #f97316, #ea580c); display: flex; align-items: center; justify-content: center;">
+                            <i data-lucide="file-text" style="width: 16px; color: white;"></i>
+                        </div>
+                        <div>
+                            <div style="font-weight: 700; font-size: 0.9rem;">Generate Records</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary);">Generate SPF/Arecord DNS entries from selected RPs & Servers</div>
+                        </div>
+                    </div>
+                    <i data-lucide="chevron-down" class="gen-chevron" style="width: 18px; color: var(--text-secondary); transition: transform 0.3s;"></i>
+                </div>
+                <div id="gen-records-body" style="display: none; padding: 20px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 16px;">
+                        <!-- RP Selection -->
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Select RPs <span style="font-weight: 400; text-transform: none; letter-spacing: 0;">(one per line, or use domain names)</span></label>
+                            <textarea id="gen-rp-input" placeholder="Enter RP domains (one per line)...\ne.g.:\nmy-rp-domain.com\nanother-rp.net" style="min-height: 120px; padding: 12px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8rem; resize: vertical; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent-primary)'" onblur="this.style.borderColor='var(--border-color)'"></textarea>
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                <button onclick="window.genRecordsFillFilteredRPs()" style="padding: 4px 10px; font-size: 0.7rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer;">
+                                    <i data-lucide="list" style="width: 10px; vertical-align: middle; margin-right: 3px;"></i>Fill from filtered list
+                                </button>
+                                <button onclick="document.getElementById('gen-rp-input').value=''" style="padding: 4px 10px; font-size: 0.7rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; cursor: pointer;">Clear</button>
+                            </div>
+                        </div>
+
+                        <!-- Server Selection -->
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Select Servers</label>
+                            <div id="gen-servers-list" style="min-height: 120px; max-height: 200px; overflow-y: auto; padding: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; display: flex; flex-direction: column; gap: 4px;">
+                                ${(app.state.servers || []).map(srv => {
+                                    return `
+                                    <label style="display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: background 0.15s;" onmouseover="this.style.background='var(--bg-tertiary)'" onmouseout="this.style.background='transparent'">
+                                        <input type="checkbox" class="gen-srv-checkbox" value="${srv.name}" style="accent-color: var(--accent-primary); cursor: pointer;">
+                                        <span style="font-weight: 500;">${srv.name}</span>
+                                        <span style="color: var(--text-secondary); font-size: 0.7rem; margin-left: auto;">${(srv.allIps || []).length} IPs</span>
+                                    </label>`;
+                                }).join('')}
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button onclick="document.querySelectorAll('.gen-srv-checkbox').forEach(c => c.checked = true)" style="padding: 4px 10px; font-size: 0.7rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer;">Select All</button>
+                                <button onclick="document.querySelectorAll('.gen-srv-checkbox').forEach(c => c.checked = false)" style="padding: 4px 10px; font-size: 0.7rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; cursor: pointer;">Deselect All</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Record Type -->
+                    <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
+                        <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Record Type:</label>
+                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.85rem;">
+                            <input type="radio" name="gen-record-type" value="Include" checked style="accent-color: var(--accent-primary);">
+                            <span style="font-weight: 500;">Include</span> <span style="color: var(--text-secondary); font-size: 0.7rem;">(v=spf1 ip4:... -all)</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.85rem;">
+                            <input type="radio" name="gen-record-type" value="Arecord" style="accent-color: var(--accent-primary);">
+                            <span style="font-weight: 500;">Arecord</span> <span style="color: var(--text-secondary); font-size: 0.7rem;">(Arecords:...)</span>
+                        </label>
+                    </div>
+
+                    <!-- Generate Button -->
+                    <button onclick="window.generateDNSRecords()" style="padding: 10px 24px; font-size: 0.85rem; font-weight: 600; background: linear-gradient(135deg, #f97316, #ea580c); border: none; color: white; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+                        <i data-lucide="zap" style="width: 16px;"></i> Generate Records
+                    </button>
+
+                    <!-- Results -->
+                    <div id="gen-records-results" style="display: none; margin-top: 16px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Generated Records</label>
+                            <button onclick="navigator.clipboard.writeText(document.getElementById('gen-records-output').value); this.innerHTML='<i data-lucide=\\'check\\' style=\\'width:12px;color:var(--success)\\'></i> Copied!'; if(window.lucide) window.lucide.createIcons(); setTimeout(()=>{this.innerHTML='<i data-lucide=\\'copy\\' style=\\'width:12px\\'></i> Copy All'; if(window.lucide) window.lucide.createIcons();}, 2000);" style="padding: 4px 10px; font-size: 0.7rem; background: var(--accent-primary); border: none; color: white; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                                <i data-lucide="copy" style="width: 12px;"></i> Copy All
+                            </button>
+                        </div>
+                        <textarea id="gen-records-output" readonly style="width: 100%; min-height: 160px; padding: 12px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; color: #22c55e; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.78rem; resize: vertical; outline: none; line-height: 1.6;"></textarea>
+                        <div id="gen-records-count" style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 6px;"></div>
+                    </div>
+                </div>
+            </div>
+
             <div class="rp-table-card">
                 <div class="rp-table-wrapper">
                     <table class="rp-table">
@@ -4370,88 +4452,6 @@ function _renderRPsInventory(app, container) {
                             ` : ''}
                         </tbody>
                     </table>
-                </div>
-            </div>
-
-            <!-- Generate Records Section -->
-            <div class="card" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden;">
-                <div onclick="document.getElementById('gen-records-body').style.display = document.getElementById('gen-records-body').style.display === 'none' ? 'block' : 'none'; this.querySelector('.gen-chevron').style.transform = document.getElementById('gen-records-body').style.display === 'none' ? 'rotate(0deg)' : 'rotate(180deg)';"
-                     style="padding: 16px 20px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); transition: background 0.2s;"
-                     onmouseover="this.style.background='var(--bg-tertiary)'" onmouseout="this.style.background='transparent'">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <div style="width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, #f97316, #ea580c); display: flex; align-items: center; justify-content: center;">
-                            <i data-lucide="file-text" style="width: 16px; color: white;"></i>
-                        </div>
-                        <div>
-                            <div style="font-weight: 700; font-size: 0.9rem;">Generate Records</div>
-                            <div style="font-size: 0.7rem; color: var(--text-secondary);">Generate SPF/Arecord DNS entries from selected RPs & Servers</div>
-                        </div>
-                    </div>
-                    <i data-lucide="chevron-down" class="gen-chevron" style="width: 18px; color: var(--text-secondary); transition: transform 0.3s;"></i>
-                </div>
-                <div id="gen-records-body" style="display: none; padding: 20px;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 16px;">
-                        <!-- RP Selection -->
-                        <div style="display: flex; flex-direction: column; gap: 8px;">
-                            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Select RPs <span style="font-weight: 400; text-transform: none; letter-spacing: 0;">(one per line, or use domain names)</span></label>
-                            <textarea id="gen-rp-input" placeholder="Enter RP domains (one per line)...\ne.g.:\nmy-rp-domain.com\nanother-rp.net" style="min-height: 120px; padding: 12px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8rem; resize: vertical; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent-primary)'" onblur="this.style.borderColor='var(--border-color)'"></textarea>
-                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                                <button onclick="window.genRecordsFillFilteredRPs()" style="padding: 4px 10px; font-size: 0.7rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer;">
-                                    <i data-lucide="list" style="width: 10px; vertical-align: middle; margin-right: 3px;"></i>Fill from filtered list
-                                </button>
-                                <button onclick="document.getElementById('gen-rp-input').value=''" style="padding: 4px 10px; font-size: 0.7rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; cursor: pointer;">Clear</button>
-                            </div>
-                        </div>
-
-                        <!-- Server Selection -->
-                        <div style="display: flex; flex-direction: column; gap: 8px;">
-                            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Select Servers</label>
-                            <div id="gen-servers-list" style="min-height: 120px; max-height: 200px; overflow-y: auto; padding: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; display: flex; flex-direction: column; gap: 4px;">
-                                ${(app.state.servers || []).map(srv => {
-                                    return `
-                                    <label style="display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: background 0.15s;" onmouseover="this.style.background='var(--bg-tertiary)'" onmouseout="this.style.background='transparent'">
-                                        <input type="checkbox" class="gen-srv-checkbox" value="${srv.name}" style="accent-color: var(--accent-primary); cursor: pointer;">
-                                        <span style="font-weight: 500;">${srv.name}</span>
-                                        <span style="color: var(--text-secondary); font-size: 0.7rem; margin-left: auto;">${(srv.allIps || []).length} IPs</span>
-                                    </label>`;
-                                }).join('')}
-                            </div>
-                            <div style="display: flex; gap: 8px;">
-                                <button onclick="document.querySelectorAll('.gen-srv-checkbox').forEach(c => c.checked = true)" style="padding: 4px 10px; font-size: 0.7rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer;">Select All</button>
-                                <button onclick="document.querySelectorAll('.gen-srv-checkbox').forEach(c => c.checked = false)" style="padding: 4px 10px; font-size: 0.7rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; cursor: pointer;">Deselect All</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Record Type -->
-                    <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
-                        <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Record Type:</label>
-                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.85rem;">
-                            <input type="radio" name="gen-record-type" value="Include" checked style="accent-color: var(--accent-primary);">
-                            <span style="font-weight: 500;">Include</span> <span style="color: var(--text-secondary); font-size: 0.7rem;">(v=spf1 ip4:... -all)</span>
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.85rem;">
-                            <input type="radio" name="gen-record-type" value="Arecord" style="accent-color: var(--accent-primary);">
-                            <span style="font-weight: 500;">Arecord</span> <span style="color: var(--text-secondary); font-size: 0.7rem;">(Arecords:...)</span>
-                        </label>
-                    </div>
-
-                    <!-- Generate Button -->
-                    <button onclick="window.generateDNSRecords()" style="padding: 10px 24px; font-size: 0.85rem; font-weight: 600; background: linear-gradient(135deg, #f97316, #ea580c); border: none; color: white; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
-                        <i data-lucide="zap" style="width: 16px;"></i> Generate Records
-                    </button>
-
-                    <!-- Results -->
-                    <div id="gen-records-results" style="display: none; margin-top: 16px;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Generated Records</label>
-                            <button onclick="navigator.clipboard.writeText(document.getElementById('gen-records-output').value); this.innerHTML='<i data-lucide=\\'check\\' style=\\'width:12px;color:var(--success)\\'></i> Copied!'; if(window.lucide) window.lucide.createIcons(); setTimeout(()=>{this.innerHTML='<i data-lucide=\\'copy\\' style=\\'width:12px\\'></i> Copy All'; if(window.lucide) window.lucide.createIcons();}, 2000);" style="padding: 4px 10px; font-size: 0.7rem; background: var(--accent-primary); border: none; color: white; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-                                <i data-lucide="copy" style="width: 12px;"></i> Copy All
-                            </button>
-                        </div>
-                        <textarea id="gen-records-output" readonly style="width: 100%; min-height: 160px; padding: 12px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; color: #22c55e; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.78rem; resize: vertical; outline: none; line-height: 1.6;"></textarea>
-                        <div id="gen-records-count" style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 6px;"></div>
-                    </div>
                 </div>
             </div>
         </div>
