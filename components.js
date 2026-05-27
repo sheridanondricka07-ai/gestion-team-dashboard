@@ -4620,6 +4620,16 @@ window.generateDNSRecords = () => {
         return;
     }
 
+    // IP Limit checks
+    let ipLimitWarning = '';
+    if (recordType === 'Arecord' && allIps.length > 49) {
+        ipLimitWarning = `You have selected ${allIps.length} IPs for Arecord type, which exceeds the maximum limit of 49 IPs.`;
+        alert(`⚠️ WARNING: ${ipLimitWarning}`);
+    } else if (recordType === 'Include' && allIps.length > 99) {
+        ipLimitWarning = `You have selected ${allIps.length} IPs for Include type, which exceeds the maximum limit of 99 IPs.`;
+        alert(`⚠️ WARNING: ${ipLimitWarning}`);
+    }
+
     // Look up each RP domain in the inventory to get domainIncluded & subdomainIncluded
     const inventory = window.app.getProcessedRPInventory() || [];
     const lines = [];
@@ -4649,7 +4659,14 @@ window.generateDNSRecords = () => {
 
     outputArea.value = lines.join('\n');
     outputDiv.style.display = 'block';
-    countDiv.innerHTML = `✅ Generated <b>${lines.length}</b> record(s) using <b>${allIps.length}</b> IPs from <b>${selectedServerNames.length}</b> server(s). ${matched > 0 ? `<span style="color: var(--success);">${matched} matched in inventory</span>` : ''} ${unmatched > 0 ? `<span style="color: var(--warning);">${unmatched} not found in inventory (using domain as-is)</span>` : ''}`;
+    
+    let resultMessage = `✅ Generated <b>${lines.length}</b> record(s) using <b>${allIps.length}</b> IPs from <b>${selectedServerNames.length}</b> server(s). ${matched > 0 ? `<span style="color: var(--success);">${matched} matched in inventory</span>` : ''} ${unmatched > 0 ? `<span style="color: var(--warning);">${unmatched} not found in inventory (using domain as-is)</span>` : ''}`;
+    
+    if (ipLimitWarning) {
+        resultMessage += `<div style="margin-top: 10px; padding: 10px 14px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; color: #ef4444; font-weight: 600; font-size: 0.75rem; display: flex; align-items: center; gap: 8px;"><i data-lucide="alert-circle" style="width: 16px; flex-shrink: 0; color: #ef4444;"></i> <span>⚠️ ${ipLimitWarning}</span></div>`;
+    }
+    
+    countDiv.innerHTML = resultMessage;
 
     if (window.lucide) window.lucide.createIcons();
 };
