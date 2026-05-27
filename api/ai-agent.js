@@ -44,6 +44,8 @@ export default async function handler(req, res) {
         const mailers = await getFirebaseData('state/mailers') || [];
         const spamhaus = await getFirebaseData('state/spamhaus') || {};
         const vmtaResults = await getFirebaseData('state/vmtaResults') || {};
+        const rpInventory = await getFirebaseData('state/rpInventory') || [];
+        const ipDeliveryStatuses = await getFirebaseData('state/ipDeliveryStatuses') || {};
 
         // 3. Calculate exact inventory counts & stats in code to avoid LLM counting hallucinations
         let totalServers = 0;
@@ -194,9 +196,53 @@ export default async function handler(req, res) {
             return `- Name: ${m.name}, Role: ${m.role || 'mailer'}, MailerID: ${m.id}`;
         }).filter(Boolean).join('\n');
 
+        // Pre-compute RP Inventory data for AI context
+        let totalRPs = 0;
+        let totalRPIntern = 0;
+        let totalRPExtern = 0;
+        let totalRPSent = 0;
+        let totalRPNotSent = 0;
+        let totalRPSpfOk = 0;
+        let totalRPSpfFail = 0;
+        const rpSpfTypeCounts = {}; // e.g. { "Include": 45, "Arecord": 12, "MxRecord": 3 }
+
+        const formattedRPInventory = rpInventory.map(item => {
+            if (!item) return null;
+            totalRPs++;
+            const rpType = (item.rpType || 'intern').toLowerCase();
+            if (rpType === 'intern') totalRPIntern++;
+            else totalRPExtern++;
+            if (item.alreadySent) totalRPSent++;
+            else totalRPNotSent++;
+            if (item.spfStatus === 'OK') totalRPSpfOk++;
+            else if (item.spfStatus && item.spfStatus !== 'OK') totalRPSpfFail++;
+            const spfType = item.spfType || 'Include';
+            rpSpfTypeCounts[spfType] = (rpSpfTypeCounts[spfType] || 0) + 1;
+            return `- RP Domain: ${item.rpDomain || 'N/A'}, Domain Included: ${item.domainIncluded || 'N/A'}, Subdomain Included: ${item.subdomainIncluded || 'N/A'}, Type: ${spfType}, Server: ${item.srv || 'Unassigned'}, RP Type: ${item.rpType || 'intern'}, Sent: ${item.alreadySent ? 'Yes' : 'No'}, SPF Status: ${item.spfStatus || 'N/A'}`;
+        }).filter(Boolean).join('\n');
+
+        const rpSpfTypeBreakdown = Object.entries(rpSpfTypeCounts)
+            .sort((a, b) => b[1] - a[1])
+            .map(([type, count]) => `- ${type}: ${count} RPs`)
+            .join('\n');
+
+        // Format IP Delivery Statuses for today
+        const today = new Date().toISOString().split('T')[0];
+        const ipStatusSummary = {};
+        Object.entries(ipDeliveryStatuses).forEach(([safeIp, dates]) => {
+            if (dates && dates[today]) {
+                const status = dates[today];
+                ipStatusSummary[status] = (ipStatusSummary[status] || 0) + 1;
+            }
+        });
+        const ipStatusBreakdown = Object.entries(ipStatusSummary)
+            .sort((a, b) => b[1] - a[1])
+            .map(([status, count]) => `- ${status.toUpperCase()}: ${count} IPs`)
+            .join('\n');
+
         // Construct System Instruction
         const systemPrompt = `You are "Gestion Team AI Agent", an intelligent assistant integrated into the Team Emailing Infrastructure Dashboard.
-Your job is to analyze real-time infrastructure, server blacklists (Spamhaus), VMTA/PTR status, and drop revenue performance to answer questions, extract data, and generate insights.
+Your job is to analyze real-time infrastructure, server blacklists (Spamhaus), VMTA/PTR status, drop revenue performance, RP (Return Path) inventory, and IP delivery statuses to answer questions, extract data, and generate insights.
 
 SUMMARY STATISTICS (EXACT PRE-COMPUTED COUNTS — USE THESE, DO NOT RECOUNT):
 ------------------
@@ -207,6 +253,21 @@ SUMMARY STATISTICS (EXACT PRE-COMPUTED COUNTS — USE THESE, DO NOT RECOUNT):
 - Total IPs with PTR Errors: ${totalVmtaErrors}
 - Total IPs with Assigned VMTA: ${totalVmtaAssigned}
 - Total IPs with Unassigned/Empty VMTA: ${totalVmtaUnassigned}
+- Total RP Domains in Inventory: ${totalRPs}
+- Total RP Intern: ${totalRPIntern}
+- Total RP Extern: ${totalRPExtern}
+- Total RP Already Sent: ${totalRPSent}
+- Total RP Not Sent: ${totalRPNotSent}
+- Total RP SPF OK: ${totalRPSpfOk}
+- Total RP SPF Failing: ${totalRPSpfFail}
+
+RP SPF TYPE BREAKDOWN (PRE-COMPUTED — USE THESE EXACT NUMBERS):
+------------------
+${rpSpfTypeBreakdown || 'No RP SPF type data.'}
+
+IP DELIVERY STATUS BREAKDOWN FOR TODAY (${today}) (PRE-COMPUTED):
+------------------
+${ipStatusBreakdown || 'No IP delivery statuses recorded for today.'}
 
 VMTA TLD BREAKDOWN (PRE-COMPUTED — USE THESE EXACT NUMBERS):
 ------------------
@@ -234,6 +295,9 @@ ${formattedMailers || 'No mailers registered.'}
 SERVERS & IP INFRASTRUCTURE (WITH PTR, SPAMHAUS & VMTA MAPPING):
 ${formattedServers || 'No servers configured.'}
 
+RP (RETURN PATH) INVENTORY — FULL DOMAIN/SUBDOMAIN/TYPE DATA:
+${formattedRPInventory || 'No RP inventory data.'}
+
 RECENT DROP REVENUE & PERFORMANCE DATA (Last 50 drops):
 ${formattedDrops || 'No recent drops recorded.'}
 ------------------
@@ -245,7 +309,9 @@ GUIDELINES:
 4. If the user asks about VMTA extensions, VMTA TLDs, VMTA domains, or domain breakdowns, reference the VMTA TLD BREAKDOWN and VMTA DOMAIN BREAKDOWN sections above.
 5. If the user asks for the "top offer" or offer analytics, look at the TOP PERFORMING OFFERS section above. Explain the rank, name, ID, total revenue, drops, EPC, and CPM.
 6. If the user asks for the "top server", "server revenue", or server performance analytics, look at the TOP PERFORMING SERVERS section above. Explain the rank, name, total revenue, drops, EPC, and CPM.
-7. If the user asks you to perform a task outside of analyzing/extracting this data, guide them back to server administration or performance analytics.`;
+7. If the user asks about RP domains, subdomains, domain inclusion, SPF types (Include, Arecord, MxRecord, Mx), or which domains are included/configured for specific RPs, search the RP INVENTORY section above. Present results in a clear table format.
+8. If the user asks about IP delivery statuses (RDNS, RP TEST, SPAM, DOWN, BOUNCE, PAUSED, Change DOM), reference the IP DELIVERY STATUS BREAKDOWN and the server infrastructure data.
+9. You have FULL access to ALL data in the dashboard. Never say you cannot provide information about domains, subdomains, RPs, IPs, servers, or any other data. Search through all provided context sections to find the answer.`;
 
         let responseText = '';
 
