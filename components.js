@@ -4306,18 +4306,6 @@ function _renderRPsInventory(app, container) {
                         </div>
                     </div>
 
-                    <!-- Record Type -->
-                    <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
-                        <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Record Type:</label>
-                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.85rem;">
-                            <input type="radio" name="gen-record-type" value="Include" checked style="accent-color: var(--accent-primary);">
-                            <span style="font-weight: 500;">Include</span> <span style="color: var(--text-secondary); font-size: 0.7rem;">(v=spf1 ip4:... -all)</span>
-                        </label>
-                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.85rem;">
-                            <input type="radio" name="gen-record-type" value="Arecord" style="accent-color: var(--accent-primary);">
-                            <span style="font-weight: 500;">Arecord</span> <span style="color: var(--text-secondary); font-size: 0.7rem;">(Arecords:...)</span>
-                        </label>
-                    </div>
 
                     <!-- Generate Button -->
                     <button onclick="window.generateDNSRecords()" style="padding: 10px 24px; font-size: 0.85rem; font-weight: 600; background: linear-gradient(135deg, #f97316, #ea580c); border: none; color: white; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
@@ -4600,9 +4588,6 @@ window.generateDNSRecords = () => {
         return;
     }
 
-    // Get record type
-    const recordType = document.querySelector('input[name="gen-record-type"]:checked')?.value || 'Include';
-
     // Collect all IPs from selected servers
     const servers = window.app.state.servers || [];
     const allIps = [];
@@ -4620,21 +4605,14 @@ window.generateDNSRecords = () => {
         return;
     }
 
-    // IP Limit checks
-    let ipLimitWarning = '';
-    if (recordType === 'Arecord' && allIps.length > 49) {
-        ipLimitWarning = `You have selected ${allIps.length} IPs for Arecord type, which exceeds the maximum limit of 49 IPs.`;
-        alert(`⚠️ WARNING: ${ipLimitWarning}`);
-    } else if (recordType === 'Include' && allIps.length > 99) {
-        ipLimitWarning = `You have selected ${allIps.length} IPs for Include type, which exceeds the maximum limit of 99 IPs.`;
-        alert(`⚠️ WARNING: ${ipLimitWarning}`);
-    }
-
-    // Look up each RP domain in the inventory to get domainIncluded & subdomainIncluded
+    // Look up each RP domain in the inventory to get domainIncluded & subdomainIncluded, and detect record type automatically
     const inventory = window.app.getProcessedRPInventory() || [];
     const lines = [];
     let matched = 0;
     let unmatched = 0;
+
+    let generatedIncludeCount = 0;
+    let generatedArecordCount = 0;
 
     rpDomains.forEach(rpDomain => {
         const rpLower = rpDomain.toLowerCase();
@@ -4643,27 +4621,47 @@ window.generateDNSRecords = () => {
         const domainIncluded = item ? (item.domainIncluded || rpDomain) : rpDomain;
         const subdomainIncluded = item ? (item.subdomainIncluded || '') : '';
 
+        // Auto-detect spfType: if not found, default to Include
+        const recordType = (item && item.spfType === 'Arecord') ? 'Arecord' : 'Include';
+
         if (item) matched++;
         else unmatched++;
 
         if (recordType === 'Include') {
+            generatedIncludeCount++;
             // Include format: domain_include,subdomain_include,TXT,v=spf1 ip4:IP1 ip4:IP2 ... -all
             const ipPart = allIps.map(ip => `ip4:${ip}`).join(' ');
             lines.push(`${domainIncluded},${subdomainIncluded},TXT,v=spf1 ${ipPart} -all`);
         } else {
+            generatedArecordCount++;
             // Arecord format: domain_include,subdomain_include,TXT,Arecords:IP1;IP2;IP3;...
             const ipPart = allIps.join(';');
             lines.push(`${domainIncluded},${subdomainIncluded},TXT,Arecords:${ipPart}`);
         }
     });
 
+    // IP Limit checks based on actually generated record types
+    let limitWarnings = [];
+    if (generatedArecordCount > 0 && allIps.length > 49) {
+        limitWarnings.push(`You have selected ${allIps.length} IPs for Arecord type (limit is 49).`);
+    }
+    if (generatedIncludeCount > 0 && allIps.length > 99) {
+        limitWarnings.push(`You have selected ${allIps.length} IPs for Include type (limit is 99).`);
+    }
+
+    if (limitWarnings.length > 0) {
+        alert(`⚠️ WARNING:\n${limitWarnings.join('\n')}`);
+    }
+
     outputArea.value = lines.join('\n');
     outputDiv.style.display = 'block';
     
     let resultMessage = `✅ Generated <b>${lines.length}</b> record(s) using <b>${allIps.length}</b> IPs from <b>${selectedServerNames.length}</b> server(s). ${matched > 0 ? `<span style="color: var(--success);">${matched} matched in inventory</span>` : ''} ${unmatched > 0 ? `<span style="color: var(--warning);">${unmatched} not found in inventory (using domain as-is)</span>` : ''}`;
     
-    if (ipLimitWarning) {
-        resultMessage += `<div style="margin-top: 10px; padding: 10px 14px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; color: #ef4444; font-weight: 600; font-size: 0.75rem; display: flex; align-items: center; gap: 8px;"><i data-lucide="alert-circle" style="width: 16px; flex-shrink: 0; color: #ef4444;"></i> <span>⚠️ ${ipLimitWarning}</span></div>`;
+    if (limitWarnings.length > 0) {
+        limitWarnings.forEach(warning => {
+            resultMessage += `<div style="margin-top: 10px; padding: 10px 14px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; color: #ef4444; font-weight: 600; font-size: 0.75rem; display: flex; align-items: center; gap: 8px;"><i data-lucide="alert-circle" style="width: 16px; flex-shrink: 0; color: #ef4444;"></i> <span>⚠️ ${warning}</span></div>`;
+        });
     }
     
     countDiv.innerHTML = resultMessage;
