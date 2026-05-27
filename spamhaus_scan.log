@@ -397,3 +397,7 @@
 [2026-05-23 09:00:00] Unique IPs to check: 221
 [2026-05-23 09:00:08] Sending Telegram notification...
 [2026-05-23 09:00:08] === SCAN COMPLETE: 136 LISTED, 3 NEW, 2 CLEANED ===
+[2026-05-27 09:00:00] === STARTING SPAMHAUS SCAN WITH COMPARISON ===
+[2026-05-27 09:00:00] Unique IPs to check: 210
+[2026-05-27 09:00:07] Sending Telegram notification...
+[2026-05-27 09:00:08] === SCAN COMPLETE: 114 LISTED, 0 NEW, 0 CLEANED ===

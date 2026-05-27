@@ -102,7 +102,7 @@ export default async function handler(req, res) {
                                         statusVal = 'spam';
                                     }
 
-                                    const priority = { 'spam': 3, 'rdns': 2, 'rp_test': 1, 'none': 0 };
+                                    const priority = { 'rdns': 3, 'rp_test': 2, 'spam': 1, 'none': 0 };
                                     const existing = results[ip];
                                     let replace = false;
                                     if (!existing) {
