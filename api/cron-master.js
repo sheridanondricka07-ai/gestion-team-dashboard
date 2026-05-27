@@ -367,7 +367,7 @@ export default async function handler(req, res) {
                                                     statusVal = 'spam';
                                                 }
 
-                                                const priority = { 'rdns': 3, 'rp_test': 2, 'spam': 1, 'none': 0 };
+                                                const priority = { 'spam': 3, 'rdns': 2, 'rp_test': 1, 'none': 0 };
                                                 const existing = resultsObj[ip];
                                                 let replace = false;
                                                 if (!existing) {
@@ -404,7 +404,10 @@ export default async function handler(req, res) {
                     targetIps.forEach(ip => {
                         const safeIp = ip.replace(/\./g, '_');
                         if (!statuses[safeIp]) statuses[safeIp] = {};
-                        statuses[safeIp][today] = 'down';
+                        const current = statuses[safeIp][today] || 'none';
+                        if (current === 'none' || current === 'down') {
+                            statuses[safeIp][today] = 'down';
+                        }
                     });
                     await setFirebaseData('state/statuses', statuses);
 
@@ -458,22 +461,26 @@ export default async function handler(req, res) {
                                 newStatusId = 'spam';
                             }
 
-                            // Priority override rules
+                            // Priority override rules: SPAM > RDNS > RP TEST
                             const currentStatusId = statuses[safeIp][today] || 'none';
                             let shouldApply = false;
-                            if (newStatusId === 'rdns') {
+                            if (newStatusId === 'spam') {
                                 shouldApply = true;
+                            } else if (newStatusId === 'rdns') {
+                                if (currentStatusId !== 'spam') shouldApply = true;
                             } else if (newStatusId === 'rp_test') {
-                                if (currentStatusId !== 'rdns') shouldApply = true;
-                            } else if (newStatusId === 'spam') {
-                                if (currentStatusId === 'none' || currentStatusId === 'spam' || currentStatusId === 'down') shouldApply = true;
+                                if (currentStatusId !== 'spam' && currentStatusId !== 'rdns') shouldApply = true;
                             }
 
                             if (shouldApply) {
                                 statuses[safeIp][today] = newStatusId;
                             }
                         } else {
-                            statuses[safeIp][today] = 'down';
+                            // Only overwrite to 'down' if there is no active success/spam delivery status today
+                            const current = statuses[safeIp][today] || 'none';
+                            if (current === 'none' || current === 'down') {
+                                statuses[safeIp][today] = 'down';
+                            }
                         }
 
                         // Final counts

@@ -3458,18 +3458,14 @@ window.runGmailIPStatusSync = async (btn) => {
                 if (!statuses[safeIp]) statuses[safeIp] = {};
                 const currentStatusId = statuses[safeIp][today] || 'none';
                 
-                // OVERRIDE RULES:
-                // 1. RDNS overrides everything
-                // 2. RP TEST overrides everything except RDNS
-                // 3. SPAM overrides nothing if RDNS/RP TEST already exist
-                
+                // OVERRIDE RULES: SPAM > RDNS > RP TEST
                 let shouldApply = false;
-                if (newStatusId === 'rdns') {
+                if (newStatusId === 'spam') {
                     shouldApply = true;
+                } else if (newStatusId === 'rdns') {
+                    if (currentStatusId !== 'spam') shouldApply = true;
                 } else if (newStatusId === 'rp_test') {
-                    if (currentStatusId !== 'rdns') shouldApply = true;
-                } else if (newStatusId === 'spam') {
-                    if (currentStatusId === 'none' || currentStatusId === 'spam') shouldApply = true;
+                    if (currentStatusId !== 'spam' && currentStatusId !== 'rdns') shouldApply = true;
                 }
 
                 if (shouldApply && currentStatusId !== newStatusId) {
