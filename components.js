@@ -2051,7 +2051,7 @@ function renderStatus(app, container) {
                                 ${days.map(d => {
                                     const [y, m, day] = d.split('-');
                                     const isSelected = d === app.selectedFilterDate;
-                                    return `<th style="padding: 12px; text-align: center; border-bottom: 2px solid var(--border-color); font-weight: 700; border-right: 1px solid var(--border-color); ${isSelected ? 'background: var(--bg-primary); border-top: 2px solid var(--accent-primary);' : ''}"> ${day}/${m}</th>`;
+                                    return `<th class="status-cell" style="padding: 12px; text-align: center; border-bottom: 2px solid var(--border-color); font-weight: 700; border-right: 1px solid var(--border-color); ${isSelected ? 'background: var(--bg-primary); border-top: 2px solid var(--accent-primary);' : ''}"> ${day}/${m}</th>`;
                                 }).join('')}
                             </tr>
                         </thead>
