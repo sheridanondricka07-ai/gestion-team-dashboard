@@ -4257,71 +4257,77 @@ function _renderRPsInventory(app, container) {
             </div>
 
             <!-- Generate Records Section -->
-            <div class="card" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; margin-bottom: 8px;">
+            <div class="card" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; margin-bottom: 12px; box-shadow: var(--shadow-lg); transition: border-color 0.3s ease;">
                 <div onclick="document.getElementById('gen-records-body').style.display = document.getElementById('gen-records-body').style.display === 'none' ? 'block' : 'none'; this.querySelector('.gen-chevron').style.transform = document.getElementById('gen-records-body').style.display === 'none' ? 'rotate(0deg)' : 'rotate(180deg)';"
-                     style="padding: 16px 20px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); transition: background 0.2s;"
-                     onmouseover="this.style.background='var(--bg-tertiary)'" onmouseout="this.style.background='transparent'">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <div style="width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, #f97316, #ea580c); display: flex; align-items: center; justify-content: center;">
-                            <i data-lucide="file-text" style="width: 16px; color: white;"></i>
+                     style="padding: 16px 24px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: linear-gradient(to right, rgba(249, 115, 22, 0.03), transparent); border-bottom: 1px solid var(--border-color); transition: background 0.2s;"
+                     onmouseover="this.style.background='linear-gradient(to right, rgba(249, 115, 22, 0.06), rgba(255, 255, 255, 0.01))'" onmouseout="this.style.background='linear-gradient(to right, rgba(249, 115, 22, 0.03), transparent)'">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #f97316, #ea580c); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(234, 88, 12, 0.2);">
+                            <i data-lucide="file-text" style="width: 18px; color: white;"></i>
                         </div>
                         <div>
-                            <div style="font-weight: 700; font-size: 0.9rem;">Generate Records</div>
-                            <div style="font-size: 0.7rem; color: var(--text-secondary);">Generate SPF/Arecord DNS entries from selected RPs & Servers</div>
+                            <div style="font-weight: 700; font-size: 0.95rem; letter-spacing: 0.02em; color: var(--text-primary);">Generate Records</div>
+                            <div style="font-size: 0.72rem; color: var(--text-secondary);">Generate SPF/Arecord DNS entries from selected RPs & Servers</div>
                         </div>
                     </div>
                     <i data-lucide="chevron-down" class="gen-chevron" style="width: 18px; color: var(--text-secondary); transition: transform 0.3s;"></i>
                 </div>
-                <div id="gen-records-body" style="display: none; padding: 20px;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 16px;">
+                <div id="gen-records-body" style="display: none; padding: 24px; background: rgba(10, 12, 16, 0.2);">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 20px;">
                         <!-- RP Selection -->
                         <div style="display: flex; flex-direction: column; gap: 8px;">
-                            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Select RPs <span style="font-weight: 400; text-transform: none; letter-spacing: 0;">(one per line, or use domain names)</span></label>
-                            <textarea id="gen-rp-input" placeholder="Enter RP domains (one per line)...\ne.g.:\nmy-rp-domain.com\nanother-rp.net" style="min-height: 120px; padding: 12px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8rem; resize: vertical; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent-primary)'" onblur="this.style.borderColor='var(--border-color)'"></textarea>
+                            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
+                                <i data-lucide="globe" style="width: 12px; color: var(--accent-primary);"></i> Select RPs 
+                                <span style="font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--text-secondary); margin-left: 4px;">(one per line)</span>
+                            </label>
+                            <textarea id="gen-rp-input" placeholder="Enter RP domains (one per line)...\ne.g.:\nmy-rp-domain.com\nanother-rp.net" style="min-height: 140px; padding: 12px; background: rgba(10, 12, 16, 0.5); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8rem; resize: vertical; outline: none; line-height: 1.5; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent-primary)'" onblur="this.style.borderColor='var(--border-color)'"></textarea>
                             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                                <button onclick="window.genRecordsFillFilteredRPs()" style="padding: 4px 10px; font-size: 0.7rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer;">
-                                    <i data-lucide="list" style="width: 10px; vertical-align: middle; margin-right: 3px;"></i>Fill from filtered list
+                                <button onclick="window.genRecordsFillFilteredRPs()" style="padding: 6px 12px; font-size: 0.72rem; font-weight: 600; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.2s;" onmouseover="this.style.background='var(--border-color)'" onmouseout="this.style.background='var(--bg-tertiary)'">
+                                    <i data-lucide="list" style="width: 12px;"></i> Fill from filtered list
                                 </button>
-                                <button onclick="document.getElementById('gen-rp-input').value=''" style="padding: 4px 10px; font-size: 0.7rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; cursor: pointer;">Clear</button>
+                                <button onclick="document.getElementById('gen-rp-input').value=''" style="padding: 6px 12px; font-size: 0.72rem; font-weight: 600; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='var(--border-color)', this.style.color='var(--text-primary)'" onmouseout="this.style.background='var(--bg-tertiary)', this.style.color='var(--text-secondary)'">Clear</button>
                             </div>
                         </div>
 
                         <!-- Server Selection -->
                         <div style="display: flex; flex-direction: column; gap: 8px;">
-                            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Select Servers</label>
-                            <div id="gen-servers-list" style="min-height: 120px; max-height: 200px; overflow-y: auto; padding: 8px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; display: flex; flex-direction: column; gap: 4px;">
+                            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
+                                <i data-lucide="server" style="width: 12px; color: #ea580c;"></i> Select Servers
+                            </label>
+                            <div id="gen-servers-list" style="min-height: 140px; max-height: 140px; overflow-y: auto; padding: 6px; background: rgba(10, 12, 16, 0.5); border: 1px solid var(--border-color); border-radius: 8px; display: flex; flex-direction: column; gap: 2px;">
                                 ${(app.state.servers || []).map(srv => {
                                     return `
-                                    <label style="display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: background 0.15s;" onmouseover="this.style.background='var(--bg-tertiary)'" onmouseout="this.style.background='transparent'">
-                                        <input type="checkbox" class="gen-srv-checkbox" value="${srv.name}" style="accent-color: var(--accent-primary); cursor: pointer;">
-                                        <span style="font-weight: 500;">${srv.name}</span>
-                                        <span style="color: var(--text-secondary); font-size: 0.7rem; margin-left: auto;">${(srv.allIps || []).length} IPs</span>
+                                    <label style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: background 0.15s; margin: 0;" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background='transparent'">
+                                        <input type="checkbox" class="gen-srv-checkbox" value="${srv.name}" style="accent-color: var(--accent-primary); cursor: pointer; margin: 0; width: 14px; height: 14px;">
+                                        <span style="font-weight: 500; color: var(--text-primary); margin-left: 2px;">${srv.name}</span>
+                                        <span style="color: var(--text-secondary); font-size: 0.72rem; margin-left: auto; background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px; font-weight: 600;">${(srv.allIps || []).length} IPs</span>
                                     </label>`;
                                 }).join('')}
                             </div>
                             <div style="display: flex; gap: 8px;">
-                                <button onclick="document.querySelectorAll('.gen-srv-checkbox').forEach(c => c.checked = true)" style="padding: 4px 10px; font-size: 0.7rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer;">Select All</button>
-                                <button onclick="document.querySelectorAll('.gen-srv-checkbox').forEach(c => c.checked = false)" style="padding: 4px 10px; font-size: 0.7rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; cursor: pointer;">Deselect All</button>
+                                <button onclick="document.querySelectorAll('.gen-srv-checkbox').forEach(c => c.checked = true)" style="flex: 1; padding: 6px 12px; font-size: 0.72rem; font-weight: 600; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='var(--border-color)'" onmouseout="this.style.background='var(--bg-tertiary)'">Select All</button>
+                                <button onclick="document.querySelectorAll('.gen-srv-checkbox').forEach(c => c.checked = false)" style="flex: 1; padding: 6px 12px; font-size: 0.72rem; font-weight: 600; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='var(--border-color)', this.style.color='var(--text-primary)'" onmouseout="this.style.background='var(--bg-tertiary)', this.style.color='var(--text-secondary)'">Deselect All</button>
                             </div>
                         </div>
                     </div>
 
-
                     <!-- Generate Button -->
-                    <button onclick="window.generateDNSRecords()" style="padding: 10px 24px; font-size: 0.85rem; font-weight: 600; background: linear-gradient(135deg, #f97316, #ea580c); border: none; color: white; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
-                        <i data-lucide="zap" style="width: 16px;"></i> Generate Records
+                    <button onclick="window.generateDNSRecords()" style="padding: 11px 24px; font-size: 0.85rem; font-weight: 700; background: linear-gradient(135deg, #f97316, #ea580c); border: none; color: white; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; box-shadow: 0 4px 14px rgba(234, 88, 12, 0.25); width: auto;" onmouseover="this.style.opacity='0.95'; this.style.transform='translateY(-1px)'" onmouseout="this.style.opacity='1'; this.style.transform='translateY(0)'">
+                        <i data-lucide="zap" style="width: 15px;"></i> Generate Records
                     </button>
 
                     <!-- Results -->
-                    <div id="gen-records-results" style="display: none; margin-top: 16px;">
+                    <div id="gen-records-results" style="display: none; margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                            <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Generated Records</label>
-                            <button onclick="navigator.clipboard.writeText(document.getElementById('gen-records-output').value); this.innerHTML='<i data-lucide=\\'check\\' style=\\'width:12px;color:var(--success)\\'></i> Copied!'; if(window.lucide) window.lucide.createIcons(); setTimeout(()=>{this.innerHTML='<i data-lucide=\\'copy\\' style=\\'width:12px\\'></i> Copy All'; if(window.lucide) window.lucide.createIcons();}, 2000);" style="padding: 4px 10px; font-size: 0.7rem; background: var(--accent-primary); border: none; color: white; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
+                                <i data-lucide="terminal" style="width: 12px; color: var(--success);"></i> Generated Records
+                            </label>
+                            <button onclick="navigator.clipboard.writeText(document.getElementById('gen-records-output').value); this.innerHTML='<i data-lucide=\\'check\\' style=\\'width:12px;color:var(--success)\\'></i> Copied!'; if(window.lucide) window.lucide.createIcons(); setTimeout(()=>{this.innerHTML='<i data-lucide=\\'copy\\' style=\\'width:12px\\'></i> Copy All'; if(window.lucide) window.lucide.createIcons();}, 2000);" style="padding: 5px 12px; font-size: 0.72rem; font-weight: 600; background: var(--accent-primary); border: none; color: white; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(59, 130, 246, 0.2); transition: opacity 0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
                                 <i data-lucide="copy" style="width: 12px;"></i> Copy All
                             </button>
                         </div>
-                        <textarea id="gen-records-output" readonly style="width: 100%; min-height: 160px; padding: 12px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; color: #22c55e; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.78rem; resize: vertical; outline: none; line-height: 1.6;"></textarea>
-                        <div id="gen-records-count" style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 6px;"></div>
+                        <textarea id="gen-records-output" readonly style="width: 100%; min-height: 160px; padding: 12px; background: rgba(10, 12, 16, 0.8); border: 1px solid var(--border-color); border-radius: 8px; color: #22c55e; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.78rem; resize: vertical; outline: none; line-height: 1.6; box-shadow: inset 0 2px 6px rgba(0,0,0,0.3);"></textarea>
+                        <div id="gen-records-count" style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 8px; line-height: 1.4;"></div>
                     </div>
                 </div>
             </div>

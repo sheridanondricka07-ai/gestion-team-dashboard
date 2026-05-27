@@ -241,6 +241,10 @@ input:focus, select:focus {
     border-color: var(--accent-primary);
 }
 
+input[type="checkbox"], input[type="radio"] {
+    width: auto !important;
+}
+
 button {
     width: 100%;
     padding: 12px;
