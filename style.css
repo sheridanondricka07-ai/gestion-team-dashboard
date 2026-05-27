@@ -554,7 +554,8 @@ button:active {
 /* Optimized Status Table styles to prevent scroll lag and freezing */
 .status-table {
     table-layout: fixed !important;
-    width: auto !important;
+    width: 100% !important;
+    min-width: max-content !important;
     border-collapse: collapse;
 }
 
