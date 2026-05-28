@@ -4627,7 +4627,7 @@ window.generateDNSRecords = () => {
         const subdomainIncluded = item ? (item.subdomainIncluded || '') : '';
 
         // Auto-detect spfType: if not found, default to Include
-        const recordType = (item && item.spfType === 'Arecord') ? 'Arecord' : 'Include';
+        const recordType = (item && (item.spfType === 'Arecord' || item.spfType === 'Arecod')) ? 'Arecord' : 'Include';
 
         if (item) matched++;
         else unmatched++;
