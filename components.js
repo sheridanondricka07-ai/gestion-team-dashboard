@@ -4258,7 +4258,7 @@ function _renderRPsInventory(app, container) {
 
             <!-- Generate Records Section -->
             <div class="card" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; margin-bottom: 12px; box-shadow: var(--shadow-lg); transition: border-color 0.3s ease;">
-                <div onclick="document.getElementById('gen-records-body').style.display = document.getElementById('gen-records-body').style.display === 'none' ? 'block' : 'none'; this.querySelector('.gen-chevron').style.transform = document.getElementById('gen-records-body').style.display === 'none' ? 'rotate(0deg)' : 'rotate(180deg)';"
+                <div onclick="event.stopPropagation(); window.app.state.generateRecordsExpanded = !window.app.state.generateRecordsExpanded; document.getElementById('gen-records-body').style.display = window.app.state.generateRecordsExpanded ? 'block' : 'none'; this.querySelector('.gen-chevron').style.transform = window.app.state.generateRecordsExpanded ? 'rotate(180deg)' : 'rotate(0deg)';"
                      style="padding: 16px 24px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: linear-gradient(to right, rgba(249, 115, 22, 0.03), transparent); border-bottom: 1px solid var(--border-color); transition: background 0.2s;"
                      onmouseover="this.style.background='linear-gradient(to right, rgba(249, 115, 22, 0.06), rgba(255, 255, 255, 0.01))'" onmouseout="this.style.background='linear-gradient(to right, rgba(249, 115, 22, 0.03), transparent)'">
                     <div style="display: flex; align-items: center; gap: 12px;">
@@ -4270,9 +4270,9 @@ function _renderRPsInventory(app, container) {
                             <div style="font-size: 0.72rem; color: var(--text-secondary);">Generate SPF/Arecord DNS entries from selected RPs & Servers</div>
                         </div>
                     </div>
-                    <i data-lucide="chevron-down" class="gen-chevron" style="width: 18px; color: var(--text-secondary); transition: transform 0.3s;"></i>
+                    <i data-lucide="chevron-down" class="gen-chevron" style="width: 18px; color: var(--text-secondary); transition: transform 0.3s; ${app.state.generateRecordsExpanded ? 'transform: rotate(180deg);' : ''}"></i>
                 </div>
-                <div id="gen-records-body" style="display: none; padding: 24px; background: rgba(10, 12, 16, 0.2);">
+                <div id="gen-records-body" style="display: ${app.state.generateRecordsExpanded ? 'block' : 'none'}; padding: 24px; background: rgba(10, 12, 16, 0.2);">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 20px;">
                         <!-- RP Selection -->
                         <div style="display: flex; flex-direction: column; gap: 8px;">
