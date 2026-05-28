@@ -4290,23 +4290,22 @@ function _renderRPsInventory(app, container) {
                         </div>
 
                         <!-- Server Selection -->
-                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <div style="display: flex; flex-direction: column; gap: 8px; grid-column: span 2;">
                             <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
                                 <i data-lucide="server" style="width: 12px; color: #ea580c;"></i> Select Servers
                             </label>
-                            <div id="gen-servers-list" style="min-height: 140px; max-height: 140px; overflow-y: auto; padding: 6px; background: rgba(10, 12, 16, 0.5); border: 1px solid var(--border-color); border-radius: 8px; display: flex; flex-direction: column; gap: 2px;">
+                            <div id="gen-servers-list" class="gen-srv-grid">
                                 ${(app.state.servers || []).map(srv => {
                                     return `
-                                    <label style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: background 0.15s; margin: 0;" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background='transparent'">
-                                        <input type="checkbox" class="gen-srv-checkbox" value="${srv.name}" style="accent-color: var(--accent-primary); cursor: pointer; margin: 0; width: 14px; height: 14px;">
-                                        <span style="font-weight: 500; color: var(--text-primary); margin-left: 2px;">${srv.name}</span>
-                                        <span style="color: var(--text-secondary); font-size: 0.72rem; margin-left: auto; background: var(--bg-tertiary); padding: 2px 6px; border-radius: 4px; font-weight: 600;">${(srv.allIps || []).length} IPs</span>
-                                    </label>`;
+                                    <button type="button" class="gen-srv-btn" data-value="${srv.name}" onclick="this.classList.toggle('selected')">
+                                        <span>${srv.name}</span>
+                                        <span class="srv-btn-badge">${(srv.allIps || []).length} IPs</span>
+                                    </button>`;
                                 }).join('')}
                             </div>
-                            <div style="display: flex; gap: 8px;">
-                                <button onclick="document.querySelectorAll('.gen-srv-checkbox').forEach(c => c.checked = true)" style="flex: 1; padding: 6px 12px; font-size: 0.72rem; font-weight: 600; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='var(--border-color)'" onmouseout="this.style.background='var(--bg-tertiary)'">Select All</button>
-                                <button onclick="document.querySelectorAll('.gen-srv-checkbox').forEach(c => c.checked = false)" style="flex: 1; padding: 6px 12px; font-size: 0.72rem; font-weight: 600; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='var(--border-color)', this.style.color='var(--text-primary)'" onmouseout="this.style.background='var(--bg-tertiary)', this.style.color='var(--text-secondary)'">Deselect All</button>
+                            <div style="display: flex; gap: 8px; max-width: 280px; margin-top: 4px;">
+                                <button onclick="document.querySelectorAll('.gen-srv-btn').forEach(btn => btn.classList.add('selected'))" style="flex: 1; padding: 6px 12px; font-size: 0.72rem; font-weight: 600; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='var(--border-color)'" onmouseout="this.style.background='var(--bg-tertiary)'">Select All</button>
+                                <button onclick="document.querySelectorAll('.gen-srv-btn').forEach(btn => btn.classList.remove('selected'))" style="flex: 1; padding: 6px 12px; font-size: 0.72rem; font-weight: 600; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='var(--border-color)', this.style.color='var(--text-primary)'" onmouseout="this.style.background='var(--bg-tertiary)', this.style.color='var(--text-secondary)'">Deselect All</button>
                             </div>
                         </div>
                     </div>
@@ -4587,8 +4586,8 @@ window.generateDNSRecords = () => {
     }
 
     // Get selected servers
-    const checkedBoxes = document.querySelectorAll('.gen-srv-checkbox:checked');
-    const selectedServerNames = Array.from(checkedBoxes).map(cb => cb.value);
+    const selectedButtons = document.querySelectorAll('.gen-srv-btn.selected');
+    const selectedServerNames = Array.from(selectedButtons).map(btn => btn.getAttribute('data-value'));
     if (selectedServerNames.length === 0) {
         alert('Please select at least one server.');
         return;
