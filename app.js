@@ -654,6 +654,8 @@ class TeamApp {
                         const rpFilterSent = this.state.rpFilterSent || 'all';
                         const rpFilterSpfStatus = this.state.rpFilterSpfStatus || 'all';
                         const rpSearch = typeof this.state.rpSearch !== 'undefined' ? this.state.rpSearch : '';
+                        const generateRecordsExpanded = !!this.state.generateRecordsExpanded;
+                        const rpFilterServerDropdownOpen = !!this.state.rpFilterServerDropdownOpen;
                         
                         this.state = { 
                             ...this.state, 
@@ -666,7 +668,9 @@ class TeamApp {
                             rpFilterRpType,
                             rpFilterSent,
                             rpFilterSpfStatus,
-                            rpSearch
+                            rpSearch,
+                            generateRecordsExpanded,
+                            rpFilterServerDropdownOpen
                         };
                         // SAFETY: Firebase may return null for these — always ensure safe defaults
                         if (!this.state.spamhausProgress) this.state.spamhausProgress = { status: 'idle', current: 0, total: 0 };
