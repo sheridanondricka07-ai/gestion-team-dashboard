@@ -14,11 +14,12 @@ async function getFirebaseData(path) {
 
 async function setFirebaseData(path, data) {
     try {
-        await fetch(`${DB_URL}/${path}.json`, {
+        const resp = await fetch(`${DB_URL}/${path}.json`, {
             method: 'PUT',
             body: JSON.stringify(data),
             headers: { 'Content-Type': 'application/json' }
         });
+        await resp.text();
     } catch (e) {
         console.error('Firebase REST Error:', e);
     }

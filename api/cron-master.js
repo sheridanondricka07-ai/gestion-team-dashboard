@@ -15,25 +15,33 @@ async function getFirebaseData(path) {
 
 async function setFirebaseData(path, data) {
     try {
-        await fetch(`${DB_URL}/${path}.json`, {
+        const resp = await fetch(`${DB_URL}/${path}.json`, {
             method: 'PUT',
             body: JSON.stringify(data),
             headers: { 'Content-Type': 'application/json' }
         });
+        const result = await resp.text();
+        if (!resp.ok) {
+            console.error(`Firebase PUT Error (${resp.status}) for ${path}:`, result);
+        }
     } catch (e) {
-        console.error('Firebase REST Error:', e);
+        console.error('Firebase REST Error (setFirebaseData):', e);
     }
 }
 
 async function updateFirebaseData(path, data) {
     try {
-        await fetch(`${DB_URL}/${path}.json`, {
+        const resp = await fetch(`${DB_URL}/${path}.json`, {
             method: 'PATCH',
             body: JSON.stringify(data),
             headers: { 'Content-Type': 'application/json' }
         });
+        const result = await resp.text();
+        if (!resp.ok) {
+            console.error(`Firebase PATCH Error (${resp.status}) for ${path}:`, result);
+        }
     } catch (e) {
-        console.error('Firebase REST Error:', e);
+        console.error('Firebase REST Error (updateFirebaseData):', e);
     }
 }
 
@@ -398,18 +406,20 @@ export default async function handler(req, res) {
                 const formattedDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
                 if (foundIpsCount === 0) {
-                    // Update database to fill all as DOWN
+                    // Update database to fill all as DOWN using per-IP PATCH
                     const statuses = await getFirebaseData('state/statuses') || {};
                     const today = new Date().toISOString().split('T')[0];
+                    const statusUpdates = {};
                     targetIps.forEach(ip => {
                         const safeIp = ip.replace(/\./g, '_');
-                        if (!statuses[safeIp]) statuses[safeIp] = {};
-                        const current = statuses[safeIp][today] || 'none';
+                        const current = (statuses[safeIp] && statuses[safeIp][today]) || 'none';
                         if (current === 'none' || current === 'down') {
-                            statuses[safeIp][today] = 'down';
+                            statusUpdates[`${safeIp}/${today}`] = 'down';
                         }
                     });
-                    await setFirebaseData('state/statuses', statuses);
+                    if (Object.keys(statusUpdates).length > 0) {
+                        await updateFirebaseData('state/statuses', statusUpdates);
+                    }
 
                     // Send Telegram Warning
                     const telegramMessage = `⚠️ <b>Daily Gmail IP Delivery Sync: IPs Not Found</b>\n` +
@@ -491,7 +501,17 @@ export default async function handler(req, res) {
                         else if (finalStatus === 'down') downCount++;
                     });
 
-                    await setFirebaseData('state/statuses', statuses);
+                    // Write each IP's status for today using PATCH (prevents race conditions with client saveState)
+                    const statusUpdates = {};
+                    targetIps.forEach(ip => {
+                        const safeIp = ip.replace(/\./g, '_');
+                        if (statuses[safeIp] && statuses[safeIp][today]) {
+                            statusUpdates[`${safeIp}/${today}`] = statuses[safeIp][today];
+                        }
+                    });
+                    if (Object.keys(statusUpdates).length > 0) {
+                        await updateFirebaseData('state/statuses', statusUpdates);
+                    }
 
                     // Send Telegram Success Report
                     const telegramMessage = `📥 <b>Daily Gmail IP Delivery Sync</b>\n` +
