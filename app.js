@@ -1041,6 +1041,52 @@ class TeamApp {
 
         let stateChanged = false;
 
+        // 0. Deduplicate RPs by domain
+        if (this.state.rps.length > 0) {
+            const seen = new Map();
+            let duplicatesRemoved = false;
+            
+            this.state.rps.forEach(rp => {
+                if (!rp || !rp.domain) return;
+                const domain = rp.domain.trim().toLowerCase();
+                if (seen.has(domain)) {
+                    const existing = seen.get(domain);
+                    if (!existing.serverId && rp.serverId) {
+                        seen.set(domain, rp);
+                    }
+                    duplicatesRemoved = true;
+                } else {
+                    seen.set(domain, rp);
+                }
+            });
+            
+            if (duplicatesRemoved) {
+                this.state.rps = Array.from(seen.values());
+                stateChanged = true;
+                console.log("Deduplicated RPs list in state.");
+            }
+        }
+
+        // 0b. Deduplicate rpInventory by domain
+        if (this.state.rpInventory.length > 0) {
+            const seen = new Map();
+            let duplicatesRemoved = false;
+            this.state.rpInventory.forEach(item => {
+                if (!item || !item.rpDomain) return;
+                const domain = item.rpDomain.trim().toLowerCase();
+                if (seen.has(domain)) {
+                    duplicatesRemoved = true;
+                } else {
+                    seen.set(domain, item);
+                }
+            });
+            if (duplicatesRemoved) {
+                this.state.rpInventory = Array.from(seen.values());
+                stateChanged = true;
+                console.log("Deduplicated rpInventory list in state.");
+            }
+        }
+
         // 1. Ensure all RPs in state.rps exist in state.rpInventory
         this.state.rps.forEach(rp => {
             const domain = (rp.domain || '').trim().toLowerCase();
