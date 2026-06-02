@@ -898,6 +898,16 @@ class TeamApp {
         this.updateDashboard();
     }
 
+    toggleHideUnlinkedRps() {
+        this.hideUnlinkedRps = !this.hideUnlinkedRps;
+        this.updateDashboard();
+    }
+
+    toggleHideUnassignedServers() {
+        this.hideUnassignedServers = !this.hideUnassignedServers;
+        this.updateDashboard();
+    }
+
     async addTool(tool) {
         tool.id = 'tool_' + Date.now();
         this.state.tools.push(tool);

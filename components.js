@@ -1266,8 +1266,14 @@ function renderManagement(app, container) {
                     ` : ''}
                 </div>
                 <div class="pool-content">
-                    <div style="color: var(--text-secondary); font-size: 0.7rem; margin-bottom: 8px; text-transform: uppercase;">Unlinked RPs</div>
-                    <div class="drop-zone" data-type="stock-rp" style="min-height: 80px; border: 1px dashed var(--border-color); border-radius: 8px; margin-bottom: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <div style="color: var(--text-secondary); font-size: 0.7rem; text-transform: uppercase;">Unlinked RPs (${stockRps.length})</div>
+                        <button onclick="app.toggleHideUnlinkedRps()" style="background: transparent; border: none; color: var(--accent-primary); cursor: pointer; padding: 2px 6px; font-size: 0.7rem; display: flex; align-items: center; gap: 4px;">
+                            <i data-lucide="${app.hideUnlinkedRps ? 'eye' : 'eye-off'}" style="width: 12px; height: 12px; vertical-align: middle;"></i>
+                            ${app.hideUnlinkedRps ? 'Show' : 'Hide'}
+                        </button>
+                    </div>
+                    <div class="drop-zone" data-type="stock-rp" style="min-height: ${app.hideUnlinkedRps ? '0px' : '80px'}; display: ${app.hideUnlinkedRps ? 'none' : 'block'}; border: 1px dashed var(--border-color); border-radius: 8px; margin-bottom: 12px; overflow: hidden;">
                         ${stockRps.map(rp => `
                             <div class="draggable-item" ${isAdmin ? 'draggable="true" ondragstart="handleDragStart(event, \'rp\', \'' + rp.id + '\')"' : ''}>
                                 <span style="flex: 1; font-weight: 500;">${rp.domain}</span>
@@ -1282,12 +1288,18 @@ function renderManagement(app, container) {
                     </div>
 
                     <div style="display: flex; justify-content: space-between; align-items: center; margin: 16px 0 8px;">
-                        <div style="color: var(--text-secondary); font-size: 0.7rem; text-transform: uppercase;">Unassigned Servers</div>
-                        <span class="action-icon" onclick="copyUnassignedServerIps(this)" title="Copy all unassigned IPs">
-                            <i data-lucide="copy" style="width: 12px; color: var(--text-secondary);"></i>
-                        </span>
+                        <div style="color: var(--text-secondary); font-size: 0.7rem; text-transform: uppercase;">Unassigned Servers (${stockSrvs.length})</div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="action-icon" onclick="copyUnassignedServerIps(this)" title="Copy all unassigned IPs">
+                                <i data-lucide="copy" style="width: 12px; color: var(--text-secondary);"></i>
+                            </span>
+                            <button onclick="app.toggleHideUnassignedServers()" style="background: transparent; border: none; color: var(--accent-primary); cursor: pointer; padding: 2px 6px; font-size: 0.7rem; display: flex; align-items: center; gap: 4px;">
+                                <i data-lucide="${app.hideUnassignedServers ? 'eye' : 'eye-off'}" style="width: 12px; height: 12px; vertical-align: middle;"></i>
+                                ${app.hideUnassignedServers ? 'Show' : 'Hide'}
+                            </button>
+                        </div>
                     </div>
-                    <div class="drop-zone" data-type="stock-srv" style="min-height: 80px; border: 1px dashed var(--border-color); border-radius: 8px;">
+                    <div class="drop-zone" data-type="stock-srv" style="min-height: ${app.hideUnassignedServers ? '0px' : '80px'}; display: ${app.hideUnassignedServers ? 'none' : 'block'}; border: 1px dashed var(--border-color); border-radius: 8px; overflow: hidden;">
                         ${stockSrvs.map(srv => {
                             const isCancel = srv.markedForCancel === true;
                             const cancelStyle = isCancel ? 'border-color: #f97316; background: rgba(249, 115, 22, 0.08);' : '';
