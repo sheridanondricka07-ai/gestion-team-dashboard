@@ -63,6 +63,7 @@ class TeamApp {
         this.statusSearch = '';
         this.selectedFilterDate = new Date().toISOString().split('T')[0];
         this.hasCheckedCancellations = false;
+        this._isSaving = false;
         this.init();
     }
 
@@ -283,6 +284,7 @@ class TeamApp {
             };
             this.state.servers.push(newServer);
             await this.saveState();
+            this.updateDashboard();
         }
 
         // Trigger automated RDNS check for the newly added/updated server's IPs
@@ -367,6 +369,7 @@ class TeamApp {
         };
         this.state.mailers.push(mailer);
         await this.saveState();
+        this.updateDashboard();
     }
 
     async deleteMailer(mailerId) {
@@ -654,7 +657,6 @@ class TeamApp {
                         const rpFilterSent = this.state.rpFilterSent || 'all';
                         const rpFilterSpfStatus = this.state.rpFilterSpfStatus || 'all';
                         const rpSearch = typeof this.state.rpSearch !== 'undefined' ? this.state.rpSearch : '';
-                        const generateRecordsExpanded = !!this.state.generateRecordsExpanded;
                         const rpFilterServerDropdownOpen = !!this.state.rpFilterServerDropdownOpen;
                         
                         this.state = { 
@@ -669,10 +671,17 @@ class TeamApp {
                             rpFilterSent,
                             rpFilterSpfStatus,
                             rpSearch,
-                            generateRecordsExpanded,
                             rpFilterServerDropdownOpen
                         };
                         // SAFETY: Firebase may return null for these — always ensure safe defaults
+                        if (!this.state.servers) this.state.servers = [];
+                        if (!this.state.mailers) this.state.mailers = [];
+                        if (!this.state.drops) this.state.drops = [];
+                        if (!this.state.historyServers) this.state.historyServers = [];
+                        if (!this.state.tools) this.state.tools = [];
+                        if (!this.state.rps) this.state.rps = [];
+                        if (!this.state.rpInventory) this.state.rpInventory = [];
+
                         if (!this.state.spamhausProgress) this.state.spamhausProgress = { status: 'idle', current: 0, total: 0 };
                         if (!this.state.rpSpfProgress) this.state.rpSpfProgress = { status: 'idle', current: 0, total: 0 };
                         if (!this.state.spamhaus) this.state.spamhaus = {};
@@ -688,10 +697,12 @@ class TeamApp {
                         
                         if (this.state.mailers) {
                             this.state.mailers.forEach(m => {
-                                const cleanName = (m.name || '').trim();
-                                if (knownIds[cleanName] && (!m.mailer_id || m.mailer_id === 'N/A')) {
-                                    m.mailer_id = knownIds[cleanName];
-                                    patched = true;
+                                if (m) {
+                                    const cleanName = (m.name || '').trim();
+                                    if (knownIds[cleanName] && (!m.mailer_id || m.mailer_id === 'N/A')) {
+                                        m.mailer_id = knownIds[cleanName];
+                                        patched = true;
+                                    }
                                 }
                             });
                         }
@@ -699,26 +710,37 @@ class TeamApp {
                         // Also patch existing drops that show "N/A" or lack offerId
                         if (this.state.drops && Array.isArray(this.state.drops)) {
                             this.state.drops.forEach(d => {
-                                const cleanName = (d.mailerName || '').trim();
-                                if (knownIds[cleanName] && (!d.mailerId || d.mailerId === 'N/A')) {
-                                    d.mailerId = knownIds[cleanName];
-                                    patched = true;
-                                }
-                                if (!d.servers) {
-                                    d.servers = this.detectServers(d.ips);
-                                    patched = true;
-                                }
-                                if (d.offer && !d.offerId) {
-                                    d.offerId = this.extractOfferId(d.offer);
-                                    patched = true;
+                                if (d) {
+                                    const cleanName = (d.mailerName || '').trim();
+                                    if (knownIds[cleanName] && (!d.mailerId || d.mailerId === 'N/A')) {
+                                        d.mailerId = knownIds[cleanName];
+                                        patched = true;
+                                    }
+                                    if (typeof d.servers === 'undefined') {
+                                        const matched = this.detectServers(d.ips);
+                                        d.servers = (matched && matched.length > 0) ? matched : ['N/A'];
+                                        patched = true;
+                                    }
+                                    if (d.offer && typeof d.offerId === 'undefined') {
+                                        const oid = this.extractOfferId(d.offer);
+                                        d.offerId = oid || 'N/A';
+                                        patched = true;
+                                    }
                                 }
                             });
                         }
                         
                         const synced = this.syncRpsAndInventory();
                         if (patched || synced) {
-                            console.log("Auto-patched or synced RPs. Saving back to Firebase...");
-                            this.saveState();
+                            console.log("Auto-patched or synced RPs. Saving back to Firebase (one-time)...");
+                            // Use a debounce flag to prevent re-triggering on the subsequent .on('value') callback
+                            if (!this._patchSaveScheduled) {
+                                this._patchSaveScheduled = true;
+                                setTimeout(async () => {
+                                    await this.saveState();
+                                    this._patchSaveScheduled = false;
+                                }, 500);
+                            }
                         }
                         
                         // If scan is running and only progress changed, just update the bar
@@ -790,28 +812,39 @@ class TeamApp {
     }
 
     async saveState() {
-        this.syncRpsAndInventory();
-        if (this.state.dbConnected) {
-            const toSave = { ...this.state };
-            delete toSave.currentUser;
-            delete toSave.dbConnected;
-            delete toSave.rpFilterServer;
-            delete toSave.rpFilterSpfType;
-            delete toSave.rpFilterRpType;
-            delete toSave.rpFilterSent;
-            delete toSave.rpFilterSpfStatus;
-            delete toSave.rpSearch;
-            await window.db.ref('state').set(toSave);
-        } else {
-            const toSave = { ...this.state };
-            delete toSave.rpFilterServer;
-            delete toSave.rpFilterSpfType;
-            delete toSave.rpFilterRpType;
-            delete toSave.rpFilterSent;
-            delete toSave.rpFilterSpfStatus;
-            delete toSave.rpSearch;
-            localStorage.setItem('team_management_state', JSON.stringify(toSave));
-            this.updateDashboard();
+        if (this._isSaving) {
+            console.log("saveState: skipped (already saving)");
+            return;
+        }
+        this._isSaving = true;
+        try {
+            this.syncRpsAndInventory();
+            if (this.state.dbConnected) {
+                const toSave = { ...this.state };
+                delete toSave.currentUser;
+                delete toSave.dbConnected;
+                delete toSave.rpFilterServer;
+                delete toSave.rpFilterSpfType;
+                delete toSave.rpFilterRpType;
+                delete toSave.rpFilterSent;
+                delete toSave.rpFilterSpfStatus;
+                delete toSave.rpSearch;
+                delete toSave.rpFilterServerDropdownOpen;
+                await window.db.ref('state').set(toSave);
+            } else {
+                const toSave = { ...this.state };
+                delete toSave.rpFilterServer;
+                delete toSave.rpFilterSpfType;
+                delete toSave.rpFilterRpType;
+                delete toSave.rpFilterSent;
+                delete toSave.rpFilterSpfStatus;
+                delete toSave.rpSearch;
+                delete toSave.rpFilterServerDropdownOpen;
+                localStorage.setItem('team_management_state', JSON.stringify(toSave));
+                this.updateDashboard();
+            }
+        } finally {
+            this._isSaving = false;
         }
     }
 

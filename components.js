@@ -298,7 +298,8 @@ window.updateServerField = async (serverId, field, value) => {
 
 function renderServerInventory(app, container) {
     const { servers } = app.state;
-    const sortedServers = [...servers].sort((a, b) => a.name.localeCompare(b.name));
+    const safeServers = (servers || []).filter(s => s);
+    const sortedServers = [...safeServers].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
     container.innerHTML = `
         <div style="padding: 24px;">
@@ -323,7 +324,7 @@ function renderServerInventory(app, container) {
 
                 <div style="padding: 0 20px; border-bottom: 1px solid var(--border-color); display: flex; gap: 24px; background: rgba(255,255,255,0.01);">
                     <div id="tab-active" class="tab ${window._activeInventoryTab !== 'history' ? 'active' : ''}" onclick="window.switchInventoryTab('active')" style="padding: 14px 4px; font-size: 0.8rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${window._activeInventoryTab !== 'history' ? 'var(--accent-primary)' : 'transparent'}; color: ${window._activeInventoryTab !== 'history' ? 'var(--text-primary)' : 'var(--text-secondary)'};">
-                        Active Inventory (${servers.length})
+                        Active Inventory (${safeServers.length})
                     </div>
                     <div id="tab-history" class="tab ${window._activeInventoryTab === 'history' ? 'active' : ''}" onclick="window.switchInventoryTab('history')" style="padding: 14px 4px; font-size: 0.8rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${window._activeInventoryTab === 'history' ? 'var(--accent-primary)' : 'transparent'}; color: ${window._activeInventoryTab === 'history' ? 'var(--text-primary)' : 'var(--text-secondary)'};">
                         Canceled History (${(app.state.historyServers || []).length})
@@ -737,8 +738,8 @@ function renderOverview(app, container) {
     const isAdmin = currentUser.role === 'admin';
     
     // Filter infra by mailer if not admin
-    const myServers = isAdmin ? servers : servers.filter(s => s.mailerId === currentUser.id);
-    const myRps = isAdmin ? rps : rps.filter(r => r.mailerId === currentUser.id);
+    const myServers = isAdmin ? (servers || []) : (servers || []).filter(s => s && s.mailerId === currentUser.id);
+    const myRps = isAdmin ? (rps || []) : (rps || []).filter(r => r && r.mailerId === currentUser.id);
 
     // Revenue Analytics
     const now = new Date();
@@ -863,9 +864,9 @@ function renderOverview(app, container) {
 
     const periodLabel = (window._revStartDate || window._revEndDate) ? 'Selected Period' : 'All Time';
 
-    const leaderboard = (mailers || []).filter(m => m.role === 'mailer').map(m => {
+    const leaderboard = (mailers || []).filter(m => m && m.role === 'mailer').map(m => {
         const rev = (drops || []).filter(d => {
-            if (d.mailerName !== m.name) return false;
+            if (!d || d.mailerName !== m.name) return false;
             if (window._revStartDate || window._revEndDate) {
                 const dDate = new Date(d.timestamp);
                 const start = window._revStartDate ? new Date(window._revStartDate + 'T00:00:00') : null;
@@ -1127,7 +1128,7 @@ function renderOverview(app, container) {
                 </div>
                 <div class="stat-info">
                     <h3>Active RPs</h3>
-                    <p>${myRps.filter(r => r.status === 'active').length}</p>
+                    <p>${myRps.filter(r => r && r.status === 'active').length}</p>
                 </div>
             </div>
             <div class="card stat-card">
@@ -1136,7 +1137,7 @@ function renderOverview(app, container) {
                 </div>
                 <div class="stat-info">
                     <h3>Stock RPs</h3>
-                    <p>${rps.filter(r => r.status === 'stock').length}</p>
+                    <p>${(rps || []).filter(r => r && r.status === 'stock').length}</p>
                 </div>
             </div>
         </div>
@@ -1151,7 +1152,7 @@ function renderOverview(app, container) {
             </div>
             <div class="infrastructure-list">
                 ${myServers.map(srv => {
-                    const srvRps = rps.filter(r => r.serverId === srv.id);
+                    const srvRps = (rps || []).filter(r => r && r.serverId === srv.id);
                     const isExpanded = app.expandedServers.has(srv.id);
                     return `
                         <div class="server-container" style="background: var(--bg-secondary); margin-bottom: 12px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
@@ -1196,11 +1197,11 @@ function renderManagement(app, container) {
     const { rps, servers, mailers, currentUser } = app.state;
     const role = currentUser.role;
     const isAdmin = role === 'admin';
-    const activeMailers = mailers.filter(m => m.role === 'mailer');
+    const activeMailers = (mailers || []).filter(m => m && m.role === 'mailer');
     const query = (app.state.searchQuery || '').toLowerCase();
     
-    const stockRps = rps.filter(r => !r.serverId && !r.mailerId && r.domain.toLowerCase().includes(query));
-    const stockSrvs = servers.filter(s => !s.mailerId && (s.name.toLowerCase().includes(query) || s.ip.includes(query)));
+    const stockRps = (rps || []).filter(r => r && !r.serverId && !r.mailerId && r.domain && r.domain.toLowerCase().includes(query));
+    const stockSrvs = (servers || []).filter(s => s && !s.mailerId && ((s.name || '').toLowerCase().includes(query) || (s.ip || '').includes(query)));
 
     container.innerHTML = `
         <div class="resource-manager">
@@ -1265,8 +1266,8 @@ function renderManagement(app, container) {
 
             <div class="mailer-grid">
                 ${activeMailers.map(m => {
-                    const mSrvs = servers.filter(s => s.mailerId === m.id);
-                    const mStandaloneRps = rps.filter(r => r.mailerId === m.id && !r.serverId);
+                    const mSrvs = (servers || []).filter(s => s && s.mailerId === m.id);
+                    const mStandaloneRps = (rps || []).filter(r => r && r.mailerId === m.id && !r.serverId);
                     
                     return `
                         <div class="mailer-card">
@@ -1276,7 +1277,7 @@ function renderManagement(app, container) {
                             </div>
                             <div class="drop-zone" data-type="mailer" data-id="${m.id}" style="min-height: 100px;">
                                 ${mSrvs.map(srv => {
-                                    const srvRps = rps.filter(r => r.serverId === srv.id);
+                                    const srvRps = (rps || []).filter(r => r && r.serverId === srv.id);
                                     const isExpanded = app.expandedServers.has(srv.id);
                                     const isCancel = srv.markedForCancel === true;
                                     const cancelStyle = isCancel ? 'border-color: #f97316; background: rgba(249, 115, 22, 0.04);' : '';
@@ -1373,7 +1374,7 @@ function renderManagement(app, container) {
 
 function renderTeamManagement(app, container) {
     const { mailers, servers, rps } = app.state;
-    const teamMembers = mailers.filter(m => m.role === 'mailer');
+    const teamMembers = (mailers || []).filter(m => m && m.role === 'mailer');
 
     container.innerHTML = `
         <div class="card">
@@ -1384,8 +1385,8 @@ function renderTeamManagement(app, container) {
             
             <div class="team-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
                 ${teamMembers.map(member => {
-                    const memberSrvs = servers.filter(s => s.mailerId === member.id);
-                    const memberRps = rps.filter(r => r.mailerId === member.id);
+                    const memberSrvs = (servers || []).filter(s => s && s.mailerId === member.id);
+                    const memberRps = (rps || []).filter(r => r && r.mailerId === member.id);
                     return `
                         <div class="card" style="background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); position: relative;">
                             <div style="position: absolute; top: 12px; right: 12px; display: flex; gap: 8px;">
@@ -3785,6 +3786,17 @@ window.renderAiAgent = (app, container) => {
     }, 100);
 };
 
+window.switchRPTab = (tab) => {
+    window._activeRPTab = tab;
+    window.app.updateDashboard();
+};
+
+window.updateGenSelectedServers = () => {
+    if (!window._genRecordsState) window._genRecordsState = {};
+    const selectedButtons = document.querySelectorAll('.gen-srv-btn.selected');
+    window._genRecordsState.selectedServers = Array.from(selectedButtons).map(btn => btn.getAttribute('data-value'));
+};
+
 function renderRPsInventory(app, container) {
     window.withFocusPreservation(() => {
         _renderRPsInventory(app, container);
@@ -3792,6 +3804,24 @@ function renderRPsInventory(app, container) {
 }
 
 function _renderRPsInventory(app, container) {
+    // CRITICAL: Capture live DOM values BEFORE innerHTML destroys them.
+    // Firebase .on('value') can trigger updateDashboard() at ANY time,
+    // which re-renders this view and replaces all DOM elements.
+    // The 'input' event saves text as-you-type, but there's a gap:
+    // if a Firebase sync fires between the last keystroke and a click,
+    // the textarea DOM is destroyed before its value is read.
+    const liveRpInput = document.getElementById('gen-rp-input');
+    if (liveRpInput) {
+        if (!window._genRecordsState) window._genRecordsState = {};
+        window._genRecordsState.rpInput = liveRpInput.value;
+    }
+    // Also snapshot server button selections from the live DOM
+    const liveServerBtns = document.querySelectorAll('.gen-srv-btn.selected');
+    if (liveServerBtns.length > 0) {
+        if (!window._genRecordsState) window._genRecordsState = {};
+        window._genRecordsState.selectedServers = Array.from(liveServerBtns).map(btn => btn.getAttribute('data-value'));
+    }
+
     const existingDropdown = document.getElementById('rp-server-dropdown-options');
     const scrollPos = existingDropdown ? existingDropdown.scrollTop : 0;
 
@@ -3892,6 +3922,11 @@ function _renderRPsInventory(app, container) {
 
         return true;
     });
+
+    if (window._activeRPTab === undefined) {
+        window._activeRPTab = 'database';
+    }
+    window._lastFilteredRPs = filteredItems;
 
     const serverNames = (app.state.servers || []).map(s => s.name).filter(Boolean);
     const uniqueServerNames = [...new Set(serverNames)].sort();
@@ -4115,6 +4150,17 @@ function _renderRPsInventory(app, container) {
         </style>
 
         <div class="rps-inventory-container">
+            <!-- Tabs Navigation -->
+            <div style="padding: 0 10px; border-bottom: 1px solid var(--border-color); display: flex; gap: 24px; background: rgba(255,255,255,0.01); margin-bottom: 8px;">
+                <div id="rp-tab-database" class="tab ${window._activeRPTab !== 'generator' ? 'active' : ''}" onclick="window.switchRPTab('database')" style="padding: 14px 4px; font-size: 0.82rem; font-weight: 700; cursor: pointer; border-bottom: 2px solid ${window._activeRPTab !== 'generator' ? 'var(--accent-primary)' : 'transparent'}; color: ${window._activeRPTab !== 'generator' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 6px;">
+                    <i data-lucide="globe" style="width: 14px;"></i> RPs Database (${filteredItems.length})
+                </div>
+                <div id="rp-tab-generator" class="tab ${window._activeRPTab === 'generator' ? 'active' : ''}" onclick="window.switchRPTab('generator')" style="padding: 14px 4px; font-size: 0.82rem; font-weight: 700; cursor: pointer; border-bottom: 2px solid ${window._activeRPTab === 'generator' ? 'var(--accent-primary)' : 'transparent'}; color: ${window._activeRPTab === 'generator' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 6px;">
+                    <i data-lucide="zap" style="width: 14px;"></i> Generate Records
+                </div>
+            </div>
+
+            ${window._activeRPTab !== 'generator' ? `
             ${isSpfRunning ? `
                 <div id="rp-spf-progress-container" class="card" style="padding: 16px 20px; background: var(--bg-secondary); border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px; animation: fadeIn 0.3s ease; margin-bottom: 16px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; font-weight: 600;">
@@ -4256,81 +4302,6 @@ function _renderRPsInventory(app, container) {
                 </div>
             </div>
 
-            <!-- Generate Records Section -->
-            <div class="card" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; margin-bottom: 12px; box-shadow: var(--shadow-lg); transition: border-color 0.3s ease;">
-                <div onclick="event.stopPropagation(); window.app.state.generateRecordsExpanded = !window.app.state.generateRecordsExpanded; document.getElementById('gen-records-body').style.display = window.app.state.generateRecordsExpanded ? 'block' : 'none'; this.querySelector('.gen-chevron').style.transform = window.app.state.generateRecordsExpanded ? 'rotate(180deg)' : 'rotate(0deg)';"
-                     style="padding: 16px 24px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: linear-gradient(to right, rgba(249, 115, 22, 0.03), transparent); border-bottom: 1px solid var(--border-color); transition: background 0.2s;"
-                     onmouseover="this.style.background='linear-gradient(to right, rgba(249, 115, 22, 0.06), rgba(255, 255, 255, 0.01))'" onmouseout="this.style.background='linear-gradient(to right, rgba(249, 115, 22, 0.03), transparent)'">
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <div style="width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #f97316, #ea580c); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(234, 88, 12, 0.2);">
-                            <i data-lucide="file-text" style="width: 18px; color: white;"></i>
-                        </div>
-                        <div>
-                            <div style="font-weight: 700; font-size: 0.95rem; letter-spacing: 0.02em; color: var(--text-primary);">Generate Records</div>
-                            <div style="font-size: 0.72rem; color: var(--text-secondary);">Generate SPF/Arecord DNS entries from selected RPs & Servers</div>
-                        </div>
-                    </div>
-                    <i data-lucide="chevron-down" class="gen-chevron" style="width: 18px; color: var(--text-secondary); transition: transform 0.3s; ${app.state.generateRecordsExpanded ? 'transform: rotate(180deg);' : ''}"></i>
-                </div>
-                <div id="gen-records-body" style="display: ${app.state.generateRecordsExpanded ? 'block' : 'none'}; padding: 24px; background: rgba(10, 12, 16, 0.2);">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 20px;">
-                        <!-- RP Selection -->
-                        <div style="display: flex; flex-direction: column; gap: 8px;">
-                            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
-                                <i data-lucide="globe" style="width: 12px; color: var(--accent-primary);"></i> Select RPs 
-                                <span style="font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--text-secondary); margin-left: 4px;">(one per line)</span>
-                            </label>
-                            <textarea id="gen-rp-input" placeholder="Enter RP domains (one per line)...\ne.g.:\nmy-rp-domain.com\nanother-rp.net" style="min-height: 140px; padding: 12px; background: rgba(10, 12, 16, 0.5); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8rem; resize: vertical; outline: none; line-height: 1.5; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent-primary)'" onblur="this.style.borderColor='var(--border-color)'"></textarea>
-                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                                <button onclick="window.genRecordsFillFilteredRPs()" style="padding: 6px 12px; font-size: 0.72rem; font-weight: 600; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.2s;" onmouseover="this.style.background='var(--border-color)'" onmouseout="this.style.background='var(--bg-tertiary)'">
-                                    <i data-lucide="list" style="width: 12px;"></i> Fill from filtered list
-                                </button>
-                                <button onclick="document.getElementById('gen-rp-input').value=''" style="padding: 6px 12px; font-size: 0.72rem; font-weight: 600; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='var(--border-color)', this.style.color='var(--text-primary)'" onmouseout="this.style.background='var(--bg-tertiary)', this.style.color='var(--text-secondary)'">Clear</button>
-                            </div>
-                        </div>
-
-                        <!-- Server Selection -->
-                        <div style="display: flex; flex-direction: column; gap: 8px; grid-column: span 2;">
-                            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
-                                <i data-lucide="server" style="width: 12px; color: #ea580c;"></i> Select Servers
-                            </label>
-                            <div id="gen-servers-list" class="gen-srv-grid">
-                                ${(app.state.servers || []).map(srv => {
-                                    return `
-                                    <button type="button" class="gen-srv-btn" data-value="${srv.name}" onclick="this.classList.toggle('selected')">
-                                        <span>${srv.name}</span>
-                                        <span class="srv-btn-badge">${(srv.allIps || []).length} IPs</span>
-                                    </button>`;
-                                }).join('')}
-                            </div>
-                            <div style="display: flex; gap: 8px; max-width: 280px; margin-top: 4px;">
-                                <button onclick="document.querySelectorAll('.gen-srv-btn').forEach(btn => btn.classList.add('selected'))" style="flex: 1; padding: 6px 12px; font-size: 0.72rem; font-weight: 600; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='var(--border-color)'" onmouseout="this.style.background='var(--bg-tertiary)'">Select All</button>
-                                <button onclick="document.querySelectorAll('.gen-srv-btn').forEach(btn => btn.classList.remove('selected'))" style="flex: 1; padding: 6px 12px; font-size: 0.72rem; font-weight: 600; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='var(--border-color)', this.style.color='var(--text-primary)'" onmouseout="this.style.background='var(--bg-tertiary)', this.style.color='var(--text-secondary)'">Deselect All</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Generate Button -->
-                    <button onclick="window.generateDNSRecords()" style="padding: 11px 24px; font-size: 0.85rem; font-weight: 700; background: linear-gradient(135deg, #f97316, #ea580c); border: none; color: white; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; box-shadow: 0 4px 14px rgba(234, 88, 12, 0.25); width: auto;" onmouseover="this.style.opacity='0.95'; this.style.transform='translateY(-1px)'" onmouseout="this.style.opacity='1'; this.style.transform='translateY(0)'">
-                        <i data-lucide="zap" style="width: 15px;"></i> Generate Records
-                    </button>
-
-                    <!-- Results -->
-                    <div id="gen-records-results" style="display: none; margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
-                                <i data-lucide="terminal" style="width: 12px; color: var(--success);"></i> Generated Records
-                            </label>
-                            <button onclick="navigator.clipboard.writeText(document.getElementById('gen-records-output').value); this.innerHTML='<i data-lucide=\\'check\\' style=\\'width:12px;color:var(--success)\\'></i> Copied!'; if(window.lucide) window.lucide.createIcons(); setTimeout(()=>{this.innerHTML='<i data-lucide=\\'copy\\' style=\\'width:12px\\'></i> Copy All'; if(window.lucide) window.lucide.createIcons();}, 2000);" style="padding: 5px 12px; font-size: 0.72rem; font-weight: 600; background: var(--accent-primary); border: none; color: white; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(59, 130, 246, 0.2); transition: opacity 0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
-                                <i data-lucide="copy" style="width: 12px;"></i> Copy All
-                            </button>
-                        </div>
-                        <textarea id="gen-records-output" readonly style="width: 100%; min-height: 160px; padding: 12px; background: rgba(10, 12, 16, 0.8); border: 1px solid var(--border-color); border-radius: 8px; color: #22c55e; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.78rem; resize: vertical; outline: none; line-height: 1.6; box-shadow: inset 0 2px 6px rgba(0,0,0,0.3);"></textarea>
-                        <div id="gen-records-count" style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 8px; line-height: 1.4;"></div>
-                    </div>
-                </div>
-            </div>
-
             <div class="rp-table-card">
                 <div class="rp-table-wrapper">
                     <table class="rp-table">
@@ -4447,20 +4418,109 @@ function _renderRPsInventory(app, container) {
                     </table>
                 </div>
             </div>
+            ` : `
+            <!-- Generate Records Tab View -->
+            <div class="card" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-lg); padding: 24px;">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border-color);">
+                    <div style="width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #f97316, #ea580c); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(234, 88, 12, 0.25);">
+                        <i data-lucide="zap" style="width: 18px; color: white;"></i>
+                    </div>
+                    <div>
+                        <h3 style="margin: 0; font-weight: 700; font-size: 1.05rem; color: var(--text-primary);">Generate Records</h3>
+                        <p style="margin: 4px 0 0; font-size: 0.75rem; color: var(--text-secondary);">Generate SPF/Arecord DNS entries from selected RPs & Servers</p>
+                    </div>
+                </div>
+                <div id="gen-records-body" style="padding: 0;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 20px;">
+                        <!-- RP Selection -->
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
+                                <i data-lucide="globe" style="width: 12px; color: var(--accent-primary);"></i> Select RPs 
+                                <span style="font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--text-secondary); margin-left: 4px;">(one per line)</span>
+                            </label>
+                            <textarea id="gen-rp-input" placeholder="Enter RP domains (one per line)...\ne.g.:\nmy-rp-domain.com\nanother-rp.net" style="min-height: 140px; padding: 12px; background: rgba(10, 12, 16, 0.5); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8rem; resize: vertical; outline: none; line-height: 1.5; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent-primary)'" onblur="this.style.borderColor='var(--border-color)'">${window._genRecordsState && window._genRecordsState.rpInput ? window._genRecordsState.rpInput : ''}</textarea>
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                <button onclick="window.genRecordsFillFilteredRPs()" style="padding: 6px 12px; font-size: 0.72rem; font-weight: 600; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.2s;" onmouseover="this.style.background='var(--border-color)'" onmouseout="this.style.background='var(--bg-tertiary)'">
+                                    <i data-lucide="list" style="width: 12px;"></i> Fill from filtered list
+                                </button>
+                                <button onclick="document.getElementById('gen-rp-input').value=''; if (!window._genRecordsState) window._genRecordsState = {}; window._genRecordsState.rpInput = '';" style="padding: 6px 12px; font-size: 0.72rem; font-weight: 600; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='var(--border-color)', this.style.color='var(--text-primary)'" onmouseout="this.style.background='var(--bg-tertiary)', this.style.color='var(--text-secondary)'">Clear</button>
+                            </div>
+                        </div>
+
+                        <!-- Server Selection -->
+                        <div style="display: flex; flex-direction: column; gap: 8px; grid-column: span 2;">
+                            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
+                                <i data-lucide="server" style="width: 12px; color: #ea580c;"></i> Select Servers
+                            </label>
+                            <div id="gen-servers-list" class="gen-srv-grid">
+                                ${(app.state.servers || []).map(srv => {
+                                    const isSelected = window._genRecordsState && window._genRecordsState.selectedServers && window._genRecordsState.selectedServers.includes(srv.name);
+                                    return `
+                                    <button type="button" class="gen-srv-btn ${isSelected ? 'selected' : ''}" data-value="${srv.name}" onclick="this.classList.toggle('selected'); window.updateGenSelectedServers();">
+                                        <span>${srv.name}</span>
+                                        <span class="srv-btn-badge">${(srv.allIps || []).length} IPs</span>
+                                    </button>`;
+                                }).join('')}
+                            </div>
+                            <div style="display: flex; gap: 8px; max-width: 280px; margin-top: 4px;">
+                                <button onclick="document.querySelectorAll('.gen-srv-btn').forEach(btn => btn.classList.add('selected')); window.updateGenSelectedServers();" style="flex: 1; padding: 6px 12px; font-size: 0.72rem; font-weight: 600; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='var(--border-color)'" onmouseout="this.style.background='var(--bg-tertiary)'">Select All</button>
+                                <button onclick="document.querySelectorAll('.gen-srv-btn').forEach(btn => btn.classList.remove('selected')); window.updateGenSelectedServers();" style="flex: 1; padding: 6px 12px; font-size: 0.72rem; font-weight: 600; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='var(--border-color)', this.style.color='var(--text-primary)'" onmouseout="this.style.background='var(--bg-tertiary)', this.style.color='var(--text-secondary)'">Deselect All</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Generate Button -->
+                    <button onclick="window.generateDNSRecords()" style="padding: 11px 24px; font-size: 0.85rem; font-weight: 700; background: linear-gradient(135deg, #f97316, #ea580c); border: none; color: white; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; box-shadow: 0 4px 14px rgba(234, 88, 12, 0.25); width: auto;" onmouseover="this.style.opacity='0.95'; this.style.transform='translateY(-1px)'" onmouseout="this.style.opacity='1'; this.style.transform='translateY(0)'">
+                        <i data-lucide="zap" style="width: 15px;"></i> Generate Records
+                    </button>
+
+                    <!-- Results -->
+                    <div id="gen-records-results" style="display: ${window._genRecordsState && window._genRecordsState.showResults ? 'block' : 'none'}; margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
+                                <i data-lucide="terminal" style="width: 12px; color: var(--success);"></i> Generated Records
+                            </label>
+                            <button onclick="navigator.clipboard.writeText(document.getElementById('gen-records-output').value); this.innerHTML='<i data-lucide=\\'check\\' style=\\'width:12px;color:var(--success)\\'></i> Copied!'; if(window.lucide) window.lucide.createIcons(); setTimeout(()=>{this.innerHTML='<i data-lucide=\\'copy\\' style=\\'width:12px\\'></i> Copy All'; if(window.lucide) window.lucide.createIcons();}, 2000);" style="padding: 5px 12px; font-size: 0.72rem; font-weight: 600; background: var(--accent-primary); border: none; color: white; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(59, 130, 246, 0.2); transition: opacity 0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+                                <i data-lucide="copy" style="width: 12px;"></i> Copy All
+                            </button>
+                        </div>
+                        <textarea id="gen-records-output" readonly style="width: 100%; min-height: 160px; padding: 12px; background: rgba(10, 12, 16, 0.8); border: 1px solid var(--border-color); border-radius: 8px; color: #22c55e; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.78rem; resize: vertical; outline: none; line-height: 1.6; box-shadow: inset 0 2px 6px rgba(0,0,0,0.3);">${window._genRecordsState && window._genRecordsState.output ? window._genRecordsState.output : ''}</textarea>
+                        <div id="gen-records-count" style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 8px; line-height: 1.4;">${window._genRecordsState && window._genRecordsState.countHtml ? window._genRecordsState.countHtml : ''}</div>
+                    </div>
+                </div>
+            </div>
+            `}
         </div>
     `;
 
-    document.getElementById('rp-search-input').addEventListener('input', (e) => {
-        app.state.rpSearch = e.target.value;
-        renderRPsInventory(app, container);
-    });
+    const searchInput = document.getElementById('rp-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            app.state.rpSearch = e.target.value;
+            renderRPsInventory(app, container);
+        });
+    }
+
     // Restore scroll position of the multiselect dropdown
     const newDropdown = document.getElementById('rp-server-dropdown-options');
     if (newDropdown) {
         newDropdown.scrollTop = scrollPos;
     }
 
-    // Toggle dropdown open/close
+    const genRpInput = document.getElementById('gen-rp-input');
+    if (genRpInput) {
+        // Save on every keystroke
+        genRpInput.addEventListener('input', (e) => {
+            if (!window._genRecordsState) window._genRecordsState = {};
+            window._genRecordsState.rpInput = e.target.value;
+        });
+        // Safety net: also save on blur (when user clicks away to server buttons)
+        genRpInput.addEventListener('blur', (e) => {
+            if (!window._genRecordsState) window._genRecordsState = {};
+            window._genRecordsState.rpInput = e.target.value;
+        });
+    }
+
     const multiselectTrigger = document.getElementById('rp-server-multiselect');
     if (multiselectTrigger) {
         multiselectTrigger.addEventListener('click', (e) => {
@@ -4470,7 +4530,6 @@ function _renderRPsInventory(app, container) {
         });
     }
 
-    // Close dropdown when clicking outside
     const outsideClickListener = (e) => {
         const dropdown = document.getElementById('rp-server-dropdown-options');
         const trigger = document.getElementById('rp-server-multiselect');
@@ -4486,7 +4545,6 @@ function _renderRPsInventory(app, container) {
         document.addEventListener('click', outsideClickListener);
     }
 
-    // Checkbox change listener
     const checkboxes = container.querySelectorAll('.rp-server-checkbox');
     checkboxes.forEach(cb => {
         cb.addEventListener('change', (e) => {
@@ -4518,24 +4576,39 @@ function _renderRPsInventory(app, container) {
             renderRPsInventory(app, container);
         });
     });
-    document.getElementById('rp-filter-spftype').addEventListener('change', (e) => {
-        app.state.rpFilterSpfType = e.target.value;
-        renderRPsInventory(app, container);
-    });
-    document.getElementById('rp-filter-rptype').addEventListener('change', (e) => {
-        app.state.rpFilterRpType = e.target.value;
-        renderRPsInventory(app, container);
-    });
-    document.getElementById('rp-filter-sent').addEventListener('change', (e) => {
-        app.state.rpFilterSent = e.target.value;
-        renderRPsInventory(app, container);
-    });
-    document.getElementById('rp-filter-spfstatus').addEventListener('change', (e) => {
-        app.state.rpFilterSpfStatus = e.target.value;
-        renderRPsInventory(app, container);
-    });
 
-    // Copy All header buttons
+    const filterSpfType = document.getElementById('rp-filter-spftype');
+    if (filterSpfType) {
+        filterSpfType.addEventListener('change', (e) => {
+            app.state.rpFilterSpfType = e.target.value;
+            renderRPsInventory(app, container);
+        });
+    }
+
+    const filterRpType = document.getElementById('rp-filter-rptype');
+    if (filterRpType) {
+        filterRpType.addEventListener('change', (e) => {
+            app.state.rpFilterRpType = e.target.value;
+            renderRPsInventory(app, container);
+        });
+    }
+
+    const filterSent = document.getElementById('rp-filter-sent');
+    if (filterSent) {
+        filterSent.addEventListener('change', (e) => {
+            app.state.rpFilterSent = e.target.value;
+            renderRPsInventory(app, container);
+        });
+    }
+
+    const filterSpfStatus = document.getElementById('rp-filter-spfstatus');
+    if (filterSpfStatus) {
+        filterSpfStatus.addEventListener('change', (e) => {
+            app.state.rpFilterSpfStatus = e.target.value;
+            renderRPsInventory(app, container);
+        });
+    }
+
     const copyAllBtn = (btnId, getData) => {
         const btn = document.getElementById(btnId);
         if (btn) {
@@ -4556,20 +4629,17 @@ function _renderRPsInventory(app, container) {
     if (window.lucide) window.lucide.createIcons();
 }
 
-// Generate Records - Fill RP textarea from currently filtered items
 window.genRecordsFillFilteredRPs = () => {
-    const container = document.getElementById('view-container');
-    if (!container) return;
     const input = document.getElementById('gen-rp-input');
     if (!input) return;
     
-    // Get the currently filtered RP items from the table
     const items = window.app.getProcessedRPInventory() || [];
     const rpDomains = items.map(i => i.rpDomain).filter(Boolean);
     input.value = rpDomains.join('\n');
+    if (!window._genRecordsState) window._genRecordsState = {};
+    window._genRecordsState.rpInput = input.value;
 };
 
-// Generate Records - Main generation function
 window.generateDNSRecords = () => {
     const rpInput = document.getElementById('gen-rp-input');
     const outputDiv = document.getElementById('gen-records-results');
@@ -4578,22 +4648,18 @@ window.generateDNSRecords = () => {
     
     if (!rpInput || !outputArea || !outputDiv) return;
 
-    // Get RP domains from textarea
     const rpDomains = rpInput.value.split('\n').map(l => l.trim()).filter(Boolean);
     if (rpDomains.length === 0) {
         alert('Please enter at least one RP domain.');
         return;
     }
 
-    // Get selected servers
-    const selectedButtons = document.querySelectorAll('.gen-srv-btn.selected');
-    const selectedServerNames = Array.from(selectedButtons).map(btn => btn.getAttribute('data-value'));
+    const selectedServerNames = (window._genRecordsState && window._genRecordsState.selectedServers) ? window._genRecordsState.selectedServers : [];
     if (selectedServerNames.length === 0) {
         alert('Please select at least one server.');
         return;
     }
 
-    // Collect all IPs from selected servers
     const servers = window.app.state.servers || [];
     const allIps = [];
     selectedServerNames.forEach(srvName => {
@@ -4610,7 +4676,6 @@ window.generateDNSRecords = () => {
         return;
     }
 
-    // Look up each RP domain in the inventory to get domainIncluded & subdomainIncluded, and detect record type automatically
     const inventory = window.app.getProcessedRPInventory() || [];
     const lines = [];
     let matched = 0;
@@ -4626,7 +4691,6 @@ window.generateDNSRecords = () => {
         const domainIncluded = item ? (item.domainIncluded || rpDomain) : rpDomain;
         const subdomainIncluded = item ? (item.subdomainIncluded || '') : '';
 
-        // Auto-detect spfType: if not found, default to Include
         const recordType = (item && (item.spfType === 'Arecord' || item.spfType === 'Arecod')) ? 'Arecord' : 'Include';
 
         if (item) matched++;
@@ -4634,18 +4698,15 @@ window.generateDNSRecords = () => {
 
         if (recordType === 'Include') {
             generatedIncludeCount++;
-            // Include format: domain_include,subdomain_include,TXT,v=spf1 ip4:IP1 ip4:IP2 ... -all
             const ipPart = allIps.map(ip => `ip4:${ip}`).join(' ');
             lines.push(`${domainIncluded},${subdomainIncluded},TXT,v=spf1 ${ipPart} -all`);
         } else {
             generatedArecordCount++;
-            // Arecord format: domain_include,subdomain_include,TXT,Arecords:IP1;IP2;IP3;...
             const ipPart = allIps.join(';');
             lines.push(`${domainIncluded},${subdomainIncluded},TXT,Arecords:${ipPart}`);
         }
     });
 
-    // IP Limit checks based on actually generated record types
     let limitWarnings = [];
     if (generatedArecordCount > 0 && allIps.length > 49) {
         limitWarnings.push(`You have selected ${allIps.length} IPs for Arecord type (limit is 49).`);
@@ -4671,11 +4732,15 @@ window.generateDNSRecords = () => {
     
     countDiv.innerHTML = resultMessage;
 
+    if (!window._genRecordsState) window._genRecordsState = {};
+    window._genRecordsState.output = lines.join('\n');
+    window._genRecordsState.countHtml = resultMessage;
+    window._genRecordsState.showResults = true;
+
     if (window.lucide) window.lucide.createIcons();
 };
 
 window.updateRPItemField = (id, field, value) => {
-    // Domain Included conflict check when assigning a server
     if (field === 'srv' && value && value !== '' && value !== 'SENT') {
         const inventory = window.app.state.rpInventory || [];
         const currentItem = inventory.find(item => item.id === id);
