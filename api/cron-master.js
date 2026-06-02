@@ -93,7 +93,7 @@ export default async function handler(req, res) {
     const runSpamhaus = task === 'all' || task === 'spamhaus' || (!task && [0, 8, 16].includes(hour));
     const runVmta = task === 'all' || task === 'vmta' || task === 'rdns' || (!task && hour % 3 === 0);
     const runGmail = task === 'all' || task === 'gmail' || (!task && [12, 18].includes(hour));
-    const runSpf = task === 'all' || task === 'spf' || (!task && [2, 10, 18].includes(hour));
+    const runSpf = task === 'all' || task === 'spf' || (!task && hour === 9);
     const runGmailStatus = task === 'all' || task === 'gmail-status' || (!task && hour === 9);
     const runPtrSpf = task === 'all' || task === 'ptr-spf' || !task;
 

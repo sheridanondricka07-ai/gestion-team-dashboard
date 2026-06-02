@@ -218,10 +218,155 @@ function verifySpfRecord(spfRecord, type, domainInc, subdomainInc, rpType, serve
     return { ok: false, reason: `Invalid SPF Type: ${type}` };
 }
 
+async function safeDnsResolve(fn, domain) {
+    try {
+        const dnsPromise = fn(domain);
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('DNS Timeout')), 1500)
+        );
+        return await Promise.race([dnsPromise, timeoutPromise]);
+    } catch (e) {
+        return null;
+    }
+}
+
+function parseSpfMechanisms(spfRecord) {
+    const terms = spfRecord.toLowerCase().split(/\s+/);
+    const result = { includes: [], aRecords: [], ip4s: [], bareA: false };
+    for (let term of terms) {
+        if (['+', '-', '~', '?'].includes(term[0])) term = term.slice(1);
+        if (term.startsWith('include:')) {
+            result.includes.push(term.substring(8));
+        } else if (term.startsWith('a:')) {
+            result.aRecords.push(term.substring(2).split('/')[0]);
+        } else if (term === 'a' || term.startsWith('a/')) {
+            result.bareA = true;
+        } else if (term.startsWith('ip4:')) {
+            result.ip4s.push(term.substring(4));
+        }
+    }
+    return result;
+}
+
+function matchIpAgainstServers(ipOrCidr, servers) {
+    for (const s of servers) {
+        for (const sIp of (s.allIps || [s.mainIp || s.ip]).filter(Boolean)) {
+            if (ipInCidr(sIp, ipOrCidr)) return s.name;
+        }
+    }
+    return null;
+}
+
+function extractRootDomain(domain) {
+    const parts = domain.split('.');
+    if (parts.length <= 2) return domain;
+    return parts.slice(-2).join('.');
+}
+
+async function autoDetectRp(item, servers) {
+    const domain = (item.rpDomain || '').trim().toLowerCase();
+    if (!domain) return null;
+
+    const spfRecord = await getSpfRecord(domain);
+    if (!spfRecord) return null;
+
+    const recordStr = Array.isArray(spfRecord) ? spfRecord[0] : spfRecord;
+    if (!recordStr) return null;
+
+    const mechs = parseSpfMechanisms(recordStr);
+
+    // 1. Check ip4: mechanisms
+    for (const ip4 of mechs.ip4s) {
+        const srv = matchIpAgainstServers(ip4, servers);
+        if (srv) {
+            return {
+                domainIncluded: domain, subdomainIncluded: domain,
+                server: srv, spfType: 'Include', rpType: 'intern'
+            };
+        }
+    }
+
+    // 2. Check bare 'a' mechanism
+    if (mechs.bareA) {
+        const aIps = await safeDnsResolve(dns.resolve4, domain);
+        if (aIps) {
+            for (const aIp of aIps) {
+                const srv = matchIpAgainstServers(aIp, servers);
+                if (srv) {
+                    return {
+                        domainIncluded: domain, subdomainIncluded: domain,
+                        server: srv, spfType: 'Arecod', rpType: 'intern'
+                    };
+                }
+            }
+        }
+    }
+
+    // 3. Check include: mechanisms (resolve 2 levels deep)
+    for (const incDomain of mechs.includes) {
+        const incSpf = await getSpfRecord(incDomain);
+        if (!incSpf) continue;
+        const incRecordStr = Array.isArray(incSpf) ? incSpf[0] : incSpf;
+        if (!incRecordStr) continue;
+
+        const incMechs = parseSpfMechanisms(incRecordStr);
+
+        for (const ip4 of incMechs.ip4s) {
+            const srv = matchIpAgainstServers(ip4, servers);
+            if (srv) {
+                const root = extractRootDomain(incDomain);
+                return {
+                    domainIncluded: root, subdomainIncluded: incDomain,
+                    server: srv, spfType: 'Include', rpType: 'extern'
+                };
+            }
+        }
+
+        // Level 2: nested includes
+        for (const nested of incMechs.includes) {
+            const nestedSpf = await getSpfRecord(nested);
+            if (!nestedSpf) continue;
+            const nestedRecordStr = Array.isArray(nestedSpf) ? nestedSpf[0] : nestedSpf;
+            if (!nestedRecordStr) continue;
+
+            const nestedMechs = parseSpfMechanisms(nestedRecordStr);
+            for (const ip4 of nestedMechs.ip4s) {
+                const srv = matchIpAgainstServers(ip4, servers);
+                if (srv) {
+                    const root = extractRootDomain(incDomain);
+                    return {
+                        domainIncluded: root, subdomainIncluded: incDomain,
+                        server: srv, spfType: 'Include', rpType: 'extern'
+                    };
+                }
+            }
+        }
+    }
+
+    // 4. Check a: mechanisms
+    for (const aDomain of mechs.aRecords) {
+        const aIps = await safeDnsResolve(dns.resolve4, aDomain);
+        if (!aIps) continue;
+        for (const aIp of aIps) {
+            const srv = matchIpAgainstServers(aIp, servers);
+            if (srv) {
+                const root = extractRootDomain(aDomain);
+                return {
+                    domainIncluded: root, subdomainIncluded: aDomain,
+                    server: srv, spfType: 'Arecod', rpType: 'extern'
+                };
+            }
+        }
+    }
+
+    return null;
+}
+
 export default async function handler(req, res) {
     try {
         const rpInventory = await getFirebaseData('state/rpInventory') || [];
         const servers = await getFirebaseData('state/servers') || [];
+        const rps = await getFirebaseData('state/rps') || [];
         
         if (rpInventory.length === 0) {
             return res.status(200).json({
@@ -230,6 +375,35 @@ export default async function handler(req, res) {
                 summary: { total: 0, ok: 0, error: 0 },
                 results: []
             });
+        }
+
+        // Auto-detect missing SPF settings for RPs before checking
+        for (const item of rpInventory) {
+            if (item.rpDomain && (!item.domainIncluded || item.domainIncluded === '---' || item.domainIncluded === '')) {
+                try {
+                    const detected = await autoDetectRp(item, servers);
+                    if (detected) {
+                        item.domainIncluded = detected.domainIncluded || '';
+                        item.subdomainIncluded = detected.subdomainIncluded || '';
+                        item.srv = detected.server || '';
+                        item.spfType = detected.spfType || 'Include';
+                        item.rpType = detected.rpType || 'intern';
+
+                        // Sync to rps array if it exists
+                        const attachedServer = servers.find(s => s.name === detected.server);
+                        if (attachedServer) {
+                            const rpInRps = rps.find(r => (r.domain || '').trim().toLowerCase() === item.rpDomain.toLowerCase());
+                            if (rpInRps) {
+                                rpInRps.serverId = attachedServer.id;
+                                rpInRps.mailerId = attachedServer.mailerId || null;
+                                rpInRps.status = 'active';
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error(`Auto-detect failed for ${item.rpDomain} in cron:`, e);
+                }
+            }
         }
 
         const checkedAt = new Date().toISOString();
@@ -296,6 +470,7 @@ export default async function handler(req, res) {
 
         // Save updated state back to Firebase
         await setFirebaseData('state/rpInventory', rpInventory);
+        await setFirebaseData('state/rps', rps);
 
         const summary = {
             total: results.length,
