@@ -568,9 +568,81 @@ class TeamApp {
         await this.saveState();
     }
 
+    checkRpServerConflict(rpDomain, targetServerName, domainIncluded = null) {
+        if (!targetServerName || targetServerName === '' || targetServerName === 'SENT') {
+            return null; // No conflict if setting to None or SENT
+        }
+        
+        const cleanRpDomain = (rpDomain || '').trim().toLowerCase();
+        if (!cleanRpDomain) return null;
+
+        // If domainIncluded is not provided, look it up in inventory
+        let domInc = domainIncluded;
+        if (!domInc) {
+            const currentItem = (this.state.rpInventory || []).find(item => 
+                (item.rpDomain || '').trim().toLowerCase() === cleanRpDomain
+            );
+            if (currentItem) domInc = currentItem.domainIncluded;
+        }
+
+        if (!domInc) return null;
+        domInc = domInc.trim().toLowerCase();
+        if (!domInc || domInc === '---') return null;
+
+        // Find any other RP in inventory with the same domainIncluded
+        const conflict = (this.state.rpInventory || []).find(item =>
+            (item.rpDomain || '').trim().toLowerCase() !== cleanRpDomain &&
+            item.domainIncluded &&
+            item.domainIncluded.trim().toLowerCase() === domInc &&
+            item.srv &&
+            item.srv !== '' &&
+            item.srv !== 'SENT' &&
+            item.srv.trim().toLowerCase() !== targetServerName.trim().toLowerCase()
+        );
+
+        return conflict || null;
+    }
+
+    showConflictModal(rpDomain, targetServer, conflict) {
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.style.zIndex = '10000';
+        overlay.innerHTML = `
+            <div class="modal" style="max-width: 480px; text-align: center; padding: 32px;">
+                <div style="background: rgba(239, 68, 68, 0.1); color: var(--error); width: 64px; height: 64px; border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                    <i data-lucide="alert-triangle" style="width: 32px; height: 32px;"></i>
+                </div>
+                <h2 style="margin: 0 0 12px; color: var(--text-primary);">Domain Conflict Detected</h2>
+                <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 20px;">
+                    Cannot assign RP <b style="color: var(--text-primary);">${rpDomain}</b> to server <b style="color: var(--error);">${targetServer}</b>.
+                    <br><br>
+                    The included domain <b style="color: var(--accent-primary);">${conflict.domainIncluded}</b> is already used by RP 
+                    <b style="color: var(--text-primary);">${conflict.rpDomain}</b> which is assigned to server 
+                    <b style="color: var(--error);">${conflict.srv}</b>.
+                </p>
+                <div style="background: var(--bg-tertiary); padding: 12px; border-radius: 8px; margin-bottom: 24px; font-size: 0.85rem; color: var(--text-secondary); text-align: left;">
+                    <b>⚠️ Why?</b> Two RPs sharing the same included domain should not be on different servers to avoid SPF conflicts.
+                </div>
+                <button onclick="this.closest('.modal-overlay').remove()" class="btn-primary" style="width: 100%;">Understood</button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        if (window.lucide) window.lucide.createIcons();
+    }
+
     async assignRPtoServer(rpId, serverId) {
         const rp = this.state.rps.find(r => r.id === rpId);
         const srv = this.state.servers.find(s => s.id === serverId);
+        
+        if (rp && srv) {
+            const conflict = this.checkRpServerConflict(rp.domain, srv.name);
+            if (conflict) {
+                this.showConflictModal(rp.domain, srv.name, conflict);
+                this.updateDashboard();
+                return;
+            }
+        }
+
         if (rp) {
             rp.serverId = serverId;
             rp.mailerId = srv ? srv.mailerId : null;
@@ -1212,6 +1284,14 @@ class TeamApp {
             return;
         }
 
+        if (data.srv && data.domainIncluded) {
+            const conflict = this.checkRpServerConflict(domain, data.srv, data.domainIncluded);
+            if (conflict) {
+                this.showConflictModal(domain, data.srv, conflict);
+                return;
+            }
+        }
+
         const item = {
             id: 'rpi_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
             rpDomain: domain,
@@ -1274,6 +1354,14 @@ class TeamApp {
                     alerts.push(`• "${domain}" (Already added / in stock)`);
                 }
                 return;
+            }
+
+            if (data.srv && data.domainIncluded) {
+                const conflict = this.checkRpServerConflict(domain, data.srv, data.domainIncluded);
+                if (conflict) {
+                    alerts.push(`• "${domain}" (Conflict: domain included "${data.domainIncluded}" is already used on server "${conflict.srv}")`);
+                    return;
+                }
             }
 
             const item = {
