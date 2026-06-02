@@ -372,7 +372,10 @@ GUIDELINES:
                             },
                             generationConfig: {
                                 temperature: 0.2,
-                                maxOutputTokens: 2500
+                                maxOutputTokens: 8192,
+                                thinkingConfig: {
+                                    thinkingBudget: 0
+                                }
                             }
                         })
                     });
