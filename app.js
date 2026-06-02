@@ -658,6 +658,7 @@ class TeamApp {
                         const rpFilterSpfStatus = this.state.rpFilterSpfStatus || 'all';
                         const rpSearch = typeof this.state.rpSearch !== 'undefined' ? this.state.rpSearch : '';
                         const rpFilterServerDropdownOpen = !!this.state.rpFilterServerDropdownOpen;
+                        const searchQuery = typeof this.state.searchQuery !== 'undefined' ? this.state.searchQuery : '';
                         
                         this.state = { 
                             ...this.state, 
@@ -671,7 +672,8 @@ class TeamApp {
                             rpFilterSent,
                             rpFilterSpfStatus,
                             rpSearch,
-                            rpFilterServerDropdownOpen
+                            rpFilterServerDropdownOpen,
+                            searchQuery
                         };
                         // SAFETY: Firebase may return null for these — always ensure safe defaults
                         if (!this.state.servers) this.state.servers = [];
@@ -830,6 +832,7 @@ class TeamApp {
                 delete toSave.rpFilterSpfStatus;
                 delete toSave.rpSearch;
                 delete toSave.rpFilterServerDropdownOpen;
+                delete toSave.searchQuery;
                 await window.db.ref('state').set(toSave);
             } else {
                 const toSave = { ...this.state };
@@ -840,6 +843,7 @@ class TeamApp {
                 delete toSave.rpFilterSpfStatus;
                 delete toSave.rpSearch;
                 delete toSave.rpFilterServerDropdownOpen;
+                delete toSave.searchQuery;
                 localStorage.setItem('team_management_state', JSON.stringify(toSave));
                 this.updateDashboard();
             }
