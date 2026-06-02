@@ -322,12 +322,13 @@ GUIDELINES:
     d. Check the RP's Type/SpfType: if the type is "Arecord" or "Arecod" (case-insensitive), it is an Arecord SPF. Otherwise, it is an Include SPF.
     e. For Include SPF, generate the TXT record in this exact format:
        [domainIncluded],[subdomainIncluded],TXT,v=spf1 ip4:[ip1] ip4:[ip2] ... -all
-       (with space-separated IPs prefixed with ip4:).
+       (Example: example.com,mail.example.com,TXT,v=spf1 ip4:1.2.3.4 ip4:5.6.7.8 -all)
     f. For Arecord SPF, generate the TXT record in this exact format:
        [domainIncluded],[subdomainIncluded],TXT,Arecords:[ip1];[ip2];...
-       (with semicolon-separated IPs).
+       (Example: test.com,,TXT,Arecords:1.2.3.4;5.6.7.8)
     g. Present the generated records inside a copyable code block using HTML tags: <pre><code>[records]</code></pre>
-    h. Include limits/warnings in your response if applicable: if record type is Arecord and the number of IPs > 49, warn the user. If record type is Include and the number of IPs > 99, warn the user.`;
+    h. CRITICAL: Each line in the code block must start exactly with the domainIncluded. Do NOT prepend or prefix any server IPs, server names, or any other metadata to the record lines. Do not use brackets, quotes, or placeholders.
+    i. Include limits/warnings in your response if applicable: if record type is Arecord and the number of IPs > 49, warn the user. If record type is Include and the number of IPs > 99, warn the user.`;
 
         let responseText = '';
 
