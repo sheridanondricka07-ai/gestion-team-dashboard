@@ -281,6 +281,41 @@ window.toggleServerCancelMark = async (id) => {
     window.app.updateDashboard();
 };
 
+window.cancelServerImmediately = async (id) => {
+    const srv = window.app.state.servers.find(s => s.id === id);
+    if (!srv) return;
+    
+    if (!confirm(`Are you sure you want to cancel server "${srv.name}" immediately? It will be archived and removed from active inventory.`)) {
+        return;
+    }
+    
+    let totalRev = 0;
+    const drops = window.app.state.drops || [];
+    drops.forEach(drop => {
+        const srvStat = (drop.serverStats || []).find(st => st.srv === srv.name);
+        if (srvStat) {
+            totalRev += parseFloat(drop.rev || 0);
+        }
+    });
+    
+    if (!window.app.state.historyServers) {
+        window.app.state.historyServers = [];
+    }
+    
+    const todayStr = new Date().toISOString().split('T')[0];
+    window.app.state.historyServers.push({
+        ...srv,
+        canceledAt: todayStr,
+        revenue: totalRev.toFixed(2),
+        originalId: srv.id
+    });
+    
+    window.app.state.servers = window.app.state.servers.filter(s => s.id !== id);
+    await window.app.saveState();
+    window.app.updateDashboard();
+};
+
+
 window.updateServerField = async (serverId, field, value) => {
     const srv = window.app.state.servers.find(s => s.id === serverId);
     if (srv) {
@@ -384,10 +419,18 @@ function renderActiveTable(app, sortedServers) {
                             <td contenteditable="true" onblur="updateServerField('${s.id}', 'reqAt', this.innerText)" style="padding: 12px; cursor: text;">${s.reqAt || '&nbsp;'}</td>
                             <td contenteditable="true" onblur="updateServerField('${s.id}', 'cancelDate', this.innerText)" style="padding: 12px; color: #ef4444; font-weight: 700; background: rgba(239, 68, 68, 0.03); cursor: text;">${s.cancelDate || '&nbsp;'}</td>
                             <td style="padding: 12px; text-align: center;">
-                                <button onclick="toggleServerCancelMark('${s.id}')" 
-                                    style="padding: 4px 10px; font-size: 0.65rem; background: ${isMarked ? '#ef4444' : 'var(--bg-tertiary)'}; border: 1px solid ${isMarked ? '#ef4444' : 'var(--border-color)'}; color: ${isMarked ? '#fff' : 'var(--text-secondary)'}; width: auto;">
-                                    ${isMarked ? 'DECLARED' : 'KEEP'}
-                                </button>
+                                <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                                    <button onclick="toggleServerCancelMark('${s.id}')" 
+                                        style="padding: 4px 8px; font-size: 0.65rem; background: ${isMarked ? '#ef4444' : 'var(--bg-tertiary)'}; border: 1px solid ${isMarked ? '#ef4444' : 'var(--border-color)'}; color: ${isMarked ? '#fff' : 'var(--text-secondary)'}; width: auto; border-radius: 4px; cursor: pointer;">
+                                        ${isMarked ? 'DECLARED' : 'KEEP'}
+                                    </button>
+                                    <button onclick="cancelServerImmediately('${s.id}')" 
+                                        style="padding: 4px 8px; font-size: 0.65rem; background: rgba(239, 68, 68, 0.15); border: 1px solid #ef444433; color: #f87171; width: auto; border-radius: 4px; cursor: pointer;"
+                                        onmouseover="this.style.background='#ef4444'; this.style.color='#fff'"
+                                        onmouseout="this.style.background='rgba(239, 68, 68, 0.15)'; this.style.color='#f87171'">
+                                        CANCEL NOW
+                                    </button>
+                                </div>
                             </td>
                             <td style="padding: 12px; text-align: center;">
                                 <span class="action-icon" onclick="refreshServerInfo('${s.id}', this)" title="Refresh IP Info">
