@@ -316,19 +316,23 @@ GUIDELINES:
 8. If the user asks about IP delivery statuses (RDNS, RP TEST, SPAM, DOWN, BOUNCE, PAUSED, Change DOM), reference the IP DELIVERY STATUS BREAKDOWN and the server infrastructure data.
 9. You have FULL access to ALL data in the dashboard. Never say you cannot provide information about domains, subdomains, RPs, IPs, servers, or any other data. Search through all provided context sections to find the answer.
 10. If the user asks to generate DNS records (e.g., for specific RPs, available/stock/unassigned RPs, or filtered RPs, using specified servers or all servers):
-    a. Identify the target RPs from the RP INVENTORY section. "Available", "stock", or "unassigned" RPs are those with "Server: Unassigned" (or empty server).
-    b. Identify the target servers from the SERVERS & IP INFRASTRUCTURE section and retrieve all their unique IPs from the Raw IPs list of those servers.
-    c. For each target RP, retrieve its "Domain Included" (fallback to the RP Domain itself if not set or "---") and "Subdomain Included" (fallback to empty string if not set or "---").
-    d. Check the RP's Type/SpfType: if the type is "Arecord" or "Arecod" (case-insensitive), it is an Arecord SPF. Otherwise, it is an Include SPF.
-    e. For Include SPF, generate the TXT record in this exact format:
+    a. Identify the target RPs ONLY from the "RP (RETURN PATH) INVENTORY" section. Do NOT use PTR domains, VMTA domains, or server domains as the target RPs.
+    b. "Available", "stock", "unassigned", or "not affected to any server" RPs are those with "Server: Unassigned" (or empty server / blank server name).
+    c. Filter target RPs by type if requested:
+       - If user asks for "Arecord" type, only use RPs where Type/SpfType is "Arecord" or "Arecod" (case-insensitive).
+       - If user asks for "Include" type, only use RPs where Type/SpfType is "Include" (case-insensitive).
+    d. Identify the target servers from the "SERVERS & IP INFRASTRUCTURE" section and retrieve ALL of their unique IPs from the "Raw IPs" list of those servers (e.g., for s_wmn3_2159, retrieve all 5 IPs: 51.178.52.186, 51.255.149.79, 51.255.149.82, 51.255.149.85, 51.255.149.91).
+    e. For each target RP, retrieve its "Domain Included" (fallback to the RP Domain itself if not set or "---") and "Subdomain Included" (fallback to empty string if not set or "---").
+    f. For EACH target RP, you MUST list ALL retrieved IPs of the target server in its record (do NOT map them one-to-one or use only a single IP per RP).
+    g. For Include SPF, generate the TXT record in this exact format:
        [domainIncluded],[subdomainIncluded],TXT,v=spf1 ip4:[ip1] ip4:[ip2] ... -all
        (Example: example.com,mail.example.com,TXT,v=spf1 ip4:1.2.3.4 ip4:5.6.7.8 -all)
-    f. For Arecord SPF, generate the TXT record in this exact format:
+    h. For Arecord SPF, generate the TXT record in this exact format:
        [domainIncluded],[subdomainIncluded],TXT,Arecords:[ip1];[ip2];...
        (Example: test.com,,TXT,Arecords:1.2.3.4;5.6.7.8)
-    g. Present the generated records inside a copyable code block using HTML tags: <pre><code>[records]</code></pre>
-    h. CRITICAL: Each line in the code block must start exactly with the domainIncluded. Do NOT prepend or prefix any server IPs, server names, or any other metadata to the record lines. Do not use brackets, quotes, or placeholders.
-    i. Include limits/warnings in your response if applicable: if record type is Arecord and the number of IPs > 49, warn the user. If record type is Include and the number of IPs > 99, warn the user.`;
+    i. Present the generated records inside a copyable code block using HTML tags: <pre><code>[records]</code></pre>
+    j. CRITICAL: Each line in the code block must start exactly with the domainIncluded. Do NOT prepend or prefix any server IPs, server names, or any other metadata to the record lines. Do not use brackets, quotes, or placeholders.
+    k. Include limits/warnings in your response if applicable: if record type is Arecord and the number of IPs > 49, warn the user. If record type is Include and the number of IPs > 99, warn the user.`;
 
         let responseText = '';
 
