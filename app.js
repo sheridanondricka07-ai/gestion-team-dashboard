@@ -1105,7 +1105,7 @@ class TeamApp {
                     if (srv) srvName = srv.name;
                 }
                 
-                if (invItem.srv !== srvName) {
+                if ((invItem.srv || '') !== srvName) {
                     invItem.srv = srvName;
                     stateChanged = true;
                 }
