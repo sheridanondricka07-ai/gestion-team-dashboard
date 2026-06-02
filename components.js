@@ -1276,7 +1276,7 @@ function renderManagement(app, container) {
                     <div class="drop-zone" data-type="stock-rp" style="min-height: ${app.hideUnlinkedRps ? '0px' : '80px'}; display: ${app.hideUnlinkedRps ? 'none' : 'block'}; border: 1px dashed var(--border-color); border-radius: 8px; margin-bottom: 12px; overflow: hidden;">
                         ${stockRps.map(rp => `
                             <div class="draggable-item" ${isAdmin ? 'draggable="true" ondragstart="handleDragStart(event, \'rp\', \'' + rp.id + '\')"' : ''}>
-                                <span style="flex: 1; font-weight: 500;">${rp.domain}</span>
+                                <span class="item-name">${rp.domain}</span>
                                 ${isAdmin ? `
                                     <span class="action-icon delete" onclick="event.stopPropagation(); deleteRP('${rp.id}')" title="Delete RP">
                                         <i data-lucide="trash-2" style="width: 14px; color: var(--error);"></i>
@@ -1305,7 +1305,7 @@ function renderManagement(app, container) {
                             const cancelStyle = isCancel ? 'border-color: #f97316; background: rgba(249, 115, 22, 0.08);' : '';
                             return `
                                 <div class="draggable-item" ${isAdmin ? 'draggable="true" ondragstart="handleDragStart(event, \'srv\', \'' + srv.id + '\')"' : ''} style="${cancelStyle}">
-                                    <span style="flex: 1; font-weight: 500; color: ${isCancel ? '#f97316' : 'inherit'};">${srv.name}</span>
+                                    <span class="item-name" style="color: ${isCancel ? '#f97316' : 'inherit'};">${srv.name}</span>
                                     ${isAdmin ? `
                                         <span class="action-icon delete" onclick="event.stopPropagation(); deleteServer('${srv.id}')" title="Delete Server">
                                             <i data-lucide="trash-2" style="width: 14px; color: var(--error);"></i>
@@ -1357,8 +1357,8 @@ function renderManagement(app, container) {
                                             <div class="rp-list drop-zone" data-type="server" data-id="${srv.id}" style="min-height: 30px; display: ${isExpanded ? 'block' : 'none'};">
                                                 ${srvRps.map(rp => `
                                                     <div class="rp-item draggable-item" ${isAdmin ? 'draggable="true" ondragstart="handleDragStart(event, \'rp\', \'' + rp.id + '\')"' : ''}>
-                                                        <div style="flex: 1;">
-                                                            <div style="font-weight: 500;">${rp.domain}</div>
+                                                        <div style="flex: 1; min-width: 0; margin-right: 8px;">
+                                                            <div class="item-name" style="font-size: 0.85rem;">${rp.domain}</div>
                                                             <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;">
                                                                 ${(rp.assignedIps || []).map(ip => `
                                                                     <span style="font-size: 0.6rem; background: var(--bg-primary); padding: 1px 4px; border-radius: 4px; color: var(--accent-primary); border: 1px solid var(--accent-primary);">${ip}</span>
@@ -1388,7 +1388,7 @@ function renderManagement(app, container) {
                                     <div style="color: var(--text-secondary); font-size: 0.65rem; margin-top: 8px;">Standalone RPs:</div>
                                     ${mStandaloneRps.map(rp => `
                                         <div class="draggable-item" ${isAdmin ? 'draggable="true" ondragstart="handleDragStart(event, \'rp\', \'' + rp.id + '\')"' : ''}>
-                                            <span style="flex: 1; font-weight: 500;">${rp.domain}</span>
+                                            <span class="item-name">${rp.domain}</span>
                                             ${isAdmin ? `
                                                 <span class="action-icon" onclick="event.stopPropagation(); unassignRP('${rp.id}')" title="Return to Stock">
                                                     <i data-lucide="archive" style="width: 14px; color: var(--text-secondary);"></i>

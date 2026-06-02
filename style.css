@@ -380,18 +380,35 @@ button:active {
 .draggable-item {
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
-    padding: var(--spacing-md);
+    padding: 10px 12px;
     border-radius: 8px;
     margin-bottom: var(--spacing-sm);
     cursor: grab;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    transition: transform 0.1s;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+    min-width: 0;
+}
+
+.draggable-item:hover {
+    border-color: var(--accent-primary);
+    background: rgba(59, 130, 246, 0.05);
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.15);
 }
 
 .draggable-item:active {
     cursor: grabbing;
+}
+
+.draggable-item .item-name {
+    flex: 1;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    margin-right: 8px;
 }
 
 .item-info {
