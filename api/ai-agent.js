@@ -63,7 +63,10 @@ export default async function handler(req, res) {
         const formattedServers = servers.map(s => {
             if (!s) return null;
             totalServers++;
-            const ips = s.allIps || [];
+            let ips = s.allIps || [];
+            if (ips.length === 0 && s.ip) {
+                ips = [s.ip];
+            }
             const vmtaMap = s.vmtaMap || {};
             const ipStatuses = ips.map(ip => {
                 totalIps++;
@@ -99,7 +102,7 @@ export default async function handler(req, res) {
                 const ptr = vm.ptr || 'N/A';
                 return `${ip} (VMTA: ${vmtaDomain || 'N/A'}, PTR: ${ptr}, Spamhaus: ${sh.status === 'listed' ? `LISTED on ${sh.list}` : 'clean'})`;
             }).join(', ');
-            return `- Name: ${s.name}, Main IP: ${s.ip || 'N/A'}, Status: ${s.status || 'active'}, IPs: [${ipStatuses}]`;
+            return `- Name: ${s.name}, Main IP: ${s.ip || 'N/A'}, Status: ${s.status || 'active'}, Raw IPs: [${ips.join(', ')}], Detailed IPs: [${ipStatuses}]`;
         }).filter(Boolean).join('\n');
 
         // Build VMTA TLD breakdown string
@@ -311,7 +314,20 @@ GUIDELINES:
 6. If the user asks for the "top server", "server revenue", or server performance analytics, look at the TOP PERFORMING SERVERS section above. Explain the rank, name, total revenue, drops, EPC, and CPM.
 7. If the user asks about RP domains, subdomains, domain inclusion, SPF types (Include, Arecord, MxRecord, Mx), or which domains are included/configured for specific RPs, search the RP INVENTORY section above. Present results in a clear table format.
 8. If the user asks about IP delivery statuses (RDNS, RP TEST, SPAM, DOWN, BOUNCE, PAUSED, Change DOM), reference the IP DELIVERY STATUS BREAKDOWN and the server infrastructure data.
-9. You have FULL access to ALL data in the dashboard. Never say you cannot provide information about domains, subdomains, RPs, IPs, servers, or any other data. Search through all provided context sections to find the answer.`;
+9. You have FULL access to ALL data in the dashboard. Never say you cannot provide information about domains, subdomains, RPs, IPs, servers, or any other data. Search through all provided context sections to find the answer.
+10. If the user asks to generate DNS records (e.g., for specific RPs, available/stock/unassigned RPs, or filtered RPs, using specified servers or all servers):
+    a. Identify the target RPs from the RP INVENTORY section. "Available", "stock", or "unassigned" RPs are those with "Server: Unassigned" (or empty server).
+    b. Identify the target servers from the SERVERS & IP INFRASTRUCTURE section and retrieve all their unique IPs from the Raw IPs list of those servers.
+    c. For each target RP, retrieve its "Domain Included" (fallback to the RP Domain itself if not set or "---") and "Subdomain Included" (fallback to empty string if not set or "---").
+    d. Check the RP's Type/SpfType: if the type is "Arecord" or "Arecod" (case-insensitive), it is an Arecord SPF. Otherwise, it is an Include SPF.
+    e. For Include SPF, generate the TXT record in this exact format:
+       [domainIncluded],[subdomainIncluded],TXT,v=spf1 ip4:[ip1] ip4:[ip2] ... -all
+       (with space-separated IPs prefixed with ip4:).
+    f. For Arecord SPF, generate the TXT record in this exact format:
+       [domainIncluded],[subdomainIncluded],TXT,Arecords:[ip1];[ip2];...
+       (with semicolon-separated IPs).
+    g. Present the generated records inside a copyable code block using HTML tags: <pre><code>[records]</code></pre>
+    h. Include limits/warnings in your response if applicable: if record type is Arecord and the number of IPs > 49, warn the user. If record type is Include and the number of IPs > 99, warn the user.`;
 
         let responseText = '';
 
