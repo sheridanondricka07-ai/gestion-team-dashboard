@@ -18,6 +18,9 @@
     "api/ai-agent.js": {
       "maxDuration": 60
     },
+    "api/check-ptr-spf.js": {
+      "maxDuration": 60
+    },
     "api/check-rp-spf.js": {
       "maxDuration": 60
     },

@@ -86,7 +86,8 @@ export default async function handler(req, res) {
     const results = {
         spamhausTriggered: false,
         vmtaTriggered: false,
-        spfTriggered: false
+        spfTriggered: false,
+        ptrSpfTriggered: false
     };
 
     const runSpamhaus = task === 'all' || task === 'spamhaus' || (!task && [0, 8, 16].includes(hour));
@@ -94,6 +95,7 @@ export default async function handler(req, res) {
     const runGmail = task === 'all' || task === 'gmail' || (!task && [12, 18].includes(hour));
     const runSpf = task === 'all' || task === 'spf' || (!task && [2, 10, 18].includes(hour));
     const runGmailStatus = task === 'all' || task === 'gmail-status' || (!task && hour === 9);
+    const runPtrSpf = task === 'all' || task === 'ptr-spf' || !task;
 
     // 1. Trigger Spamhaus Check
     if (runSpamhaus) {
@@ -532,6 +534,24 @@ export default async function handler(req, res) {
             }
         } catch (e) {
             console.error('Automated Gmail IP Status Sync Error:', e);
+        }
+    }
+
+    // 6. Trigger PTR SPF Check (Hourly)
+    if (runPtrSpf) {
+        console.log('Triggering PTR SPF Check...');
+        try {
+            const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
+            const triggerResp = await fetch(`${baseUrl}/api/check-ptr-spf`, {
+                method: 'POST',
+                headers: { 'x-vercel-cron': 'true' }
+            });
+            const triggerData = await triggerResp.json().catch(() => ({}));
+            console.log('PTR SPF Trigger Response:', triggerData);
+            results.ptrSpfTriggered = true;
+            results.ptrSpfTriggerData = triggerData;
+        } catch (e) {
+            console.error('PTR SPF Trigger Error:', e);
         }
     }
 
