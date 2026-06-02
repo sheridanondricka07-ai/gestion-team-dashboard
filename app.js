@@ -1062,8 +1062,7 @@ class TeamApp {
             
             if (duplicatesRemoved) {
                 this.state.rps = Array.from(seen.values());
-                stateChanged = true;
-                console.log("Deduplicated RPs list in state.");
+                console.log("Deduplicated RPs list in state (local only).");
             }
         }
 
@@ -1082,8 +1081,7 @@ class TeamApp {
             });
             if (duplicatesRemoved) {
                 this.state.rpInventory = Array.from(seen.values());
-                stateChanged = true;
-                console.log("Deduplicated rpInventory list in state.");
+                console.log("Deduplicated rpInventory list in state (local only).");
             }
         }
 
