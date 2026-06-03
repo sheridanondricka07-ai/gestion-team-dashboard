@@ -1,6 +1,6 @@
 const dns = require('dns').promises;
 
-const DB_URL = "https://gestion-team-c-default-rtdb.firebaseio.com";
+const DB_URL = "https://gestion-team-d-default-rtdb.firebaseio.com";
 
 async function sendTelegram(message) {
     const token = "8737550836:AAFK68Ig7xyW3KIvBhI5gpO1bGaPTwUimr0";

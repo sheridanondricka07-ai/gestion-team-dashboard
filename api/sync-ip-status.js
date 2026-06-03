@@ -1,6 +1,6 @@
 const imap = require('imap-simple');
 
-const DB_URL = "https://gestion-team-c-default-rtdb.firebaseio.com";
+const DB_URL = "https://gestion-team-d-default-rtdb.firebaseio.com";
 async function getFirebaseData(path) {
     try {
         const resp = await fetch(`${DB_URL}/${path}.json`);
