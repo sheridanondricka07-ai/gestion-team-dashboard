@@ -806,18 +806,10 @@ class TeamApp {
                             });
                         }
                         
-                        const synced = this.syncRpsAndInventory();
-                        if (patched || synced) {
-                            console.log("Auto-patched or synced RPs. Saving back to Firebase (one-time)...");
-                            // Use a debounce flag to prevent re-triggering on the subsequent .on('value') callback
-                            if (!this._patchSaveScheduled) {
-                                this._patchSaveScheduled = true;
-                                setTimeout(async () => {
-                                    await this.saveState();
-                                    this._patchSaveScheduled = false;
-                                }, 500);
-                            }
-                        }
+                        // We run syncRpsAndInventory to fix local UI state, 
+                        // but we MUST NOT saveState() back to Firebase automatically here, 
+                        // otherwise it creates a massive infinite data loop.
+                        this.syncRpsAndInventory();
                         
                         // If scan is running and only progress changed, just update the bar
                         if (progressChanged && cloudData.spamhausProgress && cloudData.spamhausProgress.status === 'running') {
