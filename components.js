@@ -5386,7 +5386,8 @@ function renderWarmupProgress(app, container) {
     const filteredGroups = currentGroups.filter(g => {
         const matchSearch = g.domain.toLowerCase().includes(search) || 
                             (g.server || '').toLowerCase().includes(search) || 
-                            (g.ip || '').includes(search);
+                            (g.ip || '').includes(search) ||
+                            g.records.some(r => (r.user || '').toLowerCase().includes(search));
         const matchServer = filterServer === 'all' || g.server === filterServer;
         return matchSearch && matchServer;
     });
@@ -5474,7 +5475,7 @@ function renderWarmupProgress(app, container) {
                 <div style="display: flex; gap: 12px; flex-grow: 1; max-width: 600px;">
                     <div class="search-input-wrapper" style="position: relative; flex-grow: 1;">
                         <i data-lucide="search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; color: var(--text-secondary);"></i>
-                        <input type="text" id="warmup-search-input" value="${app.state.warmupSearch}" placeholder="Search Domain, Server or IP..." style="padding-left: 38px; width: 100%;" oninput="window.updateWarmupSearch(this.value)">
+                        <input type="text" id="warmup-search-input" value="${app.state.warmupSearch}" placeholder="Search Domain, Server, IP or User..." style="padding-left: 38px; width: 100%;" oninput="window.updateWarmupSearch(this.value)">
                     </div>
                     <select id="warmup-server-filter" onchange="window.updateWarmupServerFilter(this.value)" style="width: 180px;">
                         <option value="all" ${filterServer === 'all' ? 'selected' : ''}>All Servers</option>
@@ -5632,6 +5633,16 @@ window.clearAllWarmupData = async () => {
 window.updateWarmupSearch = (val) => {
     window.app.state.warmupSearch = val;
     window.app.updateDashboard();
+    
+    // Retain focus and cursor position after re-render
+    setTimeout(() => {
+        const input = document.getElementById('warmup-search-input');
+        if (input) {
+            input.focus();
+            const len = input.value.length;
+            input.setSelectionRange(len, len);
+        }
+    }, 0);
 };
 
 window.updateWarmupServerFilter = (val) => {
