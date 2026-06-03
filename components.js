@@ -5481,6 +5481,11 @@ function renderWarmupProgress(app, container) {
                         ${serversList.map(s => `<option value="${s}" ${filterServer === s ? 'selected' : ''}>${s}</option>`).join('')}
                     </select>
                 </div>
+                ${app.state.warmupActiveTab === 'inactive' ? `
+                <button onclick="window.copyInactiveIps()" class="btn-secondary" style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; font-size: 0.8rem; font-weight: 600; border-radius: 8px; border: 1px solid #8b5cf6; color: #8b5cf6; background: rgba(139, 92, 246, 0.05); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#8b5cf6'; this.style.color='#fff';" onmouseout="this.style.background='rgba(139, 92, 246, 0.05)'; this.style.color='#8b5cf6';">
+                    <i data-lucide="copy" style="width: 14px;"></i> Copy Inactive IPs
+                </button>
+                ` : ''}
             </div>
 
             <!-- Table -->
@@ -5557,6 +5562,45 @@ function renderWarmupProgress(app, container) {
         </div>
     `;
 }
+
+window.copyInactiveIps = () => {
+    const table = document.querySelector('.card table');
+    if (!table) return;
+    const rows = Array.from(table.querySelectorAll('tbody tr'));
+    const ips = [];
+    rows.forEach(tr => {
+        const tds = tr.querySelectorAll('td');
+        if (tds.length >= 3) {
+            const ip = tds[2].textContent.trim();
+            if (ip && ip !== '---' && !ip.includes('No warmup data')) {
+                ips.push(ip);
+            }
+        }
+    });
+    
+    if (ips.length === 0) {
+        alert("No IPs found to copy.");
+        return;
+    }
+    
+    const uniqueIps = [...new Set(ips)];
+    navigator.clipboard.writeText(uniqueIps.join('\n')).then(() => {
+        const btn = document.querySelector('button[onclick="window.copyInactiveIps()"]');
+        if (btn) {
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i data-lucide="check" style="width: 14px;"></i> Copied!';
+            if (window.lucide) window.lucide.createIcons();
+            setTimeout(() => {
+                btn.innerHTML = originalHtml;
+                if (window.lucide) window.lucide.createIcons();
+            }, 2000);
+        } else {
+            alert(`Copied ${uniqueIps.length} inactive IPs!`);
+        }
+    }).catch(err => {
+        alert('Failed to copy IPs: ' + err);
+    });
+};
 
 window.deleteWarmupGroup = async (domain, server) => {
     if (!confirm(`Are you sure you want to delete all warmup logs for "${domain}" on server "${server}"?`)) return;
