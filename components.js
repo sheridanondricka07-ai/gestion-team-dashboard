@@ -5573,8 +5573,8 @@ window.copyInactiveIps = () => {
     const ips = [];
     rows.forEach(tr => {
         const tds = tr.querySelectorAll('td');
-        if (tds.length >= 3) {
-            const ip = tds[2].textContent.trim();
+        if (tds.length >= 4) {
+            const ip = tds[3].textContent.trim();
             if (ip && ip !== '---' && !ip.includes('No warmup data')) {
                 ips.push(ip);
             }
