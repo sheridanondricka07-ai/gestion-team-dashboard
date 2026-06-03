@@ -158,7 +158,7 @@ export default async function handler(req, res) {
             const msg = update.message || update.edited_message || update.channel_post;
             if (msg && msg.text) {
                 const chatId = msg.chat ? String(msg.chat.id) : "";
-                const isTargetGroup = chatId === "-1002633168986";
+                const isTargetGroup = chatId === "-1002633168986" || chatId === "-1003727758817";
                 const isPrivate = msg.chat && msg.chat.type === "private";
                 
                 if (!isTargetGroup && !isPrivate) {
