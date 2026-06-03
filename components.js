@@ -277,6 +277,11 @@ window.toggleServerCancelMark = async (id) => {
     if (!srv) return;
     
     srv.markedForCancel = !srv.markedForCancel;
+    if (srv.markedForCancel) {
+        srv.reqAt = new Date().toISOString().split('T')[0];
+    } else {
+        srv.reqAt = '';
+    }
     await window.app.saveState();
     window.app.updateDashboard();
 };
