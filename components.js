@@ -5495,6 +5495,7 @@ function renderWarmupProgress(app, container) {
                         <thead>
                             <tr style="text-align: left; background: var(--bg-tertiary);">
                                 <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Domain / RDNS</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">User</th>
                                 <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Server</th>
                                 <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">IP Address</th>
                                 <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); text-align: center;">Last 3 Drops (Out)</th>
@@ -5536,6 +5537,7 @@ function renderWarmupProgress(app, container) {
                                             ${g.domain}
                                             ${isRdns ? `<span style="font-size: 0.6rem; padding: 2px 4px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 4px; color: #3b82f6; margin-left: 6px;" title="No domain in summary. Resolved via IP PTR.">RDNS</span>` : ''}
                                         </td>
+                                        <td style="padding: 14px 12px; font-weight: 500; color: var(--text-secondary);"><i data-lucide="user" style="width: 12px; margin-right: 4px; display: inline-block; vertical-align: middle;"></i><span style="vertical-align: middle;">${latest && latest.user ? latest.user : 'Unknown'}</span></td>
                                         <td style="padding: 14px 12px; font-weight: 500; color: var(--accent-primary);">${g.server || '---'}</td>
                                         <td style="padding: 14px 12px; font-family: monospace; color: var(--text-secondary);">${g.ip || '---'}</td>
                                         <td style="padding: 14px 12px; text-align: center;">${last3Html}</td>
@@ -5554,7 +5556,7 @@ function renderWarmupProgress(app, container) {
                                     </tr>
                                 `;
                             }).join('')}
-                            ${filteredGroups.length === 0 ? '<tr><td colspan="8" style="padding: 60px; text-align: center; color: var(--text-secondary); font-size:0.8rem;">No warmup data found. Fetch from Telegram or paste logs above.</td></tr>' : ''}
+                            ${filteredGroups.length === 0 ? '<tr><td colspan="9" style="padding: 60px; text-align: center; color: var(--text-secondary); font-size:0.8rem;">No warmup data found. Fetch from Telegram or paste logs above.</td></tr>' : ''}
                         </tbody>
                     </table>
                 </div>
