@@ -555,5 +555,18 @@ export default async function handler(req, res) {
         }
     }
 
+    // 7. Trigger Telegram Warmup Sync
+    console.log('Triggering Telegram Warmup Sync...');
+    try {
+        const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
+        const triggerResp = await fetch(`${baseUrl}/api/sync-telegram-warmup`);
+        const triggerData = await triggerResp.json().catch(() => ({}));
+        console.log('Telegram Warmup Sync Response:', triggerData);
+        results.telegramWarmupTriggered = true;
+        results.telegramWarmupTriggerData = triggerData;
+    } catch (e) {
+        console.error('Telegram Warmup Sync Error:', e);
+    }
+
     return res.status(200).json(results);
 }

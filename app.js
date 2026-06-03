@@ -1023,6 +1023,7 @@ class TeamApp {
 
     setView(viewName) { 
         this.state.currentView = viewName; 
+        window._hasFetchedWarmupThisSession = false;
         // Reset sorting to default when changing views
         this.state.dropSort = { key: 'timestamp', order: 'desc' };
         this.updateDashboard(); 

@@ -5259,6 +5259,24 @@ function renderWarmupProgress(app, container) {
     if (app.state.warmupSearch === undefined) app.state.warmupSearch = '';
     if (app.state.warmupFilterServer === undefined) app.state.warmupFilterServer = 'all';
 
+    // Trigger background fetch once per view switch to keep it fresh automatically
+    if (!window._hasFetchedWarmupThisSession) {
+        window._hasFetchedWarmupThisSession = true;
+        (async () => {
+            try {
+                const resp = await fetch('/api/sync-telegram-warmup');
+                const data = await resp.json();
+                if (data.success && data.addedCount > 0) {
+                    const snapshot = await window.db.ref('state/warmupData').once('value');
+                    app.state.warmupData = snapshot.val() || {};
+                    app.updateDashboard();
+                }
+            } catch(e) {
+                console.warn("Background telegram fetch failed:", e);
+            }
+        })();
+    }
+
     const rawRecords = Object.values(app.state.warmupData || {});
     rawRecords.sort((a, b) => b.timestamp - a.timestamp);
 
@@ -5309,7 +5327,7 @@ function renderWarmupProgress(app, container) {
                     <button onclick="fetchTelegramWarmup(this)" class="btn-primary" style="display: flex; align-items: center; gap: 8px; width: auto; padding: 10px 16px; font-size: 0.75rem; border-radius: 8px;">
                         <i data-lucide="refresh-cw" style="width: 14px;"></i> Fetch Telegram
                     </button>
-                    <button onclick="showBulkPasteWarmupModal()" class="btn-secondary" style="display: flex; align-items: center; gap: 8px; width: auto; padding: 10px 16px; font-size: 0.75rem; border-radius: 8px; border: 1px solid var(--accent-primary); color: var(--accent-primary);">
+                    <button onclick="showBulkPasteWarmupModal()" class="btn-secondary" style="display: flex; align-items: center; gap: 8px; width: auto; padding: 10px 16px; font-size: 0.75rem; border-radius: 8px; border: 1px solid var(--accent-primary); color: var(--accent-primary); background: transparent;">
                         <i data-lucide="clipboard-list" style="width: 14px;"></i> Bulk Paste Logs
                     </button>
                     <button onclick="clearAllWarmupData()" class="btn-secondary" style="display: flex; align-items: center; gap: 8px; width: auto; padding: 10px 16px; font-size: 0.75rem; border-radius: 8px; border: 1px solid #ef4444; color: #ef4444; background: rgba(239,68,68,0.05);" onmouseover="this.style.background='#ef4444'; this.style.color='#fff';" onmouseout="this.style.background='rgba(239,68,68,0.05)'; this.style.color='#ef4444';">
