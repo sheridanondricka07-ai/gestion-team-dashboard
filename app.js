@@ -56,7 +56,8 @@ class TeamApp {
             dropSort: { key: 'timestamp', order: 'desc' },
             dropSearch: '',
             spamhausTab: 'grid',
-            vmtaResults: {}
+            vmtaResults: {},
+            warmupData: {}
         };
         this.expandedServers = new Set();
         this.statusRange = 7;
@@ -755,6 +756,7 @@ class TeamApp {
                         if (!this.state.tools) this.state.tools = [];
                         if (!this.state.rps) this.state.rps = [];
                         if (!this.state.rpInventory) this.state.rpInventory = [];
+                        if (!this.state.warmupData) this.state.warmupData = {};
 
                         if (!this.state.spamhausProgress) this.state.spamhausProgress = { status: 'idle', current: 0, total: 0 };
                         if (!this.state.rpSpfProgress) this.state.rpSpfProgress = { status: 'idle', current: 0, total: 0 };

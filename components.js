@@ -128,6 +128,10 @@ function renderSidebar(app) {
                 <i data-lucide="globe"></i>
                 <span>RPs</span>
             </div>
+            <div class="nav-item ${view === 'warmup' ? 'active' : ''}" onclick="app.setView('warmup')">
+                <i data-lucide="trending-up"></i>
+                <span>Warmup Progress</span>
+            </div>
         </div>
         <div style="margin-top: auto;">
             <div style="padding: 12px; font-size: 0.7rem; color: var(--text-secondary); text-align: center; border-top: 1px solid var(--border-color); margin-bottom: 8px; opacity: 0.5;">
@@ -218,6 +222,8 @@ function renderView(app) {
         renderAiAgent(app, container);
     } else if (view === 'rp-inventory') {
         renderRPsInventory(app, container);
+    } else if (view === 'warmup') {
+        renderWarmupProgress(app, container);
     }
 }
 
@@ -5137,4 +5143,427 @@ window.showAddRPInventoryItemModal = () => {
         btn.innerHTML = '<i data-lucide="scan" style="width:12px;"></i> Auto-Detect';
         if (window.lucide) window.lucide.createIcons();
     });
+};
+
+function getRdns(ip, state) {
+    if (!ip) return '';
+    const safeIp = ip.replace(/\./g, '_');
+    if (state.vmtaResults && state.vmtaResults[safeIp] && state.vmtaResults[safeIp].ptr) {
+        return state.vmtaResults[safeIp].ptr;
+    }
+    // Search in servers' vmtaMap
+    if (state.servers) {
+        for (const s of state.servers) {
+            if (s.vmtaMap) {
+                const sKey = Object.keys(s.vmtaMap).find(k => k === safeIp);
+                if (sKey) return s.vmtaMap[sKey];
+            }
+        }
+    }
+    return '';
+}
+
+function getRepresentativeVolume(drops) {
+    const nonZeros = drops.filter(v => v > 0);
+    if (nonZeros.length === 0) return 0;
+    if (nonZeros.length === 1) return nonZeros[0];
+    
+    // Sort descending
+    nonZeros.sort((a, b) => b - a);
+    
+    // Check if any two values are close (within 30% margin of the larger one)
+    for (let i = 0; i < nonZeros.length; i++) {
+        for (let j = i + 1; j < nonZeros.length; j++) {
+            const a = nonZeros[i];
+            const b = nonZeros[j];
+            const maxVal = Math.max(a, b);
+            const minVal = Math.min(a, b);
+            if (maxVal > 0 && (maxVal - minVal) / maxVal <= 0.3) {
+                return maxVal;
+            }
+        }
+    }
+    
+    // Default to the highest non-zero value
+    return nonZeros[0];
+}
+
+function parseMessageText(text) {
+    if (!text.includes('Server Deployment Summary')) return null;
+    
+    const lines = text.split('\n').map(l => l.trim());
+    
+    // 1. User
+    let user = 'Unknown';
+    const userLine = lines.find(l => l.includes('User:'));
+    if (userLine) {
+        user = userLine.split('User:')[1].trim();
+    }
+    
+    // 2. IP Address
+    let ip = '';
+    const ipLine = lines.find(l => l.includes('【IP】:'));
+    if (ipLine) {
+        ip = ipLine.split('【IP】:')[1].trim();
+    }
+    
+    // 3. Server name, IN, OUT, Domain
+    let server = '';
+    let inVal = 0;
+    let outVal = 0;
+    let domain = '';
+    
+    const summaryIdx = lines.findIndex(l => l.includes('Server Deployment Summary'));
+    const ipIdx = lines.findIndex(l => l.includes('【IP】:'));
+    
+    if (summaryIdx !== -1 && ipIdx !== -1) {
+        const sublines = lines.slice(summaryIdx + 1, ipIdx).map(l => l.trim()).filter(l => l !== '' && !l.startsWith('---'));
+        
+        if (sublines.length >= 2) {
+            const serverLine = sublines[1];  // e.g. "s_wmn3_2233 1510 1510" or "sh_wmn3_6 7013 7012"
+            
+            const serverParts = serverLine.split(/\s+/);
+            if (serverParts.length >= 3) {
+                server = serverParts[0];
+                inVal = parseInt(serverParts[1], 10) || 0;
+                outVal = parseInt(serverParts[2], 10) || 0;
+            } else if (serverParts.length >= 1) {
+                server = serverParts[0];
+                const volumesLine = sublines[0]; // e.g. "1510 (IN) 1510 (OUT)"
+                const matches = volumesLine.match(/(\d+)\s*\(IN\)\s*(\d+)\s*\(OUT\)/i);
+                if (matches) {
+                    inVal = parseInt(matches[1], 10) || 0;
+                    outVal = parseInt(matches[2], 10) || 0;
+                }
+            }
+            
+            if (sublines.length >= 3) {
+                domain = sublines[2]; // e.g. "lodoguide.com"
+            }
+        }
+    }
+    
+    if (!server && !ip) return null;
+    
+    return {
+        user,
+        server,
+        inVal,
+        outVal,
+        domain,
+        ip
+    };
+}
+
+function renderWarmupProgress(app, container) {
+    if (app.state.warmupSearch === undefined) app.state.warmupSearch = '';
+    if (app.state.warmupFilterServer === undefined) app.state.warmupFilterServer = 'all';
+
+    const rawRecords = Object.values(app.state.warmupData || {});
+    rawRecords.sort((a, b) => b.timestamp - a.timestamp);
+
+    const search = app.state.warmupSearch.trim().toLowerCase();
+    const filterServer = app.state.warmupFilterServer;
+    
+    const grouped = {};
+    rawRecords.forEach(r => {
+        const resolvedDomain = r.domain || getRdns(r.ip, app.state) || 'Unknown';
+        const key = `${resolvedDomain}::${r.server}`;
+        if (!grouped[key]) {
+            grouped[key] = {
+                domain: resolvedDomain,
+                server: r.server,
+                ip: r.ip,
+                records: []
+            };
+        }
+        grouped[key].records.push(r);
+    });
+
+    const groups = Object.values(grouped);
+
+    const filteredGroups = groups.filter(g => {
+        const matchSearch = g.domain.toLowerCase().includes(search) || 
+                            (g.server || '').toLowerCase().includes(search) || 
+                            (g.ip || '').includes(search);
+        const matchServer = filterServer === 'all' || g.server === filterServer;
+        return matchSearch && matchServer;
+    });
+
+    filteredGroups.sort((a, b) => b.records[0].timestamp - a.records[0].timestamp);
+
+    const totalDomains = groups.length;
+    const totalLogs = rawRecords.length;
+    const maxOut = rawRecords.reduce((max, r) => r.outVal > max ? r.outVal : max, 0);
+
+    const serversList = Array.from(new Set(rawRecords.map(r => r.server).filter(s => s)));
+
+    container.innerHTML = `
+        <div style="padding: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <div>
+                    <h2 style="margin: 0; font-size: 1.5rem; font-weight: 700;">Warmup Progress Tracker</h2>
+                    <p style="margin: 4px 0 0; font-size: 0.85rem; color: var(--text-secondary);">Monitor sending and warmup progress of Return Path domains extracted from Telegram.</p>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="fetchTelegramWarmup(this)" class="btn-primary" style="display: flex; align-items: center; gap: 8px; width: auto; padding: 10px 16px; font-size: 0.75rem; border-radius: 8px;">
+                        <i data-lucide="refresh-cw" style="width: 14px;"></i> Fetch Telegram
+                    </button>
+                    <button onclick="showBulkPasteWarmupModal()" class="btn-secondary" style="display: flex; align-items: center; gap: 8px; width: auto; padding: 10px 16px; font-size: 0.75rem; border-radius: 8px; border: 1px solid var(--accent-primary); color: var(--accent-primary);">
+                        <i data-lucide="clipboard-list" style="width: 14px;"></i> Bulk Paste Logs
+                    </button>
+                    <button onclick="clearAllWarmupData()" class="btn-secondary" style="display: flex; align-items: center; gap: 8px; width: auto; padding: 10px 16px; font-size: 0.75rem; border-radius: 8px; border: 1px solid #ef4444; color: #ef4444; background: rgba(239,68,68,0.05);" onmouseover="this.style.background='#ef4444'; this.style.color='#fff';" onmouseout="this.style.background='rgba(239,68,68,0.05)'; this.style.color='#ef4444';">
+                        <i data-lucide="trash-2" style="width: 14px;"></i> Reset Data
+                    </button>
+                </div>
+            </div>
+
+            <!-- Summary Cards -->
+            <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 24px;">
+                <div class="card" style="padding: 20px; display: flex; align-items: center; gap: 16px;">
+                    <div style="background: rgba(59, 130, 246, 0.1); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #3b82f6;">
+                        <i data-lucide="globe" style="width: 24px; height: 24px;"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Tracked Domains</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin-top: 4px;">${totalDomains}</div>
+                    </div>
+                </div>
+                <div class="card" style="padding: 20px; display: flex; align-items: center; gap: 16px;">
+                    <div style="background: rgba(16, 185, 129, 0.1); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #10b981;">
+                        <i data-lucide="bar-chart-2" style="width: 24px; height: 24px;"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Total Logs / Drops</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin-top: 4px;">${totalLogs}</div>
+                    </div>
+                </div>
+                <div class="card" style="padding: 20px; display: flex; align-items: center; gap: 16px;">
+                    <div style="background: rgba(245, 158, 11, 0.1); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #f59e0b;">
+                        <i data-lucide="zap" style="width: 24px; height: 24px;"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Max Warmup Out</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin-top: 4px;">${maxOut.toLocaleString()}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="card" style="padding: 16px; margin-bottom: 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between;">
+                <div style="display: flex; gap: 12px; flex-grow: 1; max-width: 600px;">
+                    <div class="search-input-wrapper" style="position: relative; flex-grow: 1;">
+                        <i data-lucide="search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; color: var(--text-secondary);"></i>
+                        <input type="text" id="warmup-search-input" value="${app.state.warmupSearch}" placeholder="Search Domain, Server or IP..." style="padding-left: 38px; width: 100%;" oninput="window.updateWarmupSearch(this.value)">
+                    </div>
+                    <select id="warmup-server-filter" onchange="window.updateWarmupServerFilter(this.value)" style="width: 180px;">
+                        <option value="all" ${filterServer === 'all' ? 'selected' : ''}>All Servers</option>
+                        ${serversList.map(s => `<option value="${s}" ${filterServer === s ? 'selected' : ''}>${s}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="card" style="padding: 0; overflow: hidden;">
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.75rem;">
+                        <thead>
+                            <tr style="text-align: left; background: var(--bg-tertiary);">
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Domain / RDNS</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Server</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">IP Address</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); text-align: center;">Last 3 Drops (Out)</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); text-align: center; font-weight: 700; color: var(--accent-primary);">Representative Out</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Last Active</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); width: 60px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${filteredGroups.map((g, idx) => {
+                                const latest = g.records[0];
+                                const last3 = g.records.slice(0, 3).map(r => r.outVal);
+                                const repOut = getRepresentativeVolume(last3);
+                                
+                                const last3Html = g.records.slice(0, 3).map(r => {
+                                    const valColor = r.outVal === 0 ? 'var(--text-secondary)' : 'var(--text-primary)';
+                                    const titleText = `IN: ${r.inVal} | User: ${r.user}`;
+                                    return `<span title="${titleText}" style="display:inline-block; padding: 2px 6px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 4px; margin: 0 2px; color: ${valColor}; font-weight: 500;">${r.outVal}</span>`;
+                                }).join('');
+
+                                let repColor = '#ef4444';
+                                let repBg = 'rgba(239, 68, 68, 0.1)';
+                                if (repOut >= 5000) {
+                                    repColor = '#10b981';
+                                    repBg = 'rgba(16, 185, 129, 0.1)';
+                                } else if (repOut >= 2000) {
+                                    repColor = '#f59e0b';
+                                    repBg = 'rgba(245, 158, 11, 0.1)';
+                                }
+                                
+                                const timeStr = new Date(latest.timestamp).toLocaleString();
+                                const isRdns = !latest.domain;
+
+                                return `
+                                    <tr style="background: ${idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent'}; border-bottom: 1px solid var(--border-color);">
+                                        <td style="padding: 14px 12px; font-weight: 600;">
+                                            ${g.domain}
+                                            ${isRdns ? `<span style="font-size: 0.6rem; padding: 2px 4px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 4px; color: #3b82f6; margin-left: 6px;" title="No domain in summary. Resolved via IP PTR.">RDNS</span>` : ''}
+                                        </td>
+                                        <td style="padding: 14px 12px; font-weight: 500; color: var(--accent-primary);">${g.server || '---'}</td>
+                                        <td style="padding: 14px 12px; font-family: monospace; color: var(--text-secondary);">${g.ip || '---'}</td>
+                                        <td style="padding: 14px 12px; text-align: center;">${last3Html}</td>
+                                        <td style="padding: 14px 12px; text-align: center;">
+                                            <span style="display: inline-block; padding: 4px 10px; background: ${repBg}; border: 1px solid ${repColor}33; border-radius: 20px; color: ${repColor}; font-weight: 700; font-size: 0.8rem; box-shadow: 0 0 6px ${repColor}1a;">
+                                                ${repOut.toLocaleString()}
+                                            </span>
+                                        </td>
+                                        <td style="padding: 14px 12px; color: var(--text-secondary); font-size: 0.7rem;">${timeStr}</td>
+                                        <td style="padding: 14px 12px; text-align: center;">
+                                            <button onclick="deleteWarmupGroup('${g.domain}', '${g.server}')" title="Delete Group Logs" style="padding: 4px; background:transparent; border:none; color: #ef4444; cursor:pointer;">
+                                                <i data-lucide="trash-2" style="width: 14px; height:14px;"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                            ${filteredGroups.length === 0 ? '<tr><td colspan="7" style="padding: 60px; text-align: center; color: var(--text-secondary); font-size:0.8rem;">No warmup data found. Fetch from Telegram or paste logs above.</td></tr>' : ''}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+window.deleteWarmupGroup = async (domain, server) => {
+    if (!confirm(`Are you sure you want to delete all warmup logs for "${domain}" on server "${server}"?`)) return;
+    const currentData = window.app.state.warmupData || {};
+    const updatedData = {};
+    Object.entries(currentData).forEach(([msgId, r]) => {
+        const resolvedDomain = r.domain || getRdns(r.ip, window.app.state) || 'Unknown';
+        if (resolvedDomain === domain && r.server === server) {
+            // Deleted
+        } else {
+            updatedData[msgId] = r;
+        }
+    });
+    
+    await window.db.ref('state/warmupData').set(updatedData);
+    window.app.state.warmupData = updatedData;
+    window.app.updateDashboard();
+};
+
+window.clearAllWarmupData = async () => {
+    if (!confirm("Are you sure you want to reset all Warmup Progress data? This cannot be undone.")) return;
+    await window.db.ref('state/warmupData').set(null);
+    window.app.state.warmupData = {};
+    window.app.updateDashboard();
+};
+
+window.updateWarmupSearch = (val) => {
+    window.app.state.warmupSearch = val;
+    window.app.updateDashboard();
+};
+
+window.updateWarmupServerFilter = (val) => {
+    window.app.state.warmupFilterServer = val;
+    window.app.updateDashboard();
+};
+
+window.fetchTelegramWarmup = async (btn) => {
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader" class="spin" style="width:14px; height:14px;"></i> Fetching...';
+    if (window.lucide) window.lucide.createIcons();
+    
+    try {
+        const resp = await fetch('/api/sync-telegram-warmup');
+        const data = await resp.json();
+        if (data.success) {
+            alert(`Successfully fetched updates! Added ${data.addedCount} new logs. Total: ${data.totalCount}`);
+            const snapshot = await window.db.ref('state/warmupData').once('value');
+            window.app.state.warmupData = snapshot.val() || {};
+            window.app.updateDashboard();
+        } else {
+            alert(`Error: ${data.error || 'Failed to fetch updates.'}`);
+        }
+    } catch(e) {
+        alert(`Request failed: ${e.message}`);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+        if (window.lucide) window.lucide.createIcons();
+    }
+};
+
+window.showBulkPasteWarmupModal = () => {
+    const overlay = document.createElement('div');
+    overlay.id = 'bulk-paste-warmup-overlay';
+    overlay.style = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); z-index:10000; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px);';
+    
+    overlay.innerHTML = `
+        <div class="card" style="width:600px; max-width:90%; padding:24px; position:relative; background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:12px; box-shadow:0 10px 25px rgba(0,0,0,0.5);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h3 style="margin:0; font-size:1.2rem; font-weight:700;">Bulk Paste Warmup Logs</h3>
+                <span onclick="document.getElementById('bulk-paste-warmup-overlay').remove()" style="cursor:pointer; color:var(--text-secondary);" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--text-secondary)'">
+                    <i data-lucide="x" style="width:20px; height:20px;"></i>
+                </span>
+            </div>
+            
+            <p style="margin:0 0 16px; font-size:0.8rem; color:var(--text-secondary);">
+                Paste the server deployment logs copied directly from Telegram. You can paste multiple logs at once.
+            </p>
+            
+            <textarea id="bulk-warmup-paste-text" placeholder="Paste Telegram logs here..." style="width:100%; height:250px; padding:12px; font-family:monospace; font-size:0.75rem; background:var(--bg-tertiary); border:1px solid var(--border-color); border-radius:8px; color:var(--text-primary); resize:vertical;"></textarea>
+            
+            <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+                <button onclick="document.getElementById('bulk-paste-warmup-overlay').remove()" class="btn-secondary" style="width:auto; padding:10px 16px; font-size:0.75rem; border-radius:6px; cursor:pointer;">Cancel</button>
+                <button onclick="submitBulkPasteWarmup()" class="btn-primary" style="width:auto; padding:10px 16px; font-size:0.75rem; border-radius:6px; cursor:pointer;">Process Logs</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    if (window.lucide) window.lucide.createIcons();
+};
+
+window.submitBulkPasteWarmup = async () => {
+    const rawText = document.getElementById('bulk-warmup-paste-text').value;
+    if (!rawText.trim()) {
+        alert("Please paste some text first.");
+        return;
+    }
+    
+    const parts = rawText.split(/(?:👤\s*)?User:/i);
+    const newRecords = {};
+    let count = 0;
+    
+    parts.forEach(part => {
+        if (!part.trim()) return;
+        
+        const messageText = "User:" + part;
+        const parsed = parseMessageText(messageText);
+        if (parsed) {
+            const timestamp = Date.now() - (count * 1000);
+            const messageId = "manual_" + timestamp + "_" + Math.random().toString(36).substr(2, 5);
+            parsed.messageId = messageId;
+            parsed.timestamp = timestamp;
+            newRecords[messageId] = parsed;
+            count++;
+        }
+    });
+    
+    if (count === 0) {
+        alert("Could not parse any valid deployment summary messages. Please check the format.");
+        return;
+    }
+    
+    await window.db.ref('state/warmupData').update(newRecords);
+    
+    if (!window.app.state.warmupData) window.app.state.warmupData = {};
+    Object.assign(window.app.state.warmupData, newRecords);
+    
+    document.getElementById('bulk-paste-warmup-overlay').remove();
+    window.app.updateDashboard();
+    alert(`Successfully processed and saved ${count} logs!`);
 };
