@@ -95,16 +95,29 @@ function parseMessage(text, timestamp) {
 
 export default async function handler(req, res) {
     try {
-        // Fetch updates from Telegram Bot API
-        const tgUrl = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates`;
-        const tgResp = await fetch(tgUrl);
-        const tgData = await tgResp.json();
+        let results = [];
         
-        if (!tgData.ok) {
-            return res.status(500).json({ error: 'Telegram API returned error: ' + tgData.description });
+        if (req.method === 'POST') {
+            // Webhook mode: a single update object is sent in the body
+            const update = req.body;
+            if (update && update.update_id) {
+                results = [update];
+            }
+        } else {
+            // Polling mode: Fetch updates from Telegram Bot API
+            const tgUrl = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates`;
+            const tgResp = await fetch(tgUrl);
+            const tgData = await tgResp.json();
+            
+            if (tgData.ok) {
+                results = tgData.result || [];
+            } else {
+                console.warn('Telegram API getUpdates returned error:', tgData.description);
+                // Return empty results instead of crashing if getUpdates is disabled by webhook
+                results = [];
+            }
         }
         
-        const results = tgData.result || [];
         const newRecords = {};
         let addedCount = 0;
         
