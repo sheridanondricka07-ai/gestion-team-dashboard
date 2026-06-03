@@ -5434,6 +5434,7 @@ function renderWarmupProgress(app, container) {
                                 <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">IP Address</th>
                                 <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); text-align: center;">Last 3 Drops (Out)</th>
                                 <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); text-align: center; font-weight: 700; color: var(--accent-primary);">Representative Out</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); text-align: center; font-weight: 700; color: #8b5cf6;">Total Sent (All Time)</th>
                                 <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Last Active</th>
                                 <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); width: 60px;">Actions</th>
                             </tr>
@@ -5443,6 +5444,7 @@ function renderWarmupProgress(app, container) {
                                 const latest = g.records[0];
                                 const last3 = g.records.slice(0, 3).map(r => r.outVal);
                                 const repOut = g.repOut;
+                                const totalOutAllTime = g.records.reduce((sum, r) => sum + (parseInt(r.outVal) || 0), 0);
                                 
                                 const last3Html = g.records.slice(0, 3).map(r => {
                                     const valColor = r.outVal === 0 ? 'var(--text-secondary)' : 'var(--text-primary)';
@@ -5477,6 +5479,7 @@ function renderWarmupProgress(app, container) {
                                                 ${repOut.toLocaleString()}
                                             </span>
                                         </td>
+                                        <td style="padding: 14px 12px; text-align: center; font-weight: 700; color: #8b5cf6; font-size: 0.8rem;">${totalOutAllTime.toLocaleString()}</td>
                                         <td style="padding: 14px 12px; color: var(--text-secondary); font-size: 0.7rem;">${timeStr}</td>
                                         <td style="padding: 14px 12px; text-align: center;">
                                             <button onclick="deleteWarmupGroup('${g.domain}', '${g.server}')" title="Delete Group Logs" style="padding: 4px; background:transparent; border:none; color: #ef4444; cursor:pointer;">
@@ -5486,7 +5489,7 @@ function renderWarmupProgress(app, container) {
                                     </tr>
                                 `;
                             }).join('')}
-                            ${filteredGroups.length === 0 ? '<tr><td colspan="7" style="padding: 60px; text-align: center; color: var(--text-secondary); font-size:0.8rem;">No warmup data found. Fetch from Telegram or paste logs above.</td></tr>' : ''}
+                            ${filteredGroups.length === 0 ? '<tr><td colspan="8" style="padding: 60px; text-align: center; color: var(--text-secondary); font-size:0.8rem;">No warmup data found. Fetch from Telegram or paste logs above.</td></tr>' : ''}
                         </tbody>
                     </table>
                 </div>
