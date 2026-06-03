@@ -111,6 +111,14 @@ export default async function handler(req, res) {
         results.forEach(update => {
             const msg = update.message || update.edited_message || update.channel_post;
             if (msg && msg.text) {
+                const chatId = msg.chat ? String(msg.chat.id) : "";
+                const isTargetGroup = chatId === "-1002633168986";
+                const isPrivate = msg.chat && msg.chat.type === "private";
+                
+                if (!isTargetGroup && !isPrivate) {
+                    return;
+                }
+
                 const messageId = msg.message_id;
                 const timestamp = msg.date * 1000; // Telegram date is in Unix seconds
                 const parsed = parseMessage(msg.text, timestamp);
