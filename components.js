@@ -5308,7 +5308,11 @@ function renderWarmupProgress(app, container) {
         return matchSearch && matchServer;
     });
 
-    filteredGroups.sort((a, b) => b.records[0].timestamp - a.records[0].timestamp);
+    filteredGroups.forEach(g => {
+        const last3 = g.records.slice(0, 3).map(r => r.outVal);
+        g.repOut = getRepresentativeVolume(last3);
+    });
+    filteredGroups.sort((a, b) => b.repOut - a.repOut);
 
     const totalDomains = groups.length;
     const totalLogs = rawRecords.length;
@@ -5400,7 +5404,7 @@ function renderWarmupProgress(app, container) {
                             ${filteredGroups.map((g, idx) => {
                                 const latest = g.records[0];
                                 const last3 = g.records.slice(0, 3).map(r => r.outVal);
-                                const repOut = getRepresentativeVolume(last3);
+                                const repOut = g.repOut;
                                 
                                 const last3Html = g.records.slice(0, 3).map(r => {
                                     const valColor = r.outVal === 0 ? 'var(--text-secondary)' : 'var(--text-primary)';
