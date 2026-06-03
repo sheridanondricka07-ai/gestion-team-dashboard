@@ -217,8 +217,8 @@ export default async function handler(req, res) {
                 for (const key in grouped) {
                     const g = grouped[key];
                     g.records.sort((a, b) => b.timestamp - a.timestamp);
-                    const last3 = g.records.slice(0, 3).map(r => r.outVal);
-                    const repOut = getRepOut(last3);
+                    const allOuts = g.records.map(r => r.outVal);
+                    const repOut = getRepOut(allOuts);
                     
                     const safeDomain = (g.domain || g.ip || g.server || 'unknown').replace(/[\.\#\$\[\]]/g, '_');
                     

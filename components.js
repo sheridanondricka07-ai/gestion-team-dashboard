@@ -5392,8 +5392,8 @@ function renderWarmupProgress(app, container) {
     });
 
     filteredGroups.forEach(g => {
-        const last3 = g.records.slice(0, 3).map(r => r.outVal);
-        g.repOut = getRepresentativeVolume(last3);
+        const allOuts = g.records.map(r => r.outVal);
+        g.repOut = getRepresentativeVolume(allOuts);
     });
     filteredGroups.sort((a, b) => b.repOut - a.repOut);
 
