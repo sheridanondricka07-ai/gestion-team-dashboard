@@ -212,7 +212,7 @@ export default async function handler(req, res) {
                 };
                 
                 const notifToken = "8854626437:AAETvyVLsi_NWbiUkeZxqs-r74VoTVGb4KE";
-                const notifChatId = "-5109098387";
+                const notifChatId = "-4933333573";
                 
                 for (const key in grouped) {
                     const g = grouped[key];
@@ -224,7 +224,8 @@ export default async function handler(req, res) {
                     
                     if (repOut > 25900 && !notifiedState[safeDomain]) {
                         const text = `🎯 <b>Warmup Target Reached!</b>\n\n` + 
-                                     `🌐 Domain/IP: <b>${g.domain || g.ip || 'Unknown'}</b>\n` + 
+                                     `🌐 Domain: <b>${g.domain || 'N/A'}</b>\n` +
+                                     `📌 IP: <code>${g.ip || 'Unknown'}</code>\n` + 
                                      `🖥 Server: ${g.server || 'Unknown'}\n` + 
                                      `📊 Rep Out: <b>${repOut}</b>\n\n` + 
                                      `<i>Target (>25900) achieved.</i>`;
