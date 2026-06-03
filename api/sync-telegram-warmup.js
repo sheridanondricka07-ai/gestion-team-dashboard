@@ -183,6 +183,75 @@ export default async function handler(req, res) {
         // Fetch all warmupData from Firebase to return to client
         const allData = await getFirebaseData('state/warmupData') || {};
         
+        if (addedCount > 0) {
+            try {
+                const notifiedState = await getFirebaseData('state/warmupNotified') || {};
+                let newNotified = false;
+                
+                const grouped = {};
+                Object.values(allData).forEach(r => {
+                    if (!r.domain && !r.ip && !r.server) return;
+                    const key = `${r.domain || ''}_${r.server || ''}_${r.ip || ''}`;
+                    if (!grouped[key]) grouped[key] = { ...r, records: [] };
+                    grouped[key].records.push(r);
+                });
+                
+                const getRepOut = (drops) => {
+                    const nonZeros = drops.filter(v => v > 0);
+                    if (nonZeros.length === 0) return 0;
+                    if (nonZeros.length === 1) return nonZeros[0];
+                    nonZeros.sort((a, b) => b - a);
+                    for (let i = 0; i < nonZeros.length; i++) {
+                        for (let j = i + 1; j < nonZeros.length; j++) {
+                            const maxVal = Math.max(nonZeros[i], nonZeros[j]);
+                            const minVal = Math.min(nonZeros[i], nonZeros[j]);
+                            if (maxVal > 0 && (maxVal - minVal) / maxVal <= 0.3) return maxVal;
+                        }
+                    }
+                    return nonZeros[0];
+                };
+                
+                const notifToken = "8854626437:AAETvyVLsi_NWbiUkeZxqs-r74VoTVGb4KE";
+                const notifChatId = "-5109098387";
+                
+                for (const key in grouped) {
+                    const g = grouped[key];
+                    g.records.sort((a, b) => b.timestamp - a.timestamp);
+                    const last3 = g.records.slice(0, 3).map(r => r.outVal);
+                    const repOut = getRepOut(last3);
+                    
+                    const safeDomain = (g.domain || g.ip || g.server || 'unknown').replace(/[\.\#\$\[\]]/g, '_');
+                    
+                    if (repOut > 25900 && !notifiedState[safeDomain]) {
+                        const text = `🎯 <b>Warmup Target Reached!</b>\n\n` + 
+                                     `🌐 Domain/IP: <b>${g.domain || g.ip || 'Unknown'}</b>\n` + 
+                                     `🖥 Server: ${g.server || 'Unknown'}\n` + 
+                                     `📊 Rep Out: <b>${repOut}</b>\n\n` + 
+                                     `<i>Target (>25900) achieved.</i>`;
+                                     
+                        await fetch(`https://api.telegram.org/bot${notifToken}/sendMessage`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ chat_id: notifChatId, text: text, parse_mode: 'HTML' })
+                        });
+                        
+                        notifiedState[safeDomain] = true;
+                        newNotified = true;
+                    }
+                }
+                
+                if (newNotified) {
+                    await fetch(`${DB_URL}/state/warmupNotified.json`, {
+                        method: 'PUT',
+                        body: JSON.stringify(notifiedState),
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                }
+            } catch (err) {
+                console.error("Error during notification check:", err);
+            }
+        }
+        
         return res.status(200).json({ 
             success: true, 
             addedCount, 
