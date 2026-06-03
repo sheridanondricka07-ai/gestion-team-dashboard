@@ -123,6 +123,18 @@ export default async function handler(req, res) {
                 } catch (e) {
                     console.error("Failed to write raw debug log:", e);
                 }
+            } else if (update && update.text) {
+                // Direct POST of message text from external script
+                const fakeMessageId = "ext_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+                results = [{
+                    update_id: Date.now(),
+                    message: {
+                        message_id: fakeMessageId,
+                        date: Math.floor(Date.now() / 1000),
+                        chat: { id: "-1002633168986", type: "supergroup" },
+                        text: update.text
+                    }
+                }];
             }
         } else {
             // Polling mode: Fetch updates from Telegram Bot API
