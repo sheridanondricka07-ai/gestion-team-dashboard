@@ -5317,6 +5317,7 @@ function renderWarmupProgress(app, container) {
     const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
     const seenActiveDomains = new Set();
     const seenActiveIps = new Set();
+    const seenActiveServers = new Set();
 
     groups.forEach(g => {
         g.records.sort((a, b) => b.timestamp - a.timestamp);
@@ -5324,6 +5325,7 @@ function renderWarmupProgress(app, container) {
         
         const d = g.domain ? g.domain.trim().toLowerCase() : '';
         const i = g.ip ? g.ip.trim() : '';
+        const s = g.server ? g.server.trim() : '';
         
         if ((d && sentDomains.has(d)) || (i && sentIps.has(i))) {
             archivedGroups.push(g);
@@ -5333,27 +5335,42 @@ function renderWarmupProgress(app, container) {
             activeGroups.push(g);
             if (d) seenActiveDomains.add(d);
             if (i) seenActiveIps.add(i);
+            if (s) seenActiveServers.add(s);
         }
     });
 
-    // Add items from inventory that have no recent warmup activity
-    rpInventory.forEach(item => {
-        if (item.alreadySent || item.srv === 'SENT') return;
-        const d = (item.rpDomain || '').trim().toLowerCase();
-        const i = (item.rpIp || '').trim();
+    // Add servers and IPs from infrastructure that have no recent warmup activity
+    const allServers = app.state.servers || [];
+    allServers.forEach(srv => {
+        const srvName = srv.name || '';
+        const ips = srv.allIps || [];
         
-        if (!d && !i) return;
-        
-        if ((d && !seenActiveDomains.has(d)) || (i && !seenActiveIps.has(i))) {
-            const alreadyInInactive = inactiveGroups.some(g => 
-                (d && g.domain && g.domain.toLowerCase() === d) || 
-                (i && g.ip && g.ip === i)
-            );
+        if (ips.length > 0) {
+            ips.forEach(ipStr => {
+                const i = ipStr.trim();
+                if (!i) return;
+                
+                if (!seenActiveIps.has(i) && !sentIps.has(i)) {
+                    const alreadyInInactive = inactiveGroups.some(g => g.ip === i);
+                    if (!alreadyInInactive) {
+                        inactiveGroups.push({
+                            domain: '---', 
+                            server: srvName,
+                            ip: i,
+                            records: [],
+                            repOut: 0
+                        });
+                    }
+                }
+            });
+        } else if (srvName && !seenActiveServers.has(srvName)) {
+            // Server has no IPs but is completely missing from logs
+            const alreadyInInactive = inactiveGroups.some(g => g.server === srvName);
             if (!alreadyInInactive) {
                 inactiveGroups.push({
-                    domain: item.rpDomain || '---',
-                    server: item.srv || '---',
-                    ip: item.rpIp || '---',
+                    domain: '---', 
+                    server: srvName,
+                    ip: '---',
                     records: [],
                     repOut: 0
                 });
