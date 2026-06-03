@@ -5313,19 +5313,58 @@ function renderWarmupProgress(app, container) {
 
     const activeGroups = [];
     const archivedGroups = [];
+    const inactiveGroups = [];
+    const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
+    const seenActiveDomains = new Set();
+    const seenActiveIps = new Set();
 
     groups.forEach(g => {
+        g.records.sort((a, b) => b.timestamp - a.timestamp);
+        const latestTimestamp = g.records[0] ? g.records[0].timestamp : 0;
+        
         const d = g.domain ? g.domain.trim().toLowerCase() : '';
         const i = g.ip ? g.ip.trim() : '';
+        
         if ((d && sentDomains.has(d)) || (i && sentIps.has(i))) {
             archivedGroups.push(g);
+        } else if (latestTimestamp < twentyFourHoursAgo) {
+            inactiveGroups.push(g);
         } else {
             activeGroups.push(g);
+            if (d) seenActiveDomains.add(d);
+            if (i) seenActiveIps.add(i);
+        }
+    });
+
+    // Add items from inventory that have no recent warmup activity
+    rpInventory.forEach(item => {
+        if (item.alreadySent || item.srv === 'SENT') return;
+        const d = (item.rpDomain || '').trim().toLowerCase();
+        const i = (item.rpIp || '').trim();
+        
+        if (!d && !i) return;
+        
+        if ((d && !seenActiveDomains.has(d)) || (i && !seenActiveIps.has(i))) {
+            const alreadyInInactive = inactiveGroups.some(g => 
+                (d && g.domain && g.domain.toLowerCase() === d) || 
+                (i && g.ip && g.ip === i)
+            );
+            if (!alreadyInInactive) {
+                inactiveGroups.push({
+                    domain: item.rpDomain || '---',
+                    server: item.srv || '---',
+                    ip: item.rpIp || '---',
+                    records: [],
+                    repOut: 0
+                });
+            }
         }
     });
 
     if (!app.state.warmupActiveTab) app.state.warmupActiveTab = 'active';
-    const currentGroups = app.state.warmupActiveTab === 'active' ? activeGroups : archivedGroups;
+    let currentGroups = activeGroups;
+    if (app.state.warmupActiveTab === 'archived') currentGroups = archivedGroups;
+    if (app.state.warmupActiveTab === 'inactive') currentGroups = inactiveGroups;
 
     const filteredGroups = currentGroups.filter(g => {
         const matchSearch = g.domain.toLowerCase().includes(search) || 
@@ -5343,6 +5382,7 @@ function renderWarmupProgress(app, container) {
 
     const totalDomains = activeGroups.length;
     const totalArchived = archivedGroups.length;
+    const totalInactive = inactiveGroups.length;
     const totalLogs = rawRecords.length;
     const maxOut = rawRecords.reduce((max, r) => r.outVal > max ? r.outVal : max, 0);
 
@@ -5404,6 +5444,9 @@ function renderWarmupProgress(app, container) {
                 <div onclick="window.app.state.warmupActiveTab = 'active'; window.app.updateDashboard();" style="padding: 10px 16px; cursor: pointer; font-weight: 600; font-size: 0.85rem; border-bottom: 2px solid ${app.state.warmupActiveTab === 'active' ? 'var(--accent-primary)' : 'transparent'}; color: ${app.state.warmupActiveTab === 'active' ? 'var(--accent-primary)' : 'var(--text-secondary)'}; transition: all 0.2s;">
                     Active Warmup <span style="background: ${app.state.warmupActiveTab === 'active' ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-tertiary)'}; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; margin-left: 6px;">${totalDomains}</span>
                 </div>
+                <div onclick="window.app.state.warmupActiveTab = 'inactive'; window.app.updateDashboard();" style="padding: 10px 16px; cursor: pointer; font-weight: 600; font-size: 0.85rem; border-bottom: 2px solid ${app.state.warmupActiveTab === 'inactive' ? 'var(--accent-primary)' : 'transparent'}; color: ${app.state.warmupActiveTab === 'inactive' ? 'var(--accent-primary)' : 'var(--text-secondary)'}; transition: all 0.2s;">
+                    Inactive (> 24h) <span style="background: ${app.state.warmupActiveTab === 'inactive' ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-tertiary)'}; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; margin-left: 6px;">${totalInactive}</span>
+                </div>
                 <div onclick="window.app.state.warmupActiveTab = 'archived'; window.app.updateDashboard();" style="padding: 10px 16px; cursor: pointer; font-weight: 600; font-size: 0.85rem; border-bottom: 2px solid ${app.state.warmupActiveTab === 'archived' ? 'var(--accent-primary)' : 'transparent'}; color: ${app.state.warmupActiveTab === 'archived' ? 'var(--accent-primary)' : 'var(--text-secondary)'}; transition: all 0.2s;">
                     Archived (Sent) <span style="background: ${app.state.warmupActiveTab === 'archived' ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-tertiary)'}; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; margin-left: 6px;">${totalArchived}</span>
                 </div>
@@ -5462,8 +5505,8 @@ function renderWarmupProgress(app, container) {
                                     repBg = 'rgba(245, 158, 11, 0.1)';
                                 }
                                 
-                                const timeStr = new Date(latest.timestamp).toLocaleString();
-                                const isRdns = !latest.domain;
+                                const timeStr = latest ? new Date(latest.timestamp).toLocaleString() : 'Never / > 24h ago';
+                                const isRdns = latest ? !latest.domain : false;
 
                                 return `
                                     <tr style="background: ${idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent'}; border-bottom: 1px solid var(--border-color);">
