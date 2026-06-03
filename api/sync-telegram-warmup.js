@@ -1,5 +1,5 @@
 const DB_URL = "https://gestion-team-c-default-rtdb.firebaseio.com";
-const BOT_TOKEN = "8277348945:AAGd4UVlLqxKiQUF4wdVMTs_VonGoMfEgfk";
+const BOT_TOKEN = "8827415405:AAH-sAnTE7rz_i4XSTFG6tjBX0g0BYPyn6E";
 
 async function getFirebaseData(path) {
     try {
