@@ -5300,7 +5300,34 @@ function renderWarmupProgress(app, container) {
 
     const groups = Object.values(grouped);
 
-    const filteredGroups = groups.filter(g => {
+    // Cross-reference with RP Inventory to find "Sent" items
+    const rpInventory = app.state.rpInventory || [];
+    const sentDomains = new Set();
+    const sentIps = new Set();
+    rpInventory.forEach(item => {
+        if (item.alreadySent || item.srv === 'SENT') {
+            if (item.rpDomain) sentDomains.add(item.rpDomain.trim().toLowerCase());
+            if (item.rpIp) sentIps.add(item.rpIp.trim());
+        }
+    });
+
+    const activeGroups = [];
+    const archivedGroups = [];
+
+    groups.forEach(g => {
+        const d = g.domain ? g.domain.trim().toLowerCase() : '';
+        const i = g.ip ? g.ip.trim() : '';
+        if ((d && sentDomains.has(d)) || (i && sentIps.has(i))) {
+            archivedGroups.push(g);
+        } else {
+            activeGroups.push(g);
+        }
+    });
+
+    if (!app.state.warmupActiveTab) app.state.warmupActiveTab = 'active';
+    const currentGroups = app.state.warmupActiveTab === 'active' ? activeGroups : archivedGroups;
+
+    const filteredGroups = currentGroups.filter(g => {
         const matchSearch = g.domain.toLowerCase().includes(search) || 
                             (g.server || '').toLowerCase().includes(search) || 
                             (g.ip || '').includes(search);
@@ -5314,7 +5341,8 @@ function renderWarmupProgress(app, container) {
     });
     filteredGroups.sort((a, b) => b.repOut - a.repOut);
 
-    const totalDomains = groups.length;
+    const totalDomains = activeGroups.length;
+    const totalArchived = archivedGroups.length;
     const totalLogs = rawRecords.length;
     const maxOut = rawRecords.reduce((max, r) => r.outVal > max ? r.outVal : max, 0);
 
@@ -5368,6 +5396,16 @@ function renderWarmupProgress(app, container) {
                         <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Max Warmup Out</div>
                         <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin-top: 4px;">${maxOut.toLocaleString()}</div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 0;">
+                <div onclick="window.app.state.warmupActiveTab = 'active'; window.app.updateDashboard();" style="padding: 10px 16px; cursor: pointer; font-weight: 600; font-size: 0.85rem; border-bottom: 2px solid ${app.state.warmupActiveTab === 'active' ? 'var(--accent-primary)' : 'transparent'}; color: ${app.state.warmupActiveTab === 'active' ? 'var(--accent-primary)' : 'var(--text-secondary)'}; transition: all 0.2s;">
+                    Active Warmup <span style="background: ${app.state.warmupActiveTab === 'active' ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-tertiary)'}; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; margin-left: 6px;">${totalDomains}</span>
+                </div>
+                <div onclick="window.app.state.warmupActiveTab = 'archived'; window.app.updateDashboard();" style="padding: 10px 16px; cursor: pointer; font-weight: 600; font-size: 0.85rem; border-bottom: 2px solid ${app.state.warmupActiveTab === 'archived' ? 'var(--accent-primary)' : 'transparent'}; color: ${app.state.warmupActiveTab === 'archived' ? 'var(--accent-primary)' : 'var(--text-secondary)'}; transition: all 0.2s;">
+                    Archived (Sent) <span style="background: ${app.state.warmupActiveTab === 'archived' ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-tertiary)'}; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; margin-left: 6px;">${totalArchived}</span>
                 </div>
             </div>
 
