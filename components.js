@@ -5521,7 +5521,7 @@ function renderWarmupProgress(app, container) {
                                 const rec = window.getWarmupRecommendation ? window.getWarmupRecommendation(totalOutAllTime, repOut, intel) : null;
                                 let recHtml = '';
                                 if (rec && app.state.warmupActiveTab === 'active') {
-                                    recHtml = \`<div style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 4px;">\${rec.text} <span style="opacity: 0.7;">(\${rec.sub})</span></div>\`;
+                                    recHtml = `<div style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 4px;">${rec.text} <span style="opacity: 0.7;">(${rec.sub})</span></div>`;
                                 }
                                 
                                 const last3Html = g.records.slice(0, 3).map(r => {
