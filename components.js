@@ -5406,6 +5406,8 @@ function renderWarmupProgress(app, container) {
 
     const serversList = Array.from(new Set(rawRecords.map(r => r.server).filter(s => s)));
 
+    const intel = window.computeWarmupIntelligence ? window.computeWarmupIntelligence() : null;
+
     container.innerHTML = `
         <div style="padding: 24px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
@@ -5416,6 +5418,9 @@ function renderWarmupProgress(app, container) {
                 <div style="display: flex; gap: 10px;">
                     <button onclick="fetchTelegramWarmup(this)" class="btn-primary" style="display: flex; align-items: center; gap: 8px; width: auto; padding: 10px 16px; font-size: 0.75rem; border-radius: 8px;">
                         <i data-lucide="refresh-cw" style="width: 14px;"></i> Fetch Telegram
+                    </button>
+                    <button onclick="window.showWarmupIntelligenceModal()" class="btn-primary" style="display: flex; align-items: center; gap: 8px; width: auto; padding: 10px 16px; font-size: 0.75rem; border-radius: 8px; background: var(--gradient-primary); border: none; box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);">
+                        <i data-lucide="brain-circuit" style="width: 14px;"></i> AI Insights
                     </button>
                     <button onclick="showBulkPasteWarmupModal()" class="btn-secondary" style="display: flex; align-items: center; gap: 8px; width: auto; padding: 10px 16px; font-size: 0.75rem; border-radius: 8px; border: 1px solid var(--accent-primary); color: var(--accent-primary); background: transparent;">
                         <i data-lucide="clipboard-list" style="width: 14px;"></i> Bulk Paste Logs
@@ -5501,7 +5506,7 @@ function renderWarmupProgress(app, container) {
                                 <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">IP Address</th>
                                 <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); text-align: center;">Last 3 Drops (Out)</th>
                                 <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); text-align: center; font-weight: 700; color: var(--accent-primary);">Representative Out</th>
-                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); text-align: center; font-weight: 700; color: #8b5cf6;">Total Sent (All Time)</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); text-align: center; font-weight: 700; color: #8b5cf6;">Total Sent / Next Target</th>
                                 <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Last Active</th>
                                 <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); width: 60px;">Actions</th>
                             </tr>
@@ -5512,6 +5517,12 @@ function renderWarmupProgress(app, container) {
                                 const last3 = g.records.slice(0, 3).map(r => r.outVal);
                                 const repOut = g.repOut;
                                 const totalOutAllTime = g.records.reduce((sum, r) => sum + (parseInt(r.outVal) || 0), 0);
+                                
+                                const rec = window.getWarmupRecommendation ? window.getWarmupRecommendation(totalOutAllTime, repOut, intel) : null;
+                                let recHtml = '';
+                                if (rec && app.state.warmupActiveTab === 'active') {
+                                    recHtml = \`<div style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 4px;">\${rec.text} <span style="opacity: 0.7;">(\${rec.sub})</span></div>\`;
+                                }
                                 
                                 const last3Html = g.records.slice(0, 3).map(r => {
                                     const valColor = r.outVal === 0 ? 'var(--text-secondary)' : 'var(--text-primary)';
@@ -5547,7 +5558,10 @@ function renderWarmupProgress(app, container) {
                                                 ${repOut.toLocaleString()}
                                             </span>
                                         </td>
-                                        <td style="padding: 14px 12px; text-align: center; font-weight: 700; color: #8b5cf6; font-size: 0.8rem;">${totalOutAllTime.toLocaleString()}</td>
+                                        <td style="padding: 14px 12px; text-align: center;">
+                                            <div style="font-weight: 700; color: #8b5cf6; font-size: 0.8rem;">${totalOutAllTime.toLocaleString()}</div>
+                                            ${recHtml}
+                                        </td>
                                         <td style="padding: 14px 12px; color: var(--text-secondary); font-size: 0.7rem;">${timeStr}</td>
                                         <td style="padding: 14px 12px; text-align: center;">
                                             <button onclick="deleteWarmupGroup('${g.domain}', '${g.server}')" title="Delete Group Logs" style="padding: 4px; background:transparent; border:none; color: #ef4444; cursor:pointer;">
@@ -5747,3 +5761,140 @@ window.submitBulkPasteWarmup = async () => {
     window.app.updateDashboard();
     alert(`Successfully processed and saved ${count} logs!`);
 };
+
+window.computeWarmupIntelligence = () => {
+    const rawRecords = Object.values(window.app.state.warmupData || {});
+    if (rawRecords.length === 0) return null;
+
+    const grouped = {};
+    rawRecords.forEach(r => {
+        if (!r.domain) return;
+        if (!grouped[r.domain]) grouped[r.domain] = [];
+        grouped[r.domain].push(r);
+    });
+
+    const milestones = [500, 1000, 2000, 3000, 5000, 10000, 20000];
+    const milestoneTotals = {};
+    milestones.forEach(m => milestoneTotals[m] = []);
+
+    let learnedDomains = 0;
+
+    Object.values(grouped).forEach(records => {
+        records.sort((a, b) => a.timestamp - b.timestamp); // Oldest first
+        
+        let cumulative = 0;
+        const reached = new Set();
+        let contributed = false;
+
+        records.forEach(r => {
+            const out = r.outVal;
+            milestones.forEach(m => {
+                if (out >= m && !reached.has(m)) {
+                    reached.add(m);
+                    milestoneTotals[m].push(cumulative);
+                    contributed = true;
+                }
+            });
+            cumulative += out;
+        });
+        
+        if (contributed) learnedDomains++;
+    });
+
+    const averages = {};
+    milestones.forEach(m => {
+        if (milestoneTotals[m].length > 0) {
+            const sum = milestoneTotals[m].reduce((a, b) => a + b, 0);
+            averages[m] = Math.round(sum / milestoneTotals[m].length);
+        } else {
+            averages[m] = null;
+        }
+    });
+
+    return { averages, milestones, learnedDomains };
+};
+
+window.getWarmupRecommendation = (totalSent, repOut, intel) => {
+    if (!intel || !intel.averages) return null;
+    
+    let nextMilestone = null;
+    let needed = 0;
+    
+    // Find the next milestone they haven't reached based on averages
+    for (const m of intel.milestones) {
+        if (intel.averages[m] !== null && totalSent < intel.averages[m]) {
+            nextMilestone = m;
+            needed = intel.averages[m] - totalSent;
+            break;
+        }
+    }
+
+    if (nextMilestone) {
+        return { text: `Next: ${nextMilestone}`, sub: `Need ${needed.toLocaleString()}` };
+    } else {
+        return { text: `Target: 25k+`, sub: `Scale freely` };
+    }
+};
+
+window.showWarmupIntelligenceModal = () => {
+    const intel = window.computeWarmupIntelligence();
+    if (!intel || intel.learnedDomains === 0) {
+        alert("Not enough historical data to generate a Warmup Schema. Keep sending!");
+        return;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.id = 'warmup-intelligence-overlay';
+    overlay.style = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); z-index:10000; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px);';
+    
+    let rowsHtml = '';
+    intel.milestones.forEach(m => {
+        const avg = intel.averages[m];
+        if (avg !== null) {
+            rowsHtml += `
+                <div style="display:flex; justify-content:space-between; padding:12px; border-bottom:1px solid var(--border-color); background:rgba(255,255,255,0.02);">
+                    <div style="font-weight:700; color:var(--text-primary);">Reach ${m.toLocaleString()} Drops/Day</div>
+                    <div style="font-weight:600; color:var(--accent-primary);">${avg.toLocaleString()} Total Sent</div>
+                </div>
+            `;
+        }
+    });
+
+    overlay.innerHTML = \`
+        <div class="card" style="width:600px; max-width:90%; padding:24px; position:relative; background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:12px; box-shadow:0 10px 25px rgba(0,0,0,0.5);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <div style="background:var(--gradient-primary); width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#fff;">
+                        <i data-lucide="brain-circuit" style="width:20px; height:20px;"></i>
+                    </div>
+                    <div>
+                        <h3 style="margin:0; font-size:1.2rem; font-weight:700;">AI Warmup Strategy</h3>
+                        <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">Learned from \${intel.learnedDomains} successful domains in your history.</div>
+                    </div>
+                </div>
+                <span onclick="document.getElementById('warmup-intelligence-overlay').remove()" style="cursor:pointer; color:var(--text-secondary);" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--text-secondary)'">
+                    <i data-lucide="x" style="width:20px; height:20px;"></i>
+                </span>
+            </div>
+            
+            <p style="margin:0 0 20px; font-size:0.85rem; color:var(--text-secondary); line-height:1.5;">
+                This schema is dynamically generated by analyzing your past successful telegram deployments. It calculates exactly how much total volume you usually send before safely reaching the next tier.
+            </p>
+            
+            <div style="border:1px solid var(--border-color); border-radius:8px; overflow:hidden;">
+                \${rowsHtml}
+            </div>
+            
+            <div style="margin-top:20px; padding:12px; background:rgba(59, 130, 246, 0.1); border-radius:8px; border:1px solid rgba(59, 130, 246, 0.2); display:flex; gap:12px;">
+                <i data-lucide="info" style="color:#3b82f6; width:20px; flex-shrink:0;"></i>
+                <div style="font-size:0.8rem; color:var(--text-primary); line-height:1.4;">
+                    <strong>Live Recommendations:</strong> The "Total Sent" column in your dashboard now features a live tracker recommending when your active domains are ready to scale up to the next target based on this exact schema!
+                </div>
+            </div>
+        </div>
+    \`;
+    
+    document.body.appendChild(overlay);
+    if (window.lucide) window.lucide.createIcons();
+};
+
