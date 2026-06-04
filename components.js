@@ -356,9 +356,6 @@ function renderServerInventory(app, container) {
                         <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Manage administrative details and cancellation schedules.</p>
                     </div>
                     <div style="display: flex; gap: 8px;">
-                        <button onclick="testTelegramBot(this)" style="padding: 8px 16px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px; width: auto; background: var(--bg-tertiary); border: 1px solid var(--accent-primary); color: var(--accent-primary);">
-                            <i data-lucide="send" style="width: 14px;"></i> Test Telegram Bot
-                        </button>
                         <button onclick="showBulkDeclareCancelModal()" style="padding: 8px 16px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px; width: auto; background: var(--bg-tertiary); border: 1px solid #ef444455; color: #f87171;">
                             <i data-lucide="trash-2" style="width: 14px;"></i> Bulk Declare Cancel
                         </button>
