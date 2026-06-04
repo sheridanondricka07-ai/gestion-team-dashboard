@@ -22,8 +22,21 @@ window.withFocusPreservation = function(fn) {
                 } catch(e) {}
             }
         }
-    }
 };
+
+function getRootDomain(domain) {
+    if (!domain) return '';
+    const parts = domain.split('.');
+    if (parts.length <= 2) return domain;
+    
+    const lastTwo = parts.slice(-2).join('.');
+    const isMultiPartTld = lastTwo.match(/\.(com|net|org|edu|gov|co|org)\.[a-z]{2}$/i);
+    
+    if (isMultiPartTld) {
+        return parts.slice(-3).join('.');
+    }
+    return parts.slice(-2).join('.');
+}
 
 function renderLogin(app) {
     const container = document.getElementById('login-screen');
@@ -3043,14 +3056,17 @@ function renderSpamhaus(app, container) {
                     <div style="padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02);">
                         <div>
                             <h3 style="margin: 0; font-size: 1.1rem;">Infrastructure Check</h3>
-                            <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Verify PTR records and Sync VMTA mappings from Gmail.</p>
+                            <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Verify PTR records, Sync VMTA mappings from Gmail, and check Google Postmaster reputation.</p>
                         </div>
-                        <div style="display: flex; gap: 12px;">
+                        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
                             <button onclick="triggerVMTACheck(this)" class="btn-primary" style="width: auto; padding: 8px 16px; font-size: 0.85rem; display: flex; align-items: center; gap: 8px; background: #3B82F6; border: none;">
                                 <i data-lucide="zap" style="width: 14px;"></i> Check RDNS
                             </button>
                             <button onclick="showGmailSyncModal()" class="btn-primary" style="width: auto; padding: 8px 16px; font-size: 0.85rem; display: flex; align-items: center; gap: 8px; background: #EA4335; border: none;">
                                 <i data-lucide="mail" style="width: 14px;"></i> Sync VMTA from Gmail
+                            </button>
+                            <button onclick="syncPostmasterHealth(this)" class="btn-primary" style="width: auto; padding: 8px 16px; font-size: 0.85rem; display: flex; align-items: center; gap: 8px; background: #10B981; border: none;">
+                                <i data-lucide="shield" style="width: 14px;"></i> Sync Postmaster
                             </button>
                         </div>
                     </div>
@@ -3062,6 +3078,7 @@ function renderSpamhaus(app, container) {
                                     <th style="padding: 16px 12px; width: 150px;">IP Address</th>
                                     <th style="padding: 16px 12px;">Reverse DNS (PTR)</th>
                                     <th style="padding: 16px 12px;">VMTA</th>
+                                    <th style="padding: 16px 12px; width: 180px;">Postmaster Health</th>
                                     <th style="padding: 16px 12px; width: 100px; text-align: center;">Status</th>
                                 </tr>
                             </thead>
@@ -3074,6 +3091,60 @@ function renderSpamhaus(app, container) {
                                         const ptrData = app.state.vmtaResults[safeIp] || { ptr: '---', status: '---' };
                                         const vmta = vmtaMap[safeIp] || '---';
                                         
+                                        // Extract domain name from PTR
+                                        let ptrDomain = (ptrData.ptr || '').trim().toLowerCase();
+                                        if (ptrDomain.endsWith('.')) ptrDomain = ptrDomain.slice(0, -1);
+
+                                        // Fetch postmaster stats
+                                        const cleanDomainKey = ptrDomain.replace(/\./g, '_');
+                                        let postmasterData = app.state.postmasterResults && app.state.postmasterResults[cleanDomainKey];
+                                        
+                                        // Fallback to root domain if subdomain not found in results
+                                        if (!postmasterData && ptrDomain && !ptrDomain.includes('No PTR') && !ptrDomain.includes('NXDOMAIN')) {
+                                            const rootDomain = getRootDomain(ptrDomain);
+                                            const rootKey = rootDomain.replace(/\./g, '_');
+                                            postmasterData = app.state.postmasterResults && app.state.postmasterResults[rootKey];
+                                        }
+
+                                        let postmasterHtml = '<span style="color: var(--text-secondary); opacity: 0.3;">---</span>';
+                                        if (postmasterData) {
+                                            const domainRep = postmasterData.domainReputation || 'REPUTATION_UNSPECIFIED';
+                                            const ipRep = postmasterData.ipReputations && postmasterData.ipReputations[safeIp] || 'REPUTATION_UNSPECIFIED';
+                                            const spamRate = postmasterData.spamRate !== null && postmasterData.spamRate !== undefined ? `${(postmasterData.spamRate * 100).toFixed(2)}%` : '---';
+
+                                            const getRepColor = (rep) => {
+                                                if (rep === 'HIGH') return '#4ade80';
+                                                if (rep === 'MEDIUM') return '#facc15';
+                                                if (rep === 'LOW') return '#fb923c';
+                                                if (rep === 'BAD') return '#ef4444';
+                                                return 'var(--text-secondary)';
+                                            };
+
+                                            const getRepLabel = (rep) => {
+                                                if (rep === 'REPUTATION_UNSPECIFIED') return 'UNSP';
+                                                return rep;
+                                            };
+
+                                            postmasterHtml = `
+                                                <div style="display: flex; flex-direction: column; gap: 4px; font-size: 0.7rem; line-height: 1.2;">
+                                                    <div style="display: flex; gap: 6px; align-items: center;">
+                                                        <span style="color: var(--text-secondary); font-size: 0.65rem; width: 45px;">Domain:</span>
+                                                        <span style="color: ${getRepColor(domainRep)}; font-weight: 700;">${getRepLabel(domainRep)}</span>
+                                                    </div>
+                                                    <div style="display: flex; gap: 6px; align-items: center;">
+                                                        <span style="color: var(--text-secondary); font-size: 0.65rem; width: 45px;">IP:</span>
+                                                        <span style="color: ${getRepColor(ipRep)}; font-weight: 700;">${getRepLabel(ipRep)}</span>
+                                                    </div>
+                                                    ${postmasterData.spamRate !== null ? `
+                                                        <div style="display: flex; gap: 6px; align-items: center;">
+                                                            <span style="color: var(--text-secondary); font-size: 0.65rem; width: 45px;">Spam:</span>
+                                                            <span style="color: ${parseFloat(spamRate) > 0.3 ? '#ef4444' : '#4ade80'}; font-weight: 600;">${spamRate}</span>
+                                                        </div>
+                                                    ` : ''}
+                                                </div>
+                                            `;
+                                        }
+
                                         const isFirstInServer = ipIdx === 0 && sIdx !== 0;
                                         const thickBorder = isFirstInServer ? 'border-top: 3px solid rgba(255,255,255,0.15);' : '';
                                         
@@ -3098,6 +3169,7 @@ function renderSpamhaus(app, container) {
                                                     </div>
                                                 </td>
                                                 <td style="padding: 12px; font-family: monospace; color: var(--accent-primary); ${thickBorder}">${vmta}</td>
+                                                <td style="padding: 12px; ${thickBorder}">${postmasterHtml}</td>
                                                 <td style="padding: 12px; text-align: center; ${thickBorder}">
                                                     <span style="color: ${ptrData.status === 'OK' ? 'var(--success)' : (ptrData.status === '---' ? 'var(--text-secondary)' : 'var(--error)')}; font-weight: 700; font-size: 0.7rem;">
                                                         ${ptrData.status}
@@ -3107,7 +3179,7 @@ function renderSpamhaus(app, container) {
                                         `;
                                     }).join('');
                                 }).join('')}
-                                ${servers.length === 0 ? '<tr><td colspan="5" style="padding: 40px; text-align: center; color: var(--text-secondary);">No servers found.</td></tr>' : ''}
+                                ${servers.length === 0 ? '<tr><td colspan="6" style="padding: 40px; text-align: center; color: var(--text-secondary);">No servers found.</td></tr>' : ''}
                             </tbody>
                         </table>
                     </div>
@@ -3693,6 +3765,40 @@ window.triggerVMTACheck = async (btn) => {
     } catch (err) {
         console.error('VMTA Check Error:', err);
         alert('VMTA Check failed: ' + err.message);
+    } finally {
+        app.updateDashboard();
+};
+
+window.syncPostmasterHealth = async (btn) => {
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i data-lucide="refresh-cw" class="spin" style="width: 14px;"></i> Syncing...';
+    btn.disabled = true;
+    
+    const app = window.app;
+    
+    try {
+        const response = await fetch('/api/check-postmaster', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.error || errData.message || 'API request failed');
+        }
+        
+        const data = await response.json();
+        if (data.results) {
+            if (!app.state.postmasterResults) {
+                app.state.postmasterResults = {};
+            }
+            app.state.postmasterResults = { ...app.state.postmasterResults, ...data.results };
+            await app.saveState();
+        }
+        alert('Postmaster sync completed successfully!');
+    } catch (err) {
+        console.error('Postmaster Sync Error:', err);
+        alert('Postmaster sync failed: ' + err.message);
     } finally {
         app.updateDashboard();
         btn.innerHTML = originalText;

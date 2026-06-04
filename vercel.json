@@ -26,6 +26,9 @@
     },
     "api/extract-spf-info.js": {
       "maxDuration": 30
+    },
+    "api/check-postmaster.js": {
+      "maxDuration": 60
     }
   },
   "rewrites": [
