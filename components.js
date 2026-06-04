@@ -860,6 +860,82 @@ function renderOverview(app, container) {
         });
     }
 
+    // Build set of RP domains
+    const rpDomains = new Set();
+    if (rps) {
+        rps.forEach(r => {
+            if (r && r.domain) rpDomains.add(r.domain.trim().toLowerCase());
+        });
+    }
+    if (app.state.rpInventory) {
+        app.state.rpInventory.forEach(item => {
+            if (item && item.rpDomain) rpDomains.add(item.rpDomain.trim().toLowerCase());
+        });
+    }
+
+    const getMatchedRpDomain = (rpVal) => {
+        if (!rpVal || rpVal === 'n/a' || rpVal === '---') return null;
+        const clean = rpVal.trim().toLowerCase();
+        for (const rpDom of rpDomains) {
+            if (clean === rpDom || clean.endsWith('.' + rpDom)) {
+                return rpDom;
+            }
+        }
+        return null;
+    };
+
+    let rdnsRevenue = 0;
+    let rpRevenue = 0;
+    let rdnsDropsCount = 0;
+    let rpDropsCount = 0;
+
+    const rpBreakdown = {};
+    const rdnsBreakdown = {};
+
+    activeRangeDrops.forEach(d => {
+        const rev = parseFloat(d.rev) || 0;
+        const rpVal = (d.returnPath || '').trim().toLowerCase();
+        
+        if (!rpVal || rpVal === 'n/a' || rpVal === '---') {
+            rdnsRevenue += rev;
+            rdnsDropsCount++;
+            const fallbackKey = 'Unspecified / Empty';
+            if (!rdnsBreakdown[fallbackKey]) {
+                rdnsBreakdown[fallbackKey] = { name: fallbackKey, rev: 0, count: 0 };
+            }
+            rdnsBreakdown[fallbackKey].rev += rev;
+            rdnsBreakdown[fallbackKey].count++;
+            return;
+        }
+
+        const matchedRpDom = getMatchedRpDomain(rpVal);
+
+        if (matchedRpDom) {
+            rpRevenue += rev;
+            rpDropsCount++;
+            if (!rpBreakdown[matchedRpDom]) {
+                rpBreakdown[matchedRpDom] = { name: matchedRpDom, rev: 0, count: 0 };
+            }
+            rpBreakdown[matchedRpDom].rev += rev;
+            rpBreakdown[matchedRpDom].count++;
+        } else {
+            rdnsRevenue += rev;
+            rdnsDropsCount++;
+            if (!rdnsBreakdown[rpVal]) {
+                rdnsBreakdown[rpVal] = { name: rpVal, rev: 0, count: 0 };
+            }
+            rdnsBreakdown[rpVal].rev += rev;
+            rdnsBreakdown[rpVal].count++;
+        }
+    });
+
+    const totalActiveRevenue = rdnsRevenue + rpRevenue || 1;
+    const rdnsPct = (rdnsRevenue / totalActiveRevenue) * 100;
+    const rpPct = (rpRevenue / totalActiveRevenue) * 100;
+
+    const sortedRpBreakdown = Object.values(rpBreakdown).sort((a, b) => b.rev - a.rev);
+    const sortedRdnsBreakdown = Object.values(rdnsBreakdown).sort((a, b) => b.rev - a.rev);
+
     // Offer Statistics — group by offerId so same-offer drops consolidate
     const offerStatsMap = {};
     activeRangeDrops.forEach(d => {
@@ -1049,6 +1125,117 @@ function renderOverview(app, container) {
                             `;
                         }).join('')}
                         ${leaderboard.length === 0 ? '<p style="text-align: center; color: var(--text-secondary); font-size: 0.85rem;">No data yet for this period</p>' : ''}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Domain Class & RP/RDNS Revenue Breakdown -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin: 32px 0 16px;">
+                <h2 style="margin: 0; font-size: 1.25rem; font-weight: 700;">Domain & Return Path (RP) Analytics (${periodLabel})</h2>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; margin-bottom: 24px;">
+                <!-- Column 1: Domain Class Distribution -->
+                <div class="card" style="padding: 20px; display: flex; flex-direction: column; justify-content: space-between; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px;">
+                    <div>
+                        <h3 style="margin: 0 0 20px 0; font-size: 1rem; display: flex; align-items: center; gap: 10px;">
+                            <i data-lucide="pie-chart" style="width: 18px; color: var(--accent-primary);"></i>
+                            Revenue Class Share
+                        </h3>
+                        <div style="display: flex; flex-direction: column; gap: 20px; margin-bottom: 20px;">
+                            <!-- RP Share -->
+                            <div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <div style="width: 12px; height: 12px; border-radius: 4px; background: linear-gradient(135deg, var(--accent-primary) 0%, #a855f7 100%);"></div>
+                                        <span style="font-size: 0.85rem; font-weight: 600;">RP Domains (Custom)</span>
+                                    </div>
+                                    <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">$${rpRevenue.toLocaleString(undefined, {minimumFractionDigits: 2})} <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 500;">(${rpPct.toFixed(1)}%)</span></span>
+                                </div>
+                                <div style="width: 100%; height: 10px; background: var(--bg-primary); border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color); padding: 1px;">
+                                    <div style="width: ${rpPct}%; height: 100%; background: linear-gradient(90deg, var(--accent-primary) 0%, #a855f7 100%); border-radius: 4px; transition: width 0.6s ease-out;"></div>
+                                </div>
+                                <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 4px;">${rpDropsCount} drops tracked</div>
+                            </div>
+
+                            <!-- RDNS Share -->
+                            <div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <div style="width: 12px; height: 12px; border-radius: 4px; background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);"></div>
+                                        <span style="font-size: 0.85rem; font-weight: 600;">RDNS Hostnames (Server)</span>
+                                    </div>
+                                    <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">$${rdnsRevenue.toLocaleString(undefined, {minimumFractionDigits: 2})} <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 500;">(${rdnsPct.toFixed(1)}%)</span></span>
+                                </div>
+                                <div style="width: 100%; height: 10px; background: var(--bg-primary); border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color); padding: 1px;">
+                                    <div style="width: ${rdnsPct}%; height: 100%; background: linear-gradient(90deg, #06b6d4 0%, #0891b2 100%); border-radius: 4px; transition: width 0.6s ease-out;"></div>
+                                </div>
+                                <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 4px;">${rdnsDropsCount} drops tracked</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="border-top: 1px solid var(--border-color); padding-top: 14px; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4;">
+                        💡 <b>RP Domains</b> are custom domain Return Paths from your inventory. <b>RDNS Hostnames</b> are primary server hostname matches.
+                    </div>
+                </div>
+
+                <!-- Column 2: Top RP Domains Revenue -->
+                <div class="card" style="padding: 20px; max-height: 350px; overflow-y: auto; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px;">
+                    <h3 style="margin: 0 0 20px 0; font-size: 1rem; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; background: var(--bg-secondary); padding-bottom: 10px; z-index: 5;">
+                        <i data-lucide="globe" style="width: 18px; color: #a855f7;"></i>
+                        Top RP Domains
+                    </h3>
+                    <div style="display: flex; flex-direction: column; gap: 14px;">
+                        ${sortedRpBreakdown.map((r, idx) => {
+                            const maxRpRev = sortedRpBreakdown[0] ? sortedRpBreakdown[0].rev : 1;
+                            const pctOfRp = maxRpRev > 0 ? (r.rev / maxRpRev) * 100 : 0;
+                            const shareOfTotal = rpRevenue > 0 ? (r.rev / rpRevenue) * 100 : 0;
+                            return `
+                                <div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                        <span style="font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%;">${idx + 1}. ${r.name}</span>
+                                        <span style="font-size: 0.8rem; color: var(--text-secondary);">${r.count} drops • <b style="color: #a855f7;">$${r.rev.toLocaleString(undefined, {minimumFractionDigits: 2})}</b></span>
+                                    </div>
+                                    <div style="width: 100%; height: 6px; background: var(--bg-primary); border-radius: 4px; overflow: hidden; border: 1px solid var(--border-color);">
+                                        <div style="width: ${pctOfRp}%; height: 100%; background: linear-gradient(90deg, #a855f7 0%, #8b5cf6 100%); border-radius: 4px;"></div>
+                                    </div>
+                                    <div style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 3px; display: flex; justify-content: space-between;">
+                                        <span>Share of RP Revenue: ${shareOfTotal.toFixed(1)}%</span>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                        ${sortedRpBreakdown.length === 0 ? '<p style="text-align: center; color: var(--text-secondary); font-size: 0.85rem; padding: 40px 0;">No RP domain revenue in this period</p>' : ''}
+                    </div>
+                </div>
+
+                <!-- Column 3: Top RDNS Hostnames Revenue -->
+                <div class="card" style="padding: 20px; max-height: 350px; overflow-y: auto; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px;">
+                    <h3 style="margin: 0 0 20px 0; font-size: 1rem; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; background: var(--bg-secondary); padding-bottom: 10px; z-index: 5;">
+                        <i data-lucide="shield" style="width: 18px; color: #06b6d4;"></i>
+                        Top RDNS Hostnames
+                    </h3>
+                    <div style="display: flex; flex-direction: column; gap: 14px;">
+                        ${sortedRdnsBreakdown.map((r, idx) => {
+                            const maxRdnsRev = sortedRdnsBreakdown[0] ? sortedRdnsBreakdown[0].rev : 1;
+                            const pctOfRdns = maxRdnsRev > 0 ? (r.rev / maxRdnsRev) * 100 : 0;
+                            const shareOfTotal = rdnsRevenue > 0 ? (r.rev / rdnsRevenue) * 100 : 0;
+                            return `
+                                <div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                        <span style="font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%;">${idx + 1}. ${r.name}</span>
+                                        <span style="font-size: 0.8rem; color: var(--text-secondary);">${r.count} drops • <b style="color: #06b6d4;">$${r.rev.toLocaleString(undefined, {minimumFractionDigits: 2})}</b></span>
+                                    </div>
+                                    <div style="width: 100%; height: 6px; background: var(--bg-primary); border-radius: 4px; overflow: hidden; border: 1px solid var(--border-color);">
+                                        <div style="width: ${pctOfRdns}%; height: 100%; background: linear-gradient(90deg, #06b6d4 0%, #0891b2 100%); border-radius: 4px;"></div>
+                                    </div>
+                                    <div style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 3px; display: flex; justify-content: space-between;">
+                                        <span>Share of RDNS Revenue: ${shareOfTotal.toFixed(1)}%</span>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                        ${sortedRdnsBreakdown.length === 0 ? '<p style="text-align: center; color: var(--text-secondary); font-size: 0.85rem; padding: 40px 0;">No RDNS revenue in this period</p>' : ''}
                     </div>
                 </div>
             </div>
