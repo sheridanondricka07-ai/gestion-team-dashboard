@@ -29,7 +29,7 @@ async function getAccessToken() {
     const header = { alg: 'RS256', typ: 'JWT' };
     const payload = {
         iss: creds.client_email,
-        scope: 'https://www.googleapis.com/auth/postmastertools.readonly',
+        scope: 'https://www.googleapis.com/auth/postmastertools.readonly https://www.googleapis.com/auth/postmastertools.settings',
         aud: 'https://oauth2.googleapis.com/token',
         exp: exp,
         iat: iat
@@ -70,6 +70,15 @@ async function getAccessToken() {
     return data.access_token;
 }
 
+async function getFirebaseData(path) {
+    try {
+        const resp = await fetch(`${DB_URL}/${path}.json`);
+        return await resp.json();
+    } catch (e) {
+        return null;
+    }
+}
+
 async function setFirebaseData(path, data) {
     try {
         const resp = await fetch(`${DB_URL}/${path}.json`, {
@@ -83,6 +92,20 @@ async function setFirebaseData(path, data) {
     }
 }
 
+function getRootDomain(domain) {
+    if (!domain) return '';
+    const parts = domain.split('.');
+    if (parts.length <= 2) return domain;
+    
+    const lastTwo = parts.slice(-2).join('.');
+    const isMultiPartTld = lastTwo.match(/\.(com|net|org|edu|gov|co|org)\.[a-z]{2}$/i);
+    
+    if (isMultiPartTld) {
+        return parts.slice(-3).join('.');
+    }
+    return parts.slice(-2).join('.');
+}
+
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
@@ -90,86 +113,176 @@ export default async function handler(req, res) {
 
     try {
         const accessToken = await getAccessToken();
+        const action = req.body.action || 'check';
 
-        // 1. Fetch verified domains from Google Postmaster
-        const domainsResp = await fetch('https://postmastertools.googleapis.com/v1/domains', {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-
-        if (!domainsResp.ok) {
-            const errorDetails = await domainsResp.text();
-            return res.status(domainsResp.status).json({ 
-                error: 'Failed to fetch domains from Google Postmaster',
-                details: errorDetails
+        if (action === 'add') {
+            // === AUTO-ADD DOMAINS LOGIC ===
+            
+            // 1. Get current domains in Google Postmaster
+            const domainsResp = await fetch('https://postmastertools.googleapis.com/v1/domains', {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
             });
-        }
 
-        const domainsData = await domainsResp.json();
-        const verifiedDomains = (domainsData.domains || []).map(d => d.name.replace('domains/', ''));
-
-        if (verifiedDomains.length === 0) {
-            return res.status(200).json({ success: true, message: 'No verified domains found in Google Postmaster account.' });
-        }
-
-        const results = {};
-
-        // 2. Fetch traffic stats for each verified domain
-        for (const domain of verifiedDomains) {
-            try {
-                const statsResp = await fetch(`https://postmastertools.googleapis.com/v1/domains/${domain}/trafficStats`, {
-                    headers: { 'Authorization': `Bearer ${accessToken}` }
+            if (!domainsResp.ok) {
+                const errorDetails = await domainsResp.text();
+                return res.status(domainsResp.status).json({ 
+                    error: 'Failed to fetch domains from Google Postmaster',
+                    details: errorDetails
                 });
-
-                if (!statsResp.ok) continue;
-
-                const statsData = await statsResp.json();
-                const stats = statsData.trafficStats || [];
-
-                if (stats.length === 0) continue;
-
-                // Sort stats to find the latest daily record
-                stats.sort((a, b) => a.name.localeCompare(b.name));
-                const latestStat = stats[stats.length - 1];
-
-                const ipReputations = {};
-                if (latestStat.ipReputationDetails) {
-                    latestStat.ipReputationDetails.forEach(detail => {
-                        const rep = detail.ipReputation;
-                        const ips = detail.sampleIps || [];
-                        ips.forEach(ip => {
-                            const safeIp = ip.replace(/\./g, '_');
-                            ipReputations[safeIp] = rep;
-                        });
-                    });
-                }
-
-                const cleanDomainKey = domain.replace(/\./g, '_');
-                const postmasterRecord = {
-                    domain: domain,
-                    domainReputation: latestStat.domainReputation || 'REPUTATION_UNSPECIFIED',
-                    spamRate: latestStat.spamRate !== undefined ? latestStat.spamRate : null,
-                    spfSuccess: latestStat.spfSuccessRate !== undefined ? latestStat.spfSuccessRate : null,
-                    dkimSuccess: latestStat.dkimSuccessRate !== undefined ? latestStat.dkimSuccessRate : null,
-                    dmarcSuccess: latestStat.dmarcSuccessRate !== undefined ? latestStat.dmarcSuccessRate : null,
-                    ipReputations: ipReputations,
-                    timestamp: Date.now(),
-                    dateString: latestStat.name.split('/').pop() // e.g. "20260603"
-                };
-
-                results[cleanDomainKey] = postmasterRecord;
-
-                // Save to Firebase under state/postmasterResults/{cleanDomainKey}
-                await setFirebaseData(`state/postmasterResults/${cleanDomainKey}`, postmasterRecord);
-
-            } catch (err) {
-                console.error(`Error fetching stats for ${domain}:`, err.message);
             }
+
+            const domainsData = await domainsResp.json();
+            const verifiedDomains = new Set((domainsData.domains || []).map(d => d.name.replace('domains/', '').toLowerCase().trim()));
+
+            // 2. Get active domains from Firebase RTDB (from state/vmtaResults PTR records)
+            const vmtaResults = await getFirebaseData('state/vmtaResults') || {};
+            const systemDomains = new Set();
+            Object.values(vmtaResults).forEach(d => {
+                if (d.ptr && d.ptr !== '---' && !d.ptr.includes('No PTR') && !d.ptr.includes('NXDOMAIN')) {
+                    let clean = d.ptr.trim().toLowerCase();
+                    if (clean.endsWith('.')) clean = clean.slice(0, -1);
+                    
+                    systemDomains.add(clean);
+                    
+                    const root = getRootDomain(clean);
+                    if (root) systemDomains.add(root);
+                }
+            });
+
+            // 3. Find missing domains
+            const missingDomains = [];
+            for (const dom of systemDomains) {
+                if (!verifiedDomains.has(dom)) {
+                    missingDomains.push(dom);
+                }
+            }
+
+            if (missingDomains.length === 0) {
+                return res.status(200).json({ 
+                    success: true, 
+                    added: [], 
+                    message: 'All system domains are already added to Google Postmaster Tools.' 
+                });
+            }
+
+            const added = [];
+            const verificationToken = req.body.token || "google-site-verification=qo8V9cAsy9CrNm42J8V_DuUIILXgXsnj8-Wzehk7rOA";
+
+            // 4. Auto-insert each missing domain
+            for (const domain of missingDomains) {
+                try {
+                    const addResp = await fetch('https://postmastertools.googleapis.com/v1/domains', {
+                        method: 'POST',
+                        headers: { 
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ name: domain })
+                    });
+
+                    if (addResp.ok || addResp.status === 409) {
+                        added.push({
+                            domain,
+                            record: `${domain},${domain},TXT,${verificationToken}`
+                        });
+                    } else {
+                        const errText = await addResp.text();
+                        console.error(`Failed to insert domain ${domain}:`, errText);
+                    }
+                } catch (err) {
+                    console.error(`Error inserting domain ${domain}:`, err.message);
+                }
+            }
+
+            return res.status(200).json({ 
+                success: true, 
+                added,
+                verificationToken
+            });
+
+        } else {
+            // === CHECK REPUTATION LOGIC ===
+
+            // 1. Fetch verified domains from Google Postmaster
+            const domainsResp = await fetch('https://postmastertools.googleapis.com/v1/domains', {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            });
+
+            if (!domainsResp.ok) {
+                const errorDetails = await domainsResp.text();
+                return res.status(domainsResp.status).json({ 
+                    error: 'Failed to fetch domains from Google Postmaster',
+                    details: errorDetails
+                });
+            }
+
+            const domainsData = await domainsResp.json();
+            const verifiedDomains = (domainsData.domains || []).map(d => d.name.replace('domains/', ''));
+
+            if (verifiedDomains.length === 0) {
+                return res.status(200).json({ success: true, message: 'No verified domains found in Google Postmaster account.' });
+            }
+
+            const results = {};
+
+            // 2. Fetch traffic stats for each verified domain
+            for (const domain of verifiedDomains) {
+                try {
+                    const statsResp = await fetch(`https://postmastertools.googleapis.com/v1/domains/${domain}/trafficStats`, {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+
+                    if (!statsResp.ok) continue;
+
+                    const statsData = await statsResp.json();
+                    const stats = statsData.trafficStats || [];
+
+                    if (stats.length === 0) continue;
+
+                    // Sort stats to find the latest daily record
+                    stats.sort((a, b) => a.name.localeCompare(b.name));
+                    const latestStat = stats[stats.length - 1];
+
+                    const ipReputations = {};
+                    if (latestStat.ipReputationDetails) {
+                        latestStat.ipReputationDetails.forEach(detail => {
+                            const rep = detail.ipReputation;
+                            const ips = detail.sampleIps || [];
+                            ips.forEach(ip => {
+                                const safeIp = ip.replace(/\./g, '_');
+                                ipReputations[safeIp] = rep;
+                            });
+                        });
+                    }
+
+                    const cleanDomainKey = domain.replace(/\./g, '_');
+                    const postmasterRecord = {
+                        domain: domain,
+                        domainReputation: latestStat.domainReputation || 'REPUTATION_UNSPECIFIED',
+                        spamRate: latestStat.spamRate !== undefined ? latestStat.spamRate : null,
+                        spfSuccess: latestStat.spfSuccessRate !== undefined ? latestStat.spfSuccessRate : null,
+                        dkimSuccess: latestStat.dkimSuccessRate !== undefined ? latestStat.dkimSuccessRate : null,
+                        dmarcSuccess: latestStat.dmarcSuccessRate !== undefined ? latestStat.dmarcSuccessRate : null,
+                        ipReputations: ipReputations,
+                        timestamp: Date.now(),
+                        dateString: latestStat.name.split('/').pop() // e.g. "20260603"
+                    };
+
+                    results[cleanDomainKey] = postmasterRecord;
+
+                    // Save to Firebase under state/postmasterResults/{cleanDomainKey}
+                    await setFirebaseData(`state/postmasterResults/${cleanDomainKey}`, postmasterRecord);
+
+                } catch (err) {
+                    console.error(`Error fetching stats for ${domain}:`, err.message);
+                }
+            }
+
+            // Save last updated timestamp
+            await setFirebaseData('state/postmasterLastUpdate', new Date().toLocaleString());
+
+            return res.status(200).json({ success: true, results });
         }
-
-        // Save last updated timestamp
-        await setFirebaseData('state/postmasterLastUpdate', new Date().toLocaleString());
-
-        return res.status(200).json({ success: true, results });
 
     } catch (error) {
         console.error('Postmaster handler critical error:', error);

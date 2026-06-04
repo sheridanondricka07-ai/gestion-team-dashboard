@@ -22,6 +22,7 @@ window.withFocusPreservation = function(fn) {
                 } catch(e) {}
             }
         }
+    }
 };
 
 function getRootDomain(domain) {
@@ -3770,6 +3771,7 @@ window.triggerVMTACheck = async (btn) => {
         alert('VMTA Check failed: ' + err.message);
     } finally {
         app.updateDashboard();
+    }
 };
 
 window.syncPostmasterHealth = async (btn) => {
@@ -3819,10 +3821,10 @@ window.autoAddPostmasterDomains = async (btn) => {
     btn.disabled = true;
 
     try {
-        const response = await fetch('/api/add-postmaster-domains', {
+        const response = await fetch('/api/check-postmaster', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: tokenInput })
+            body: JSON.stringify({ action: 'add', token: tokenInput })
         });
 
         if (!response.ok) {

@@ -29,9 +29,6 @@
     },
     "api/check-postmaster.js": {
       "maxDuration": 60
-    },
-    "api/add-postmaster-domains.js": {
-      "maxDuration": 60
     }
   },
   "rewrites": [
