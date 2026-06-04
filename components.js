@@ -5860,7 +5860,7 @@ window.showWarmupIntelligenceModal = () => {
         }
     });
 
-    overlay.innerHTML = \`
+    overlay.innerHTML = `
         <div class="card" style="width:600px; max-width:90%; padding:24px; position:relative; background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:12px; box-shadow:0 10px 25px rgba(0,0,0,0.5);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                 <div style="display:flex; align-items:center; gap:12px;">
@@ -5869,7 +5869,7 @@ window.showWarmupIntelligenceModal = () => {
                     </div>
                     <div>
                         <h3 style="margin:0; font-size:1.2rem; font-weight:700;">AI Warmup Strategy</h3>
-                        <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">Learned from \${intel.learnedDomains} successful domains in your history.</div>
+                        <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">Learned from ${intel.learnedDomains} successful domains in your history.</div>
                     </div>
                 </div>
                 <span onclick="document.getElementById('warmup-intelligence-overlay').remove()" style="cursor:pointer; color:var(--text-secondary);" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--text-secondary)'">
@@ -5882,7 +5882,7 @@ window.showWarmupIntelligenceModal = () => {
             </p>
             
             <div style="border:1px solid var(--border-color); border-radius:8px; overflow:hidden;">
-                \${rowsHtml}
+                ${rowsHtml}
             </div>
             
             <div style="margin-top:20px; padding:12px; background:rgba(59, 130, 246, 0.1); border-radius:8px; border:1px solid rgba(59, 130, 246, 0.2); display:flex; gap:12px;">
@@ -5892,7 +5892,7 @@ window.showWarmupIntelligenceModal = () => {
                 </div>
             </div>
         </div>
-    \`;
+    `;
     
     document.body.appendChild(overlay);
     if (window.lucide) window.lucide.createIcons();
