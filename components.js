@@ -356,6 +356,9 @@ function renderServerInventory(app, container) {
                         <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Manage administrative details and cancellation schedules.</p>
                     </div>
                     <div style="display: flex; gap: 8px;">
+                        <button onclick="showChangeDomainModal()" style="padding: 8px 16px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color);">
+                            <i data-lucide="globe" style="width: 14px;"></i> Change Domain
+                        </button>
                         <button onclick="showBulkDeclareCancelModal()" style="padding: 8px 16px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px; width: auto; background: var(--bg-tertiary); border: 1px solid #ef444455; color: #f87171;">
                             <i data-lucide="trash-2" style="width: 14px;"></i> Bulk Declare Cancel
                         </button>
@@ -610,6 +613,153 @@ window.importInventoryData = async (btn) => {
         btn.innerText = 'Import & Apply to Inventory';
         btn.disabled = false;
         alert('No matching server names found. Please check your data.');
+    }
+};
+
+window.showChangeDomainModal = () => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'change-domain-modal-overlay';
+    
+    const history = window.app.state.domainChangeHistory || [];
+    const sortedHistory = [...history].sort((a, b) => b.timestamp - a.timestamp);
+    
+    overlay.innerHTML = `
+        <div class="modal" style="width: 800px; max-height: 85vh; display: flex; flex-direction: column;">
+            <h2 style="margin-bottom: 8px;">Change Domain & Update IP Statuses</h2>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 16px;">
+                Paste your domain mappings. Syntax: <code>IP;domain</code> (one per line).<br>
+                This will update the local RDNS mapping, set today's status to <b>Change DOM</b>, and log the change history.
+            </p>
+            
+            <textarea id="change-domain-data" placeholder="67.205.121.53;oakvaleon.cam&#10;67.205.121.54;wivbillugeha.space" 
+                style="width: 100%; height: 160px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; padding: 12px; font-family: monospace; font-size: 0.75rem; margin-bottom: 16px;"></textarea>
+
+            <div style="display: flex; gap: 12px; margin-bottom: 24px;">
+                <button onclick="applyChangeDomain(this)" style="flex: 2; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <i data-lucide="play" style="width: 16px;"></i> Apply Domain Changes
+                </button>
+                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary); color: var(--text-primary);">Cancel</button>
+            </div>
+
+            <div style="border-top: 1px solid var(--border-color); padding-top: 16px; display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+                <h3 style="margin: 0 0 12px; font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+                    <i data-lucide="history" style="width: 18px; color: var(--accent-primary);"></i> Domain Change History (${history.length})
+                </h3>
+                <div style="flex: 1; overflow-y: auto; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-color);">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
+                        <thead>
+                            <tr style="background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border-color);">
+                                <th style="padding: 10px 12px; color: var(--text-secondary);">Date/Time</th>
+                                <th style="padding: 10px 12px; color: var(--text-secondary);">IP Address</th>
+                                <th style="padding: 10px 12px; color: var(--text-secondary);">Old Domain (RDNS)</th>
+                                <th style="padding: 10px 12px; color: var(--text-secondary);">New Domain (RDNS)</th>
+                                <th style="padding: 10px 12px; color: var(--text-secondary);">Operator</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${sortedHistory.length === 0 ? `
+                                <tr>
+                                    <td colspan="5" style="padding: 30px; text-align: center; color: var(--text-secondary);">No domain changes logged yet.</td>
+                                </tr>
+                            ` : sortedHistory.map(h => `
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.02);">
+                                    <td style="padding: 10px 12px; color: var(--text-secondary);">${new Date(h.timestamp).toLocaleString()}</td>
+                                    <td style="padding: 10px 12px; font-family: monospace; font-weight: 600; color: var(--text-primary);">${h.ip}</td>
+                                    <td style="padding: 10px 12px; font-family: monospace; color: #f87171;">${h.oldDomain || '---'}</td>
+                                    <td style="padding: 10px 12px; font-family: monospace; color: #4ade80;">${h.newDomain || '---'}</td>
+                                    <td style="padding: 10px 12px; font-weight: 500;">${h.operator || 'Unknown'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    if (window.lucide) window.lucide.createIcons();
+};
+
+window.applyChangeDomain = async (btn) => {
+    const text = document.getElementById('change-domain-data').value;
+    if (!text.trim()) return;
+
+    btn.innerText = 'Applying changes...';
+    btn.disabled = true;
+
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l !== '');
+    const today = new Date().toISOString().split('T')[0];
+    const history = window.app.state.domainChangeHistory || [];
+    const operator = window.app.state.currentUser ? window.app.state.currentUser.name : 'Unknown';
+
+    let updateCount = 0;
+    
+    // Make sure we have vmtaResults mapping
+    if (!window.app.state.vmtaResults) window.app.state.vmtaResults = {};
+    if (!window.app.state.statuses) window.app.state.statuses = {};
+
+    for (const line of lines) {
+        if (!line.includes(';')) continue;
+        const [ipRaw, domainRaw] = line.split(';');
+        const ip = ipRaw.trim();
+        const newDomain = domainRaw.trim();
+        if (!ip || !newDomain) continue;
+
+        const safeIp = ip.replace(/\./g, '_');
+        const oldDomain = getRdns(ip, window.app.state) || '---';
+
+        if (oldDomain !== newDomain) {
+            // 1. Update vmtaResults
+            if (!window.app.state.vmtaResults[safeIp]) {
+                window.app.state.vmtaResults[safeIp] = {};
+            }
+            window.app.state.vmtaResults[safeIp].ptr = newDomain;
+
+            // 2. Update server vmtaMap if this IP belongs to a server
+            if (window.app.state.servers) {
+                window.app.state.servers.forEach(srv => {
+                    if (srv.vmtaMap && srv.vmtaMap[safeIp] !== undefined) {
+                        srv.vmtaMap[safeIp] = newDomain;
+                    } else if (srv.mainIp === ip || (srv.allIps && srv.allIps.includes(ip))) {
+                        if (!srv.vmtaMap) srv.vmtaMap = {};
+                        srv.vmtaMap[safeIp] = newDomain;
+                    }
+                });
+            }
+
+            // 3. Set status to 'change_dom'
+            if (!window.app.state.statuses[safeIp]) {
+                window.app.state.statuses[safeIp] = {};
+            }
+            window.app.state.statuses[safeIp][today] = 'change_dom';
+
+            // 4. Log change history
+            history.push({
+                ip,
+                oldDomain,
+                newDomain,
+                timestamp: Date.now(),
+                operator
+            });
+
+            updateCount++;
+        }
+    }
+
+    if (updateCount > 0) {
+        window.app.state.domainChangeHistory = history;
+        await window.app.saveState();
+        window.app.updateDashboard();
+        
+        // Refresh the modal to show the updated history list
+        document.getElementById('change-domain-modal-overlay').remove();
+        window.showChangeDomainModal();
+        alert(`Successfully changed domain for ${updateCount} IPs! Statuses updated to Change DOM.`);
+    } else {
+        btn.innerText = 'Apply Domain Changes';
+        btn.disabled = false;
+        alert('No domain changes were detected. Check if domain values are different from current ones.');
     }
 };
 
