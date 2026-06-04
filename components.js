@@ -390,6 +390,13 @@ function renderServerInventory(app, container) {
             </div>
         </div>
     `;
+    const domainSearchInput = document.getElementById('domain-history-search');
+    if (domainSearchInput) {
+        domainSearchInput.focus();
+        const val = domainSearchInput.value;
+        domainSearchInput.value = '';
+        domainSearchInput.value = val;
+    }
     if (window.lucide) window.lucide.createIcons();
 }
 
@@ -627,6 +634,7 @@ function renderDomainChangeHistoryTable(app) {
     const history = app.state.domainChangeHistory || [];
     const sortedHistory = [...history].sort((a, b) => b.timestamp - a.timestamp);
     const viewMode = window._domainHistoryViewMode || 'grouped';
+    const query = (window._domainHistorySearch || '').toLowerCase().trim();
 
     let content = '';
 
@@ -641,13 +649,34 @@ function renderDomainChangeHistoryTable(app) {
         });
 
         // For each IP, sort history by timestamp descending
-        const ipList = Object.keys(ipHistoryMap).map(ip => {
+        let ipList = Object.keys(ipHistoryMap).map(ip => {
             const changes = [...ipHistoryMap[ip]].sort((a, b) => b.timestamp - a.timestamp);
             return {
                 ip,
                 changes
             };
         }).sort((a, b) => b.changes[0].timestamp - a.changes[0].timestamp); // Sort IPs by most recent change
+
+        // Apply search filter if query is present
+        if (query) {
+            ipList = ipList.filter(item => {
+                const currentDomain = getRdns(item.ip, app.state) || '---';
+                const ipMatches = item.ip.toLowerCase().includes(query);
+                const currentDomainMatches = currentDomain.toLowerCase().includes(query);
+                
+                const server = app.state.servers && app.state.servers.find(s => s.allIps && s.allIps.includes(item.ip));
+                const serverName = server ? server.name.toLowerCase() : '';
+                const serverMatches = serverName.includes(query);
+
+                const timelineMatches = item.changes.some(c => 
+                    (c.oldDomain || '').toLowerCase().includes(query) || 
+                    (c.newDomain || '').toLowerCase().includes(query) ||
+                    (c.operator || '').toLowerCase().includes(query)
+                );
+
+                return ipMatches || currentDomainMatches || serverMatches || timelineMatches;
+            });
+        }
 
         content = `
             <table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.75rem;">
@@ -661,7 +690,7 @@ function renderDomainChangeHistoryTable(app) {
                 <tbody>
                     ${ipList.length === 0 ? `
                         <tr>
-                            <td colspan="3" style="padding: 60px; text-align: center; color: var(--text-secondary); font-size: 0.8rem;">No domain changes logged yet. Click "Change Domain" above to start.</td>
+                            <td colspan="3" style="padding: 60px; text-align: center; color: var(--text-secondary); font-size: 0.8rem;">No matching history entries found.</td>
                         </tr>
                     ` : ipList.map((item, idx) => {
                         const currentDomain = getRdns(item.ip, app.state) || '---';
@@ -701,6 +730,23 @@ function renderDomainChangeHistoryTable(app) {
             </table>
         `;
     } else {
+        let displayedHistory = sortedHistory;
+        if (query) {
+            displayedHistory = sortedHistory.filter(h => {
+                const ipMatches = h.ip.toLowerCase().includes(query);
+                
+                const server = app.state.servers && app.state.servers.find(s => s.allIps && s.allIps.includes(h.ip));
+                const serverName = server ? server.name.toLowerCase() : '';
+                const serverMatches = serverName.includes(query);
+
+                const oldDomainMatches = (h.oldDomain || '').toLowerCase().includes(query);
+                const newDomainMatches = (h.newDomain || '').toLowerCase().includes(query);
+                const operatorMatches = (h.operator || '').toLowerCase().includes(query);
+
+                return ipMatches || serverMatches || oldDomainMatches || newDomainMatches || operatorMatches;
+            });
+        }
+
         content = `
             <table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.75rem;">
                 <thead>
@@ -713,11 +759,11 @@ function renderDomainChangeHistoryTable(app) {
                     </tr>
                 </thead>
                 <tbody>
-                    ${sortedHistory.length === 0 ? `
+                    ${displayedHistory.length === 0 ? `
                         <tr>
-                            <td colspan="5" style="padding: 60px; text-align: center; color: var(--text-secondary); font-size: 0.8rem;">No domain changes logged yet. Click "Change Domain" above to start.</td>
+                            <td colspan="5" style="padding: 60px; text-align: center; color: var(--text-secondary); font-size: 0.8rem;">No matching history entries found.</td>
                         </tr>
-                    ` : sortedHistory.map((h, idx) => `
+                    ` : displayedHistory.map((h, idx) => `
                         <tr style="background: ${idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent'}; border-bottom: 1px solid var(--border-color);">
                             <td style="padding: 14px 12px; color: var(--text-secondary);">${new Date(h.timestamp).toLocaleString()}</td>
                             <td style="padding: 14px 12px; font-family: monospace; font-weight: 700; color: var(--text-primary);">${h.ip}</td>
@@ -732,9 +778,17 @@ function renderDomainChangeHistoryTable(app) {
     }
 
     return `
-        <div style="padding: 12px 20px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-size: 0.8rem; color: var(--text-secondary);">
-                ${viewMode === 'grouped' ? 'Grouped by IP (shows up to last 6 domain changes per IP with their change dates)' : 'Flat list of all domain changes'}
+        <div style="padding: 12px 20px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 16px; flex: 1; min-width: 300px;">
+                <div style="position: relative; width: 300px;">
+                    <i data-lucide="search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; color: var(--text-secondary);"></i>
+                    <input type="text" id="domain-history-search" placeholder="Search by IP, Server, or Domain..." value="${window._domainHistorySearch || ''}" 
+                           oninput="window._domainHistorySearch = this.value; window.app.updateDashboard();"
+                           style="width: 100%; padding: 8px 12px 8px 32px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.8rem; color: var(--text-primary); outline: none;">
+                </div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                    ${viewMode === 'grouped' ? 'Grouped by IP (shows up to last 6 domain changes per IP with their change dates)' : 'Flat list of all domain changes'}
+                </div>
             </div>
             <div style="display: flex; gap: 8px; background: var(--bg-tertiary); padding: 4px; border-radius: 8px; border: 1px solid var(--border-color);">
                 <button onclick="window._domainHistoryViewMode = 'grouped'; window.app.updateDashboard();" 
