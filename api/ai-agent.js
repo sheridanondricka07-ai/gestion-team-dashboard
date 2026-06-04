@@ -46,6 +46,7 @@ export default async function handler(req, res) {
         const vmtaResults = await getFirebaseData('state/vmtaResults') || {};
         const rpInventory = await getFirebaseData('state/rpInventory') || [];
         const ipDeliveryStatuses = await getFirebaseData('state/ipDeliveryStatuses') || {};
+        const warmupData = await getFirebaseData('state/warmupData') || {};
 
         // 3. Calculate exact inventory counts & stats in code to avoid LLM counting hallucinations
         let totalServers = 0;
@@ -243,9 +244,161 @@ export default async function handler(req, res) {
             .map(([status, count]) => `- ${status.toUpperCase()}: ${count} IPs`)
             .join('\n');
 
+        // Process Warmup data
+        const getRdns = (ip) => {
+            if (!ip) return '';
+            const safeIp = ip.replace(/\./g, '_');
+            if (vmtaResults[safeIp] && vmtaResults[safeIp].ptr) {
+                return vmtaResults[safeIp].ptr;
+            }
+            if (servers) {
+                for (const s of servers) {
+                    if (s && s.vmtaMap) {
+                        const sKey = Object.keys(s.vmtaMap).find(k => k === safeIp);
+                        if (sKey) return s.vmtaMap[sKey];
+                    }
+                }
+            }
+            return '';
+        };
+
+        const rawWarmupRecords = Object.values(warmupData);
+        rawWarmupRecords.sort((a, b) => b.timestamp - a.timestamp);
+
+        const warmupGrouped = {};
+        rawWarmupRecords.forEach(r => {
+            const resolvedDomain = r.domain || getRdns(r.ip) || 'Unknown';
+            const key = `${resolvedDomain}::${r.server}`;
+            if (!warmupGrouped[key]) {
+                warmupGrouped[key] = {
+                    domain: resolvedDomain,
+                    server: r.server,
+                    ip: r.ip,
+                    records: []
+                };
+            }
+            warmupGrouped[key].records.push(r);
+        });
+
+        const warmupGroups = Object.values(warmupGrouped);
+
+        const sentDomains = new Set();
+        const sentIps = new Set();
+        rpInventory.forEach(item => {
+            if (item.alreadySent || item.srv === 'SENT') {
+                if (item.rpDomain) sentDomains.add(item.rpDomain.trim().toLowerCase());
+                if (item.rpIp) sentIps.add(item.rpIp.trim());
+            }
+        });
+
+        const activeWarmupGroups = [];
+        const archivedWarmupGroups = [];
+        const inactiveWarmupGroups = [];
+        const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
+
+        warmupGroups.forEach(g => {
+            g.records.sort((a, b) => b.timestamp - a.timestamp);
+            const latestTimestamp = g.records[0] ? g.records[0].timestamp : 0;
+            const d = g.domain ? g.domain.trim().toLowerCase() : '';
+            const ipVal = g.ip ? g.ip.trim() : '';
+
+            const isArchived = sentDomains.has(d) || sentIps.has(ipVal);
+            const isInactive = !isArchived && (latestTimestamp < twentyFourHoursAgo);
+
+            if (isArchived) archivedWarmupGroups.push(g);
+            else if (isInactive) inactiveWarmupGroups.push(g);
+            else activeWarmupGroups.push(g);
+        });
+
+        const milestones = [100, 300, 500, 1000, 2000, 5000, 10000, 15000, 20000, 25000, 30000];
+        const milestoneTotals = {};
+        milestones.forEach(m => milestoneTotals[m] = []);
+        let learnedDomains = 0;
+
+        const domainGroups = {};
+        rawWarmupRecords.forEach(r => {
+            if (!r.domain) return;
+            if (!domainGroups[r.domain]) domainGroups[r.domain] = [];
+            domainGroups[r.domain].push(r);
+        });
+
+        Object.values(domainGroups).forEach(records => {
+            records.sort((a, b) => a.timestamp - b.timestamp);
+            if (records[0].outVal >= 500) return;
+
+            let cumulative = 0;
+            const reached = new Set();
+            let contributed = false;
+
+            records.forEach(r => {
+                const out = r.outVal;
+                milestones.forEach(m => {
+                    if (out >= m && !reached.has(m)) {
+                        reached.add(m);
+                        milestoneTotals[m].push(cumulative);
+                        contributed = true;
+                    }
+                });
+                cumulative += out;
+            });
+            if (contributed) learnedDomains++;
+        });
+
+        const warmupAverages = {};
+        milestones.forEach(m => {
+            if (milestoneTotals[m].length > 0) {
+                const sum = milestoneTotals[m].reduce((a, b) => a + b, 0);
+                warmupAverages[m] = Math.round(sum / milestoneTotals[m].length);
+            } else {
+                warmupAverages[m] = null;
+            }
+        });
+
+        const getWarmupRecommendation = (totalSent) => {
+            let nextMilestone = null;
+            let needed = 0;
+            for (const m of milestones) {
+                if (warmupAverages[m] !== null && totalSent < warmupAverages[m]) {
+                    nextMilestone = m;
+                    needed = warmupAverages[m] - totalSent;
+                    break;
+                }
+            }
+            if (nextMilestone) {
+                return `Next: ${nextMilestone} emails/Drop (Needs ${needed.toLocaleString()} total sent)`;
+            } else {
+                return `Target: 30k+ emails/Drop (Scale freely)`;
+            }
+        };
+
+        const formatWarmupGroup = (g, statusLabel) => {
+            const records = g.records;
+            const totalOutAllTime = records.reduce((sum, r) => sum + (r.outVal || 0), 0);
+            const latest = records[0];
+            const first = records[records.length - 1];
+            
+            const durationDays = first ? Math.max(1, Math.ceil((latest.timestamp - first.timestamp) / (24 * 60 * 60 * 1000))) : 0;
+            const startDate = first ? new Date(first.timestamp).toLocaleDateString() : 'N/A';
+            const dropsCount = records.length;
+            const lastOut = latest ? latest.outVal : 0;
+            const user = latest ? latest.user : 'Unknown';
+            const rec = getWarmupRecommendation(totalOutAllTime);
+
+            return `- Domain/IP: ${g.domain}, Server: ${g.server}, IP: ${g.ip || 'N/A'}, Status: ${statusLabel}, Warmup Start Date: ${startDate}, Warmup Duration: ${durationDays} days, Warmup Drops Count: ${dropsCount}, Total Sent: ${totalOutAllTime.toLocaleString()}, Last Drop Size: ${lastOut.toLocaleString()} emails, Operator: ${user}, Recommendation: ${rec}`;
+        };
+
+        const activeWarmupSummary = activeWarmupGroups.map(g => formatWarmupGroup(g, 'Active')).join('\n');
+        const inactiveWarmupSummary = inactiveWarmupGroups.map(g => formatWarmupGroup(g, 'Inactive')).join('\n');
+        const archivedWarmupSummary = archivedWarmupGroups.map(g => formatWarmupGroup(g, 'Archived (Sent)')).join('\n');
+
+        const milestoneAveragesStr = milestones.map(m => {
+            const avg = warmupAverages[m];
+            return `- Reach ${m} emails/Drop: ${avg !== null ? `${avg.toLocaleString()} total sent` : 'No data yet'}`;
+        }).join('\n');
+
         // Construct System Instruction
         const systemPrompt = `You are "Gestion Team AI Agent", an intelligent assistant integrated into the Team Emailing Infrastructure Dashboard.
-Your job is to analyze real-time infrastructure, server blacklists (Spamhaus), VMTA/PTR status, drop revenue performance, RP (Return Path) inventory, and IP delivery statuses to answer questions, extract data, and generate insights.
+Your job is to analyze real-time infrastructure, server blacklists (Spamhaus), VMTA/PTR status, drop revenue performance, RP (Return Path) inventory, IP delivery statuses, and domain/IP warmup progress to answer questions, extract data, and generate insights.
 
 SUMMARY STATISTICS (EXACT PRE-COMPUTED COUNTS — USE THESE, DO NOT RECOUNT):
 ------------------
@@ -263,6 +416,26 @@ SUMMARY STATISTICS (EXACT PRE-COMPUTED COUNTS — USE THESE, DO NOT RECOUNT):
 - Total RP Not Sent: ${totalRPNotSent}
 - Total RP SPF OK: ${totalRPSpfOk}
 - Total RP SPF Failing: ${totalRPSpfFail}
+- Total Active Warmup Groups: ${activeWarmupGroups.length}
+- Total Inactive Warmup Groups: ${inactiveWarmupGroups.length}
+- Total Archived Warmup Groups: ${archivedWarmupGroups.length}
+
+DOMAIN WARMUP INTELLIGENCE (LEARNED STRATEGY / SCHEMA):
+------------------
+Learned from ${learnedDomains} domains. Cumulative sent targets needed to scale drops safely:
+${milestoneAveragesStr || 'No learned milestone data yet.'}
+
+ACTIVE DOMAIN WARMUP GROUPS:
+------------------
+${activeWarmupSummary || 'No active warmup groups.'}
+
+INACTIVE DOMAIN WARMUP GROUPS:
+------------------
+${inactiveWarmupSummary || 'No inactive warmup groups.'}
+
+ARCHIVED DOMAIN WARMUP GROUPS:
+------------------
+${archivedWarmupSummary || 'No archived warmup groups.'}
 
 RP SPF TYPE BREAKDOWN (PRE-COMPUTED — USE THESE EXACT NUMBERS):
 ------------------
@@ -332,7 +505,8 @@ GUIDELINES:
        (Example: test.com,,TXT,Arecords:1.2.3.4;5.6.7.8)
     i. Present the generated records inside a copyable code block using HTML tags: <pre><code>[records]</code></pre>
     j. CRITICAL: Each line in the code block must start exactly with the domainIncluded. Do NOT prepend or prefix any server IPs, server names, or any other metadata to the record lines. Do not use brackets, quotes, or placeholders.
-    k. Include limits/warnings in your response if applicable: if record type is Arecord and the number of IPs > 49, warn the user. If record type is Include and the number of IPs > 99, warn the user.`;
+    k. Include limits/warnings in your response if applicable: if record type is Arecord and the number of IPs > 49, warn the user. If record type is Include and the number of IPs > 99, warn the user.
+11. If the user asks about domain warmup progress, start date, duration of warmup, drops count, total sent, last drop size, or warmup strategy/recommendations, refer directly to the ACTIVE DOMAIN WARMUP GROUPS, INACTIVE DOMAIN WARMUP GROUPS, ARCHIVED DOMAIN WARMUP GROUPS, and DOMAIN WARMUP INTELLIGENCE sections above. Respond with details about start date, duration in days, and recommendations computed from historical data.`;
 
         let responseText = '';
 
