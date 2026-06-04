@@ -626,34 +626,128 @@ window.importInventoryData = async (btn) => {
 function renderDomainChangeHistoryTable(app) {
     const history = app.state.domainChangeHistory || [];
     const sortedHistory = [...history].sort((a, b) => b.timestamp - a.timestamp);
+    const viewMode = window._domainHistoryViewMode || 'grouped';
+
+    let content = '';
+
+    if (viewMode === 'grouped') {
+        // Group history entries by IP
+        const ipHistoryMap = {};
+        history.forEach(h => {
+            if (!ipHistoryMap[h.ip]) {
+                ipHistoryMap[h.ip] = [];
+            }
+            ipHistoryMap[h.ip].push(h);
+        });
+
+        // For each IP, sort history by timestamp descending
+        const ipList = Object.keys(ipHistoryMap).map(ip => {
+            const changes = [...ipHistoryMap[ip]].sort((a, b) => b.timestamp - a.timestamp);
+            return {
+                ip,
+                changes
+            };
+        }).sort((a, b) => b.changes[0].timestamp - a.changes[0].timestamp); // Sort IPs by most recent change
+
+        content = `
+            <table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.75rem;">
+                <thead>
+                    <tr style="text-align: left; background: var(--bg-tertiary);">
+                        <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); width: 180px;">IP Address</th>
+                        <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); width: 220px;">Current Domain (RDNS)</th>
+                        <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Domain History Timeline (Up to 6 Changes & Change Dates)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${ipList.length === 0 ? `
+                        <tr>
+                            <td colspan="3" style="padding: 60px; text-align: center; color: var(--text-secondary); font-size: 0.8rem;">No domain changes logged yet. Click "Change Domain" above to start.</td>
+                        </tr>
+                    ` : ipList.map((item, idx) => {
+                        const currentDomain = getRdns(item.ip, app.state) || '---';
+                        // Keep last 6 changes
+                        const displayedChanges = item.changes.slice(0, 6);
+                        
+                        return `
+                            <tr style="background: ${idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent'}; border-bottom: 1px solid var(--border-color); vertical-align: top;">
+                                <td style="padding: 16px 12px; font-family: monospace; font-weight: 700; color: var(--text-primary); border-right: 1px solid var(--border-color);">${item.ip}</td>
+                                <td style="padding: 16px 12px; font-family: monospace; color: #4ade80; border-right: 1px solid var(--border-color);">${currentDomain}</td>
+                                <td style="padding: 16px 12px;">
+                                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                                        ${displayedChanges.map((c, cIdx) => `
+                                            <div style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-tertiary); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.7rem;">
+                                                <div style="display: flex; align-items: center; gap: 8px;">
+                                                    <span style="background: rgba(239, 68, 68, 0.1); color: #f87171; padding: 2px 6px; border-radius: 4px; font-family: monospace;">${c.oldDomain || '---'}</span>
+                                                    <span style="color: var(--text-secondary); font-size: 0.65rem;">&rarr;</span>
+                                                    <span style="background: rgba(74, 222, 128, 0.1); color: #4ade80; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-weight: 600;">${c.newDomain}</span>
+                                                </div>
+                                                <div style="color: var(--text-secondary); font-size: 0.65rem; display: flex; gap: 12px; align-items: center;">
+                                                    <span style="display: flex; align-items: center; gap: 4px;">
+                                                        <i data-lucide="calendar" style="width: 12px; color: var(--accent-primary);"></i>
+                                                        ${new Date(c.timestamp).toLocaleString()}
+                                                    </span>
+                                                    <span style="background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; color: var(--text-primary); font-weight: 500;">
+                                                        <i data-lucide="user" style="width: 10px; display: inline; margin-right: 2px;"></i>${c.operator || 'Unknown'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        `;
+    } else {
+        content = `
+            <table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.75rem;">
+                <thead>
+                    <tr style="text-align: left; background: var(--bg-tertiary);">
+                        <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); width: 180px;">Date/Time</th>
+                        <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); width: 150px;">IP Address</th>
+                        <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Old Domain (RDNS)</th>
+                        <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">New Domain (RDNS)</th>
+                        <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); width: 150px;">Operator</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${sortedHistory.length === 0 ? `
+                        <tr>
+                            <td colspan="5" style="padding: 60px; text-align: center; color: var(--text-secondary); font-size: 0.8rem;">No domain changes logged yet. Click "Change Domain" above to start.</td>
+                        </tr>
+                    ` : sortedHistory.map((h, idx) => `
+                        <tr style="background: ${idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent'}; border-bottom: 1px solid var(--border-color);">
+                            <td style="padding: 14px 12px; color: var(--text-secondary);">${new Date(h.timestamp).toLocaleString()}</td>
+                            <td style="padding: 14px 12px; font-family: monospace; font-weight: 700; color: var(--text-primary);">${h.ip}</td>
+                            <td style="padding: 14px 12px; font-family: monospace; color: #f87171;">${h.oldDomain || '---'}</td>
+                            <td style="padding: 14px 12px; font-family: monospace; color: #4ade80;">${h.newDomain || '---'}</td>
+                            <td style="padding: 14px 12px; font-weight: 500; color: var(--text-secondary);">${h.operator || 'Unknown'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
 
     return `
-        <table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.75rem;">
-            <thead>
-                <tr style="text-align: left; background: var(--bg-tertiary);">
-                    <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); width: 180px;">Date/Time</th>
-                    <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); width: 150px;">IP Address</th>
-                    <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Old Domain (RDNS)</th>
-                    <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">New Domain (RDNS)</th>
-                    <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); width: 150px;">Operator</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${sortedHistory.length === 0 ? `
-                    <tr>
-                        <td colspan="5" style="padding: 60px; text-align: center; color: var(--text-secondary); font-size: 0.8rem;">No domain changes logged yet. Click "Change Domain" above to start.</td>
-                    </tr>
-                ` : sortedHistory.map((h, idx) => `
-                    <tr style="background: ${idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent'}; border-bottom: 1px solid var(--border-color);">
-                        <td style="padding: 14px 12px; color: var(--text-secondary);">${new Date(h.timestamp).toLocaleString()}</td>
-                        <td style="padding: 14px 12px; font-family: monospace; font-weight: 700; color: var(--text-primary);">${h.ip}</td>
-                        <td style="padding: 14px 12px; font-family: monospace; color: #f87171;">${h.oldDomain || '---'}</td>
-                        <td style="padding: 14px 12px; font-family: monospace; color: #4ade80;">${h.newDomain || '---'}</td>
-                        <td style="padding: 14px 12px; font-weight: 500; color: var(--text-secondary);">${h.operator || 'Unknown'}</td>
-                    </tr>
-                `).join('')}
-            </tbody>
-        </table>
+        <div style="padding: 12px 20px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                ${viewMode === 'grouped' ? 'Grouped by IP (shows up to last 6 domain changes per IP with their change dates)' : 'Flat list of all domain changes'}
+            </div>
+            <div style="display: flex; gap: 8px; background: var(--bg-tertiary); padding: 4px; border-radius: 8px; border: 1px solid var(--border-color);">
+                <button onclick="window._domainHistoryViewMode = 'grouped'; window.app.updateDashboard();" 
+                    style="padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; border: none; background: ${viewMode === 'grouped' ? 'var(--accent-primary)' : 'transparent'}; color: ${viewMode === 'grouped' ? '#fff' : 'var(--text-secondary)'}; cursor: pointer; transition: all 0.2s;">
+                    Grouped by IP
+                </button>
+                <button onclick="window._domainHistoryViewMode = 'flat'; window.app.updateDashboard();" 
+                    style="padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; border: none; background: ${viewMode === 'flat' ? 'var(--accent-primary)' : 'transparent'}; color: ${viewMode === 'flat' ? '#fff' : 'var(--text-secondary)'}; cursor: pointer; transition: all 0.2s;">
+                    Flat Log
+                </button>
+            </div>
+        </div>
+        ${content}
     `;
 }
 
@@ -746,6 +840,21 @@ window.applyChangeDomain = async (btn) => {
                 timestamp: Date.now(),
                 operator
             });
+
+            // 5. Update local IP history (up to 6)
+            if (!window.app.state.vmtaResults[safeIp].history) {
+                window.app.state.vmtaResults[safeIp].history = [];
+            }
+            const ipHistory = window.app.state.vmtaResults[safeIp].history;
+            if (!ipHistory.length || ipHistory[ipHistory.length - 1].domain !== oldDomain) {
+                ipHistory.push({
+                    domain: oldDomain,
+                    date: new Date().toLocaleString()
+                });
+                if (ipHistory.length > 6) {
+                    ipHistory.shift();
+                }
+            }
 
             updateCount++;
         }
@@ -2922,7 +3031,18 @@ function renderSpamhaus(app, container) {
                                                     </td>
                                                 ` : ''}
                                                 <td style="padding: 12px; font-family: monospace; border-right: 1px solid var(--border-color); ${thickBorder}">${ip}</td>
-                                                <td style="padding: 12px; font-family: monospace; color: var(--text-secondary); ${thickBorder}">${ptrData.ptr}</td>
+                                                <td style="padding: 12px; font-family: monospace; color: var(--text-secondary); ${thickBorder}">
+                                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                                                        <span>${ptrData.ptr}</span>
+                                                        ${ptrData.history && ptrData.history.length > 0 ? `
+                                                            <span class="history-badge" 
+                                                                  style="cursor: help; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); color: var(--accent-primary); font-size: 0.6rem; padding: 2px 6px; border-radius: 4px;"
+                                                                  title="Previous Domains:&#10;${ptrData.history.map(h => `• ${h.domain} (${h.date})`).join('&#10;')}">
+                                                                History (${ptrData.history.length})
+                                                            </span>
+                                                        ` : ''}
+                                                    </div>
+                                                </td>
                                                 <td style="padding: 12px; font-family: monospace; color: var(--accent-primary); ${thickBorder}">${vmta}</td>
                                                 <td style="padding: 12px; text-align: center; ${thickBorder}">
                                                     <span style="color: ${ptrData.status === 'OK' ? 'var(--success)' : (ptrData.status === '---' ? 'var(--text-secondary)' : 'var(--error)')}; font-weight: 700; font-size: 0.7rem;">
