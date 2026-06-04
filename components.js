@@ -5782,6 +5782,9 @@ window.computeWarmupIntelligence = () => {
     Object.values(grouped).forEach(records => {
         records.sort((a, b) => a.timestamp - b.timestamp); // Oldest first
         
+        // Skip domains where we missed the early warmup phase (started tracking at >= 500 drops)
+        if (records[0].outVal >= 500) return;
+
         let cumulative = 0;
         const reached = new Set();
         let contributed = false;
