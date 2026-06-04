@@ -5763,25 +5763,55 @@ window.submitBulkPasteWarmup = async () => {
 };
 
 window.computeWarmupIntelligence = () => {
-    // Hardcoded Industry Standard Warmup Schema
-    // Maps "Target emails per drop" to "Required Total Sent All Time"
-    const staticAverages = {
-        100: 150,
-        300: 500,
-        500: 1500,
-        1000: 3000,
-        2000: 6000,
-        5000: 12000,
-        10000: 25000,
-        15000: 50000,
-        20000: 80000,
-        25000: 120000,
-        30000: 160000
-    };
+    const rawRecords = Object.values(window.app.state.warmupData || {});
+    if (rawRecords.length === 0) return null;
+
+    const grouped = {};
+    rawRecords.forEach(r => {
+        if (!r.domain) return;
+        if (!grouped[r.domain]) grouped[r.domain] = [];
+        grouped[r.domain].push(r);
+    });
 
     const milestones = [100, 300, 500, 1000, 2000, 5000, 10000, 15000, 20000, 25000, 30000];
+    const milestoneTotals = {};
+    milestones.forEach(m => milestoneTotals[m] = []);
 
-    return { averages: staticAverages, milestones, learnedDomains: 'Industry Standard' };
+    let learnedDomains = 0;
+
+    Object.values(grouped).forEach(records => {
+        records.sort((a, b) => a.timestamp - b.timestamp); // Oldest first
+        
+        let cumulative = 0;
+        const reached = new Set();
+        let contributed = false;
+
+        records.forEach(r => {
+            const out = r.outVal;
+            milestones.forEach(m => {
+                if (out >= m && !reached.has(m)) {
+                    reached.add(m);
+                    milestoneTotals[m].push(cumulative);
+                    contributed = true;
+                }
+            });
+            cumulative += out;
+        });
+        
+        if (contributed) learnedDomains++;
+    });
+
+    const averages = {};
+    milestones.forEach(m => {
+        if (milestoneTotals[m].length > 0) {
+            const sum = milestoneTotals[m].reduce((a, b) => a + b, 0);
+            averages[m] = Math.round(sum / milestoneTotals[m].length);
+        } else {
+            averages[m] = null;
+        }
+    });
+
+    return { averages, milestones, learnedDomains };
 };
 
 window.getWarmupRecommendation = (totalSent, repOut, intel) => {
@@ -5802,7 +5832,7 @@ window.getWarmupRecommendation = (totalSent, repOut, intel) => {
     if (nextMilestone) {
         return { text: `Next: ${nextMilestone}`, sub: `Need ${needed.toLocaleString()}` };
     } else {
-        return { text: `Target: 25k+`, sub: `Scale freely` };
+        return { text: `Target: 30k+`, sub: `Scale freely` };
     }
 };
 
@@ -5823,7 +5853,7 @@ window.showWarmupIntelligenceModal = () => {
         if (avg !== null) {
             rowsHtml += `
                 <div style="display:flex; justify-content:space-between; padding:12px; border-bottom:1px solid var(--border-color); background:rgba(255,255,255,0.02);">
-                    <div style="font-weight:700; color:var(--text-primary);">Reach ${m.toLocaleString()} Drops/Day</div>
+                    <div style="font-weight:700; color:var(--text-primary);">Reach ${m.toLocaleString()} emails/Drop</div>
                     <div style="font-weight:600; color:var(--accent-primary);">${avg.toLocaleString()} Total Sent</div>
                 </div>
             `;
@@ -5835,11 +5865,11 @@ window.showWarmupIntelligenceModal = () => {
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                 <div style="display:flex; align-items:center; gap:12px;">
                     <div style="background:var(--gradient-primary); width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#fff;">
-                        <i data-lucide="shield-check" style="width:20px; height:20px;"></i>
+                        <i data-lucide="brain-circuit" style="width:20px; height:20px;"></i>
                     </div>
                     <div>
-                        <h3 style="margin:0; font-size:1.2rem; font-weight:700;">Standard Warmup Strategy</h3>
-                        <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">Based on ${intel.learnedDomains} best practices.</div>
+                        <h3 style="margin:0; font-size:1.2rem; font-weight:700;">AI Warmup Strategy</h3>
+                        <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">Learned from ${intel.learnedDomains} successful domains in your history.</div>
                     </div>
                 </div>
                 <span onclick="document.getElementById('warmup-intelligence-overlay').remove()" style="cursor:pointer; color:var(--text-secondary);" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--text-secondary)'">
@@ -5848,7 +5878,7 @@ window.showWarmupIntelligenceModal = () => {
             </div>
             
             <p style="margin:0 0 20px; font-size:0.85rem; color:var(--text-secondary); line-height:1.5;">
-                This is the industry standard safe warmup protocol. It maps your target drop volumes to the exact total accumulated emails you should have sent before scaling up safely.
+                This schema is dynamically generated by analyzing your past successful telegram deployments. It calculates exactly how much total volume you usually send before safely reaching the next tier.
             </p>
             
             <div style="border:1px solid var(--border-color); border-radius:8px; overflow:hidden;">
