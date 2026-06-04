@@ -5514,9 +5514,19 @@ function renderWarmupProgress(app, container) {
                         <tbody>
                             ${filteredGroups.map((g, idx) => {
                                 const latest = g.records[0];
+                                const oldest = g.records[g.records.length - 1];
+                                
                                 const last3 = g.records.slice(0, 3).map(r => r.outVal);
                                 const repOut = g.repOut;
                                 const totalOutAllTime = g.records.reduce((sum, r) => sum + (parseInt(r.outVal) || 0), 0);
+                                
+                                let durationDays = 0;
+                                if (latest && oldest) {
+                                    const msDiff = latest.timestamp - oldest.timestamp;
+                                    durationDays = Math.max(1, Math.ceil(msDiff / (1000 * 60 * 60 * 24)));
+                                }
+                                const startDateStr = oldest ? new Date(oldest.timestamp).toLocaleDateString() : 'Unknown';
+                                const totalDrops = g.records.length;
                                 
                                 const rec = window.getWarmupRecommendation ? window.getWarmupRecommendation(totalOutAllTime, repOut, intel) : null;
                                 let recHtml = '';
@@ -5546,8 +5556,15 @@ function renderWarmupProgress(app, container) {
                                 return `
                                     <tr style="background: ${idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent'}; border-bottom: 1px solid var(--border-color);">
                                         <td style="padding: 14px 12px; font-weight: 600;">
-                                            ${g.domain}
-                                            ${isRdns ? `<span style="font-size: 0.6rem; padding: 2px 4px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 4px; color: #3b82f6; margin-left: 6px;" title="No domain in summary. Resolved via IP PTR.">RDNS</span>` : ''}
+                                            <div style="font-size: 0.85rem;">
+                                                ${g.domain}
+                                                ${isRdns ? `<span style="font-size: 0.6rem; padding: 2px 4px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 4px; color: #3b82f6; margin-left: 6px;" title="No domain in summary. Resolved via IP PTR.">RDNS</span>` : ''}
+                                            </div>
+                                            <div style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 6px; font-weight: 500; display: flex; flex-direction: column; gap: 3px;">
+                                                <div style="display: flex; align-items: center; gap: 4px;" title="First recorded drop date"><i data-lucide="calendar" style="width: 12px; height: 12px;"></i> Started: ${startDateStr}</div>
+                                                <div style="display: flex; align-items: center; gap: 4px;" title="Total days since first drop"><i data-lucide="clock" style="width: 12px; height: 12px;"></i> Duration: ${durationDays} Days</div>
+                                                <div style="display: flex; align-items: center; gap: 4px;" title="Total successful drops"><i data-lucide="activity" style="width: 12px; height: 12px;"></i> Drops: ${totalDrops}</div>
+                                            </div>
                                         </td>
                                         <td style="padding: 14px 12px; font-weight: 500; color: var(--text-secondary);"><i data-lucide="user" style="width: 12px; margin-right: 4px; display: inline-block; vertical-align: middle;"></i><span style="vertical-align: middle;">${latest && latest.user ? latest.user : 'Unknown'}</span></td>
                                         <td style="padding: 14px 12px; font-weight: 500; color: var(--accent-primary);">${g.server || '---'}</td>
