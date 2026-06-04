@@ -267,7 +267,9 @@ export default async function handler(req, res) {
 
         const warmupGrouped = {};
         rawWarmupRecords.forEach(r => {
-            const resolvedDomain = r.domain || getRdns(r.ip) || 'Unknown';
+            const cleanDomain = (r.domain || '').trim();
+            const isRdnsPlaceholder = cleanDomain.toLowerCase() === '[rdns]' || cleanDomain.toLowerCase() === 'rdns';
+            const resolvedDomain = (!cleanDomain || isRdnsPlaceholder) ? (getRdns(r.ip) || 'Unknown') : cleanDomain;
             const key = `${resolvedDomain}::${r.server}`;
             if (!warmupGrouped[key]) {
                 warmupGrouped[key] = {
@@ -317,9 +319,12 @@ export default async function handler(req, res) {
 
         const domainGroups = {};
         rawWarmupRecords.forEach(r => {
-            if (!r.domain) return;
-            if (!domainGroups[r.domain]) domainGroups[r.domain] = [];
-            domainGroups[r.domain].push(r);
+            const cleanDomain = (r.domain || '').trim();
+            const isRdnsPlaceholder = cleanDomain.toLowerCase() === '[rdns]' || cleanDomain.toLowerCase() === 'rdns';
+            const resolvedDomain = (!cleanDomain || isRdnsPlaceholder) ? getRdns(r.ip) : cleanDomain;
+            if (!resolvedDomain || resolvedDomain === 'Unknown') return;
+            if (!domainGroups[resolvedDomain]) domainGroups[resolvedDomain] = [];
+            domainGroups[resolvedDomain].push(r);
         });
 
         Object.values(domainGroups).forEach(records => {
@@ -384,7 +389,11 @@ export default async function handler(req, res) {
             const user = latest ? latest.user : 'Unknown';
             const rec = getWarmupRecommendation(totalOutAllTime);
 
-            return `- Domain/IP: ${g.domain}, Server: ${g.server}, IP: ${g.ip || 'N/A'}, Status: ${statusLabel}, Warmup Start Date: ${startDate}, Warmup Duration: ${durationDays} days, Warmup Drops Count: ${dropsCount}, Total Sent: ${totalOutAllTime.toLocaleString()}, Last Drop Size: ${lastOut.toLocaleString()} emails, Operator: ${user}, Recommendation: ${rec}`;
+            const latestClean = latest && latest.domain ? latest.domain.trim().toLowerCase() : '';
+            const isRdns = latest ? (!latest.domain || latestClean === '[rdns]' || latestClean === 'rdns') : false;
+            const typeLabel = isRdns ? ' (RDNS Hostname)' : ' (Custom Domain)';
+
+            return `- Domain/IP: ${g.domain}${typeLabel}, Server: ${g.server}, IP: ${g.ip || 'N/A'}, Status: ${statusLabel}, Warmup Start Date: ${startDate}, Warmup Duration: ${durationDays} days, Warmup Drops Count: ${dropsCount}, Total Sent: ${totalOutAllTime.toLocaleString()}, Last Drop Size: ${lastOut.toLocaleString()} emails, Operator: ${user}, Recommendation: ${rec}`;
         };
 
         const activeWarmupSummary = activeWarmupGroups.map(g => formatWarmupGroup(g, 'Active')).join('\n');

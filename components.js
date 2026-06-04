@@ -5469,7 +5469,9 @@ function renderWarmupProgress(app, container) {
     
     const grouped = {};
     rawRecords.forEach(r => {
-        const resolvedDomain = r.domain || getRdns(r.ip, app.state) || 'Unknown';
+        const cleanDomain = (r.domain || '').trim();
+        const isRdnsPlaceholder = cleanDomain.toLowerCase() === '[rdns]' || cleanDomain.toLowerCase() === 'rdns';
+        const resolvedDomain = (!cleanDomain || isRdnsPlaceholder) ? (getRdns(r.ip, app.state) || 'Unknown') : cleanDomain;
         const key = `${resolvedDomain}::${r.server}`;
         if (!grouped[key]) {
             grouped[key] = {
@@ -5735,7 +5737,8 @@ function renderWarmupProgress(app, container) {
                                 }
                                 
                                 const timeStr = latest ? new Date(latest.timestamp).toLocaleString() : 'Never / > 24h ago';
-                                const isRdns = latest ? !latest.domain : false;
+                                const latestClean = latest && latest.domain ? latest.domain.trim().toLowerCase() : '';
+                                const isRdns = latest ? (!latest.domain || latestClean === '[rdns]' || latestClean === 'rdns') : false;
 
                                 return `
                                     <tr style="background: ${idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent'}; border-bottom: 1px solid var(--border-color);">
@@ -5825,7 +5828,9 @@ window.deleteWarmupGroup = async (domain, server) => {
     const currentData = window.app.state.warmupData || {};
     const updatedData = {};
     Object.entries(currentData).forEach(([msgId, r]) => {
-        const resolvedDomain = r.domain || getRdns(r.ip, window.app.state) || 'Unknown';
+        const cleanDomain = (r.domain || '').trim();
+        const isRdnsPlaceholder = cleanDomain.toLowerCase() === '[rdns]' || cleanDomain.toLowerCase() === 'rdns';
+        const resolvedDomain = (!cleanDomain || isRdnsPlaceholder) ? (getRdns(r.ip, window.app.state) || 'Unknown') : cleanDomain;
         if (resolvedDomain === domain && r.server === server) {
             // Deleted
         } else {
@@ -5969,9 +5974,12 @@ window.computeWarmupIntelligence = () => {
 
     const grouped = {};
     rawRecords.forEach(r => {
-        if (!r.domain) return;
-        if (!grouped[r.domain]) grouped[r.domain] = [];
-        grouped[r.domain].push(r);
+        const cleanDomain = (r.domain || '').trim();
+        const isRdnsPlaceholder = cleanDomain.toLowerCase() === '[rdns]' || cleanDomain.toLowerCase() === 'rdns';
+        const resolvedDomain = (!cleanDomain || isRdnsPlaceholder) ? getRdns(r.ip, window.app.state) : cleanDomain;
+        if (!resolvedDomain || resolvedDomain === 'Unknown') return;
+        if (!grouped[resolvedDomain]) grouped[resolvedDomain] = [];
+        grouped[resolvedDomain].push(r);
     });
 
     const milestones = [100, 300, 500, 1000, 2000, 5000, 10000, 15000, 20000, 25000, 30000];
