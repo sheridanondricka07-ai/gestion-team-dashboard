@@ -40,7 +40,7 @@ export default async function handler(req, res) {
 
         const connection = await imap.connect(config);
         const results = {}; // { [ip]: { folder: 'INBOX'|'SPAM', returnPath: '...', headerRdns: '...', status: '...' } }
-        const oneHourAgo = new Date(Date.now() - 1 * 60 * 60 * 1000);
+        const timeWindow = new Date(Date.now() - 90 * 60 * 1000);
         
         const boxes = ['INBOX', '[Gmail]/Spam'];
 
@@ -62,7 +62,7 @@ export default async function handler(req, res) {
                     const headerPart = msg.parts.find(part => part.which === 'HEADER');
                     const msgDate = new Date(msg.attributes.date);
 
-                    if (msgDate < oneHourAgo) break;
+                    if (msgDate < timeWindow) break;
 
                     const headers = headerPart.body;
                     
@@ -96,7 +96,7 @@ export default async function handler(req, res) {
 
                                     let statusVal = 'none';
                                     if (folder === 'INBOX') {
-                                        const isMatch = (targetRdns && (rpFull.includes(targetRdns) || targetRdns.includes(rpDomain)));
+                                        const isMatch = (targetRdns && rpDomain && (rpFull.includes(targetRdns) || targetRdns.includes(rpDomain)));
                                         statusVal = isMatch ? 'rdns' : 'rp_test';
                                     } else if (folder === 'SPAM') {
                                         statusVal = 'spam';

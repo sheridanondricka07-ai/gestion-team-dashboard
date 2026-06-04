@@ -3517,7 +3517,7 @@ window.runGmailIPStatusSync = async (btn) => {
             let newStatusId = 'none';
             if (folder === 'INBOX') {
                 // MATCH LOGIC: Check if Return-Path matches the RDNS hostname or domain
-                const isMatch = (targetRdns && (rpFull.includes(targetRdns) || targetRdns.includes(rpDomain)));
+                const isMatch = (targetRdns && rpDomain && (rpFull.includes(targetRdns) || targetRdns.includes(rpDomain)));
                 newStatusId = isMatch ? 'rdns' : 'rp_test';
             } else if (folder === 'SPAM') {
                 newStatusId = 'spam';

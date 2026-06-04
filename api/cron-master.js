@@ -331,7 +331,7 @@ export default async function handler(req, res) {
 
                     const connection = await imap.connect(config);
                     const boxes = ['INBOX', '[Gmail]/Spam'];
-                    const oneHourAgo = new Date(Date.now() - 1 * 60 * 60 * 1000);
+                    const timeWindow = new Date(Date.now() - 90 * 60 * 1000);
 
                     for (const boxName of boxes) {
                         try {
@@ -341,7 +341,7 @@ export default async function handler(req, res) {
                             const sorted = messages.sort((a, b) => b.attributes.uid - a.attributes.uid);
 
                             for (const msg of sorted) {
-                                if (new Date(msg.attributes.date) < oneHourAgo) break;
+                                if (new Date(msg.attributes.date) < timeWindow) break;
                                 
                                 const headers = msg.parts.find(p => p.which === 'HEADER').body;
                                 const headerKeys = Object.keys(headers);
@@ -371,7 +371,7 @@ export default async function handler(req, res) {
 
                                                 let statusVal = 'none';
                                                 if (folder === 'INBOX') {
-                                                    const isMatch = (targetRdns && (rpFull.includes(targetRdns) || targetRdns.includes(rpDomain)));
+                                                    const isMatch = (targetRdns && rpDomain && (rpFull.includes(targetRdns) || targetRdns.includes(rpDomain)));
                                                     statusVal = isMatch ? 'rdns' : 'rp_test';
                                                 } else if (folder === 'SPAM') {
                                                     statusVal = 'spam';
@@ -427,7 +427,7 @@ export default async function handler(req, res) {
                     const telegramMessage = `⚠️ <b>Daily Gmail IP Delivery Sync: IPs Not Found</b>\n` +
                                             `📅 <b>Date:</b> ${formattedDate}\n` +
                                             `⏰ <b>Time:</b> 10:30 AM (Morocco Time)\n\n` +
-                                            `🔴 <b>No IPs Found:</b> No delivery data or IP headers were matched in your recent emails (last hour).\n` +
+                                            `🔴 <b>No IPs Found:</b> No delivery data or IP headers were matched in your recent emails (last 90 mins).\n` +
                                             `<i>All target IPs have been marked as DOWN in the dashboard. Please verify test email delivery.</i>`;
                     await sendTelegram(telegramMessage);
 
@@ -467,7 +467,7 @@ export default async function handler(req, res) {
                             let newStatusId = 'none';
 
                             if (folder === 'INBOX') {
-                                const isMatch = (targetRdns && (rpFull.includes(targetRdns) || targetRdns.includes(rpDomain)));
+                                const isMatch = (targetRdns && rpDomain && (rpFull.includes(targetRdns) || targetRdns.includes(rpDomain)));
                                 newStatusId = isMatch ? 'rdns' : 'rp_test';
                             } else if (folder === 'SPAM') {
                                 newStatusId = 'spam';
