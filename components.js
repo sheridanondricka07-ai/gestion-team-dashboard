@@ -3068,6 +3068,9 @@ function renderSpamhaus(app, container) {
                             <button onclick="syncPostmasterHealth(this)" class="btn-primary" style="width: auto; padding: 8px 16px; font-size: 0.85rem; display: flex; align-items: center; gap: 8px; background: #10B981; border: none;">
                                 <i data-lucide="shield" style="width: 14px;"></i> Sync Postmaster
                             </button>
+                            <button onclick="autoAddPostmasterDomains(this)" class="btn-primary" style="width: auto; padding: 8px 16px; font-size: 0.85rem; display: flex; align-items: center; gap: 8px; background: #8B5CF6; border: none;">
+                                <i data-lucide="plus-circle" style="width: 14px;"></i> Auto-Add Postmaster
+                            </button>
                         </div>
                     </div>
                     <div style="overflow-x: auto; background: var(--bg-secondary);">
@@ -3804,6 +3807,108 @@ window.syncPostmasterHealth = async (btn) => {
         btn.innerHTML = originalText;
         btn.disabled = false;
     }
+};
+
+window.autoAddPostmasterDomains = async (btn) => {
+    const defaultToken = "google-site-verification=qo8V9cAsy9CrNm42J8V_DuUIILXgXsnj8-Wzehk7rOA";
+    const tokenInput = prompt("Enter Google site verification token:", defaultToken);
+    if (tokenInput === null) return; 
+
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i data-lucide="refresh-cw" class="spin" style="width: 14px;"></i> Adding...';
+    btn.disabled = true;
+
+    try {
+        const response = await fetch('/api/add-postmaster-domains', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: tokenInput })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.error || errData.message || 'API request failed');
+        }
+
+        const data = await response.json();
+        const added = data.added || [];
+
+        if (added.length === 0) {
+            alert('All system domains are already registered in Google Postmaster Tools!');
+            return;
+        }
+
+        window.showPostmasterVerificationModal(added, tokenInput);
+    } catch (err) {
+        console.error('Auto-Add Postmaster Error:', err);
+        alert('Auto-Add Postmaster failed: ' + err.message);
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        if (window.lucide) window.lucide.createIcons();
+    }
+};
+
+window.showPostmasterVerificationModal = (addedList, token) => {
+    const recordsText = addedList.map(item => item.record).join('\n');
+    
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+    
+    overlay.innerHTML = `
+        <div class="modal" style="width: 600px; max-width: 90%; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; color: var(--text-primary);">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(139, 92, 246, 0.1); display: flex; align-items: center; justify-content: center; color: #8B5CF6;">
+                    <i data-lucide="shield-check" style="width: 24px;"></i>
+                </div>
+                <div>
+                    <h2 style="margin: 0; font-size: 1.25rem;">Postmaster Verification Records</h2>
+                    <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">${addedList.length} domains registered.</p>
+                </div>
+            </div>
+            
+            <p style="font-size: 0.85rem; margin-bottom: 16px; line-height: 1.4;">
+                Add the following TXT records to your DNS provider. Once updated, Google Postmaster Tools will verify ownership automatically.
+            </p>
+            
+            <textarea id="pm-verification-records" readonly style="width: 100%; height: 180px; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; font-family: monospace; font-size: 0.8rem; color: var(--text-primary); resize: none; margin-bottom: 20px;">${recordsText}</textarea>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                <div style="display: flex; gap: 12px;">
+                    <button onclick="copyPostmasterRecords()" class="btn-primary" style="background: var(--accent-primary); border: none; padding: 8px 16px; font-size: 0.85rem; cursor: pointer;">
+                        Copy All Records
+                    </button>
+                    <button onclick="downloadPostmasterRecords()" class="btn-secondary" style="padding: 8px 16px; font-size: 0.85rem; cursor: pointer;">
+                        Download TXT File
+                    </button>
+                </div>
+                <button onclick="this.closest('.modal-overlay').remove()" class="btn-secondary" style="padding: 8px 16px; font-size: 0.85rem; background: transparent; border: 1px solid var(--border-color); cursor: pointer;">
+                    Close
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    if (window.lucide) window.lucide.createIcons();
+    
+    window.copyPostmasterRecords = () => {
+        const copyText = document.getElementById('pm-verification-records');
+        copyText.select();
+        document.execCommand('copy');
+        alert('All verification records copied to clipboard!');
+    };
+    
+    window.downloadPostmasterRecords = () => {
+        const element = document.createElement('a');
+        const file = new Blob([recordsText], {type: 'text/plain'});
+        element.href = URL.createObjectURL(file);
+        element.download = 'postmaster_dns_verification_records.txt';
+        document.body.appendChild(element);
+        element.click();
+        document.body.removeChild(element);
+    };
 };
 
 window.showGmailSyncModal = () => {
