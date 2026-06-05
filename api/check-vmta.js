@@ -49,14 +49,33 @@ export default async function handler(req, res) {
     }
 
     const results = {};
+    const servers = await getFirebaseData('state/servers') || [];
+
+    const rdnsMatches = (resolvedPtr, expectedHost) => {
+        if (!resolvedPtr || !expectedHost) return false;
+        let r = resolvedPtr.trim().toLowerCase().replace(/\.$/, '');
+        let e = expectedHost.trim().toLowerCase().replace(/\.$/, '');
+        if (r === e) return true;
+        if (r.endsWith('.' + e) || e.endsWith('.' + r)) return true;
+        return false;
+    };
     
-    const checkIp = async (ip) => {
+    const checkIp = async (ip, expectedHost) => {
         try {
             // Set a timeout for each individual DNS lookup
             const ptrs = await dns.reverse(ip);
+            const resolved = ptrs[0];
+            let isOk = false;
+            if (resolved) {
+                if (expectedHost && expectedHost !== '---') {
+                    isOk = rdnsMatches(resolved, expectedHost);
+                } else {
+                    isOk = true;
+                }
+            }
             return {
-                ptr: ptrs[0] || 'No PTR record',
-                status: ptrs[0] ? 'OK' : 'ERROR',
+                ptr: resolved || 'No PTR record',
+                status: isOk ? 'OK' : 'ERROR',
                 timestamp: new Date().toLocaleString()
             };
         } catch (err) {
@@ -74,8 +93,12 @@ export default async function handler(req, res) {
     for (let i = 0; i < ips.length; i += chunkSize) {
         const chunk = ips.slice(i, i + chunkSize);
         const chunkResults = await Promise.all(chunk.map(async (ip) => {
-            const data = await checkIp(ip);
-            return [ip.replace(/\./g, '_'), data];
+            const safeIp = ip.replace(/\./g, '_');
+            const server = servers.find(s => s.allIps && s.allIps.includes(ip));
+            const expectedHost = server && server.vmtaMap && server.vmtaMap[safeIp];
+            
+            const data = await checkIp(ip, expectedHost);
+            return [safeIp, data];
         }));
         
         chunkResults.forEach(([key, val]) => {
@@ -86,7 +109,6 @@ export default async function handler(req, res) {
     let telegramResponse = null;
     // Send Telegram Notification for Manual Check
     try {
-        const servers = await getFirebaseData('state/servers') || [];
         let okCount = 0;
         let errorCount = 0;
         let errorLines = [];
@@ -100,8 +122,13 @@ export default async function handler(req, res) {
             } else {
                 errorCount++;
                 const server = servers.find(s => s.allIps && s.allIps.includes(ip));
+                const expectedHost = server && server.vmtaMap && server.vmtaMap[safeIp];
                 const ptr = data ? data.ptr : 'Lookup Failed';
-                errorLines.push(`• <b>${server ? server.name : 'Unknown'}</b>: ${ip} (${ptr})`);
+                let detail = ptr;
+                if (expectedHost && expectedHost !== '---' && ptr !== 'NXDOMAIN / No PTR' && ptr !== 'No PTR record') {
+                    detail = `${ptr} [expected: ${expectedHost}]`;
+                }
+                errorLines.push(`• <b>${server ? server.name : 'Unknown'}</b>: ${ip} (${detail})`);
             }
         }
 

@@ -130,19 +130,40 @@ export default async function handler(req, res) {
             if (uniqueIps.length > 0) {
                 const vmtaResults = {};
                 const chunkSize = 10;
+
+                const rdnsMatches = (resolvedPtr, expectedHost) => {
+                    if (!resolvedPtr || !expectedHost) return false;
+                    let r = resolvedPtr.trim().toLowerCase().replace(/\.$/, '');
+                    let e = expectedHost.trim().toLowerCase().replace(/\.$/, '');
+                    if (r === e) return true;
+                    if (r.endsWith('.' + e) || e.endsWith('.' + r)) return true;
+                    return false;
+                };
                 
                 for (let i = 0; i < uniqueIps.length; i += chunkSize) {
                     const chunk = uniqueIps.slice(i, i + chunkSize);
                     await Promise.all(chunk.map(async (ip) => {
+                        const safeIp = ip.replace(/\./g, '_');
+                        const server = servers.find(s => s.allIps && s.allIps.includes(ip));
+                        const expectedHost = server && server.vmtaMap && server.vmtaMap[safeIp];
                         try {
                             const ptrs = await dns.reverse(ip);
-                            vmtaResults[ip.replace(/\./g, '_')] = {
-                                ptr: ptrs[0] || 'No PTR record',
-                                status: ptrs[0] ? 'OK' : 'ERROR',
+                            const resolved = ptrs[0];
+                            let isOk = false;
+                            if (resolved) {
+                                if (expectedHost && expectedHost !== '---') {
+                                    isOk = rdnsMatches(resolved, expectedHost);
+                                } else {
+                                    isOk = true;
+                                }
+                            }
+                            vmtaResults[safeIp] = {
+                                ptr: resolved || 'No PTR record',
+                                status: isOk ? 'OK' : 'ERROR',
                                 timestamp: new Date().toLocaleString()
                             };
                         } catch (err) {
-                            vmtaResults[ip.replace(/\./g, '_')] = {
+                            vmtaResults[safeIp] = {
                                 ptr: 'NXDOMAIN / No PTR',
                                 status: 'ERROR',
                                 timestamp: new Date().toLocaleString()
@@ -168,8 +189,13 @@ export default async function handler(req, res) {
                         errorCount++;
                         // Find server name for this IP
                         const server = servers.find(s => s.allIps && s.allIps.includes(ip));
+                        const expectedHost = server && server.vmtaMap && server.vmtaMap[safeIp];
                         const ptr = data ? data.ptr : 'Lookup Failed';
-                        errorLines.push(`• <b>${server ? server.name : 'Unknown'}</b>: ${ip} (${ptr})`);
+                        let detail = ptr;
+                        if (expectedHost && expectedHost !== '---' && ptr !== 'NXDOMAIN / No PTR' && ptr !== 'No PTR record') {
+                            detail = `${ptr} [expected: ${expectedHost}]`;
+                        }
+                        errorLines.push(`• <b>${server ? server.name : 'Unknown'}</b>: ${ip} (${detail})`);
                     }
                 }
 
