@@ -169,7 +169,10 @@ async function checkIP(ip, token, retryCount = 0) {
 }
 
 export default async function handler(req, res) {
-    if (req.method !== 'POST' && !req.headers['x-vercel-cron']) {
+    const isCronJobOrg = req.headers['authorization'] === 'Bearer internal-cron-secret';
+    const isVercelCron = req.headers['x-vercel-cron'] === 'true' || req.headers['x-vercel-cron'] === '1';
+
+    if (req.method !== 'POST' && !isVercelCron && !isCronJobOrg) {
         return res.status(405).send('Method Not Allowed');
     }
 
