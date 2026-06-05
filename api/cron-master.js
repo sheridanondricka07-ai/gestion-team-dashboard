@@ -456,7 +456,7 @@ export default async function handler(req, res) {
                                             `⏰ <b>Time:</b> 10:30 AM (Morocco Time)\n\n` +
                                             `🔴 <b>No IPs Found:</b> No delivery data or IP headers were matched in your recent emails (last 90 mins).\n` +
                                             `<i>All target IPs have been marked as DOWN in the dashboard. Please verify test email delivery.</i>`;
-                    await sendTelegram(telegramMessage, 6);
+                    await sendTelegram(telegramMessage, 17);
 
                     results.gmailStatusSyncTriggered = true;
                     results.gmailStatusStats = { totalChecked: targetIps.length, rdnsCount: 0, rpTestCount: 0, spamCount: 0, downCount: targetIps.length };
@@ -553,7 +553,7 @@ export default async function handler(req, res) {
                                             `• 🔴 <b>SPAM:</b> <code>${spamCount}</code> IPs\n` +
                                             `• 🟠 <b>Not Received (DOWN):</b> <code>${downCount}</code> IPs\n\n` +
                                             `⚙️ <i>All IP statuses successfully updated and filled in the dashboard.</i>`;
-                    await sendTelegram(telegramMessage, 6);
+                    await sendTelegram(telegramMessage, 17);
 
                     results.gmailStatusSyncTriggered = true;
                     results.gmailStatusStats = { totalChecked: targetIps.length, rdnsCount, rpTestCount, spamCount, downCount };
