@@ -378,6 +378,17 @@ function renderServerInventory(app, container) {
     const safeServers = (servers || []).filter(s => s);
     const sortedServers = [...safeServers].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
+    const activeFilter = window._activeInventoryFilter || 'keep';
+    const serversToKeepCount = safeServers.filter(s => s.markedForCancel !== true).length;
+    const allActiveCount = safeServers.length;
+
+    const filteredActiveServers = sortedServers.filter(s => {
+        if (activeFilter === 'keep') {
+            return s.markedForCancel !== true;
+        }
+        return true;
+    });
+
     container.innerHTML = `
         <div style="padding: 24px;">
             <div class="card" style="padding: 0; overflow: hidden; background: var(--bg-secondary); border: 1px solid var(--border-color);">
@@ -410,13 +421,35 @@ function renderServerInventory(app, container) {
                         Domain Change History (${(app.state.domainChangeHistory || []).length})
                     </div>
                 </div>
+
+                ${(!window._activeInventoryTab || window._activeInventoryTab === 'active') ? `
+                <div style="padding: 12px 20px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 16px; background: rgba(255,255,255,0.015);">
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Filter:</div>
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="window.switchActiveInventoryFilter('keep')" 
+                                style="padding: 6px 14px; font-size: 0.75rem; font-weight: 600; border-radius: 6px; cursor: pointer; transition: all 0.2s;
+                                       background: ${activeFilter === 'keep' ? 'rgba(59, 130, 246, 0.15)' : 'var(--bg-tertiary)'};
+                                       color: ${activeFilter === 'keep' ? 'var(--accent-primary)' : 'var(--text-secondary)'};
+                                       border: 1px solid ${activeFilter === 'keep' ? 'var(--accent-primary)' : 'var(--border-color)'};">
+                            To keep Servers (${serversToKeepCount})
+                        </button>
+                        <button onclick="window.switchActiveInventoryFilter('all')" 
+                                style="padding: 6px 14px; font-size: 0.75rem; font-weight: 600; border-radius: 6px; cursor: pointer; transition: all 0.2s;
+                                       background: ${activeFilter === 'all' ? 'rgba(59, 130, 246, 0.15)' : 'var(--bg-tertiary)'};
+                                       color: ${activeFilter === 'all' ? 'var(--accent-primary)' : 'var(--text-secondary)'};
+                                       border: 1px solid ${activeFilter === 'all' ? 'var(--accent-primary)' : 'var(--border-color)'};">
+                            All active (${allActiveCount})
+                        </button>
+                    </div>
+                </div>
+                ` : ''}
                 
                 <div style="overflow-x: auto;">
                     ${window._activeInventoryTab === 'history' 
                         ? renderHistoryTable(app) 
                         : (window._activeInventoryTab === 'domain_history' 
                             ? renderDomainChangeHistoryTable(app) 
-                            : renderActiveTable(app, sortedServers))}
+                            : renderActiveTable(app, filteredActiveServers))}
                 </div>
             </div>
         </div>
@@ -433,6 +466,11 @@ function renderServerInventory(app, container) {
 
 window.switchInventoryTab = (tab) => {
     window._activeInventoryTab = tab;
+    window.app.updateDashboard();
+};
+
+window.switchActiveInventoryFilter = (filter) => {
+    window._activeInventoryFilter = filter;
     window.app.updateDashboard();
 };
 
@@ -6082,9 +6120,11 @@ function renderWarmupProgress(app, container) {
         }
     });
 
-    const activeGroups = [];
+    const active12Groups = [];
+    const active24Groups = [];
     const archivedGroups = [];
     const inactiveGroups = [];
+    const twelveHoursAgo = Date.now() - (12 * 60 * 60 * 1000);
     const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
     const seenActiveDomains = new Set();
     const seenActiveIps = new Set();
@@ -6103,7 +6143,10 @@ function renderWarmupProgress(app, container) {
         } else if (latestTimestamp < twentyFourHoursAgo) {
             inactiveGroups.push(g);
         } else {
-            activeGroups.push(g);
+            active24Groups.push(g);
+            if (latestTimestamp >= twelveHoursAgo) {
+                active12Groups.push(g);
+            }
             if (d) seenActiveDomains.add(d);
             if (i) seenActiveIps.add(i);
             if (s) seenActiveServers.add(s);
@@ -6149,8 +6192,9 @@ function renderWarmupProgress(app, container) {
         }
     });
 
-    if (!app.state.warmupActiveTab) app.state.warmupActiveTab = 'active';
-    let currentGroups = activeGroups;
+    if (!app.state.warmupActiveTab || app.state.warmupActiveTab === 'active') app.state.warmupActiveTab = 'active12';
+    let currentGroups = active12Groups;
+    if (app.state.warmupActiveTab === 'active24') currentGroups = active24Groups;
     if (app.state.warmupActiveTab === 'archived') currentGroups = archivedGroups;
     if (app.state.warmupActiveTab === 'inactive') currentGroups = inactiveGroups;
 
@@ -6169,7 +6213,7 @@ function renderWarmupProgress(app, container) {
     });
     filteredGroups.sort((a, b) => b.repOut - a.repOut);
 
-    const totalDomains = activeGroups.length;
+    const totalDomains = active24Groups.length;
     const totalArchived = archivedGroups.length;
     const totalInactive = inactiveGroups.length;
     const totalLogs = rawRecords.length;
@@ -6235,8 +6279,11 @@ function renderWarmupProgress(app, container) {
 
             <!-- Tabs -->
             <div style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 0;">
-                <div onclick="window.app.state.warmupActiveTab = 'active'; window.app.updateDashboard();" style="padding: 10px 16px; cursor: pointer; font-weight: 600; font-size: 0.85rem; border-bottom: 2px solid ${app.state.warmupActiveTab === 'active' ? 'var(--accent-primary)' : 'transparent'}; color: ${app.state.warmupActiveTab === 'active' ? 'var(--accent-primary)' : 'var(--text-secondary)'}; transition: all 0.2s;">
-                    Active Warmup <span style="background: ${app.state.warmupActiveTab === 'active' ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-tertiary)'}; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; margin-left: 6px;">${totalDomains}</span>
+                <div onclick="window.app.state.warmupActiveTab = 'active12'; window.app.updateDashboard();" style="padding: 10px 16px; cursor: pointer; font-weight: 600; font-size: 0.85rem; border-bottom: 2px solid ${app.state.warmupActiveTab === 'active12' ? 'var(--accent-primary)' : 'transparent'}; color: ${app.state.warmupActiveTab === 'active12' ? 'var(--accent-primary)' : 'var(--text-secondary)'}; transition: all 0.2s;">
+                    Active (12h) <span style="background: ${app.state.warmupActiveTab === 'active12' ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-tertiary)'}; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; margin-left: 6px;">${active12Groups.length}</span>
+                </div>
+                <div onclick="window.app.state.warmupActiveTab = 'active24'; window.app.updateDashboard();" style="padding: 10px 16px; cursor: pointer; font-weight: 600; font-size: 0.85rem; border-bottom: 2px solid ${app.state.warmupActiveTab === 'active24' ? 'var(--accent-primary)' : 'transparent'}; color: ${app.state.warmupActiveTab === 'active24' ? 'var(--accent-primary)' : 'var(--text-secondary)'}; transition: all 0.2s;">
+                    Active (24h) <span style="background: ${app.state.warmupActiveTab === 'active24' ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-tertiary)'}; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; margin-left: 6px;">${active24Groups.length}</span>
                 </div>
                 <div onclick="window.app.state.warmupActiveTab = 'inactive'; window.app.updateDashboard();" style="padding: 10px 16px; cursor: pointer; font-weight: 600; font-size: 0.85rem; border-bottom: 2px solid ${app.state.warmupActiveTab === 'inactive' ? 'var(--accent-primary)' : 'transparent'}; color: ${app.state.warmupActiveTab === 'inactive' ? 'var(--accent-primary)' : 'var(--text-secondary)'}; transition: all 0.2s;">
                     Inactive (> 24h) <span style="background: ${app.state.warmupActiveTab === 'inactive' ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-tertiary)'}; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; margin-left: 6px;">${totalInactive}</span>
@@ -6301,7 +6348,7 @@ function renderWarmupProgress(app, container) {
                                 
                                 const rec = window.getWarmupRecommendation ? window.getWarmupRecommendation(totalOutAllTime, repOut, intel) : null;
                                 let recHtml = '';
-                                if (rec && app.state.warmupActiveTab === 'active') {
+                                if (rec && (app.state.warmupActiveTab === 'active12' || app.state.warmupActiveTab === 'active24')) {
                                     recHtml = `<div style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 4px;">${rec.text} <span style="opacity: 0.7;">(${rec.sub})</span></div>`;
                                 }
                                 
