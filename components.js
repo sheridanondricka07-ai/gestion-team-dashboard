@@ -423,24 +423,31 @@ function renderServerInventory(app, container) {
                 </div>
 
                 ${(!window._activeInventoryTab || window._activeInventoryTab === 'active') ? `
-                <div style="padding: 12px 20px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 16px; background: rgba(255,255,255,0.015);">
-                    <div style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Filter:</div>
-                    <div style="display: flex; gap: 8px;">
-                        <button onclick="window.switchActiveInventoryFilter('keep')" 
-                                style="padding: 6px 14px; font-size: 0.75rem; font-weight: 600; border-radius: 6px; cursor: pointer; transition: all 0.2s;
-                                       background: ${activeFilter === 'keep' ? 'rgba(59, 130, 246, 0.15)' : 'var(--bg-tertiary)'};
-                                       color: ${activeFilter === 'keep' ? 'var(--accent-primary)' : 'var(--text-secondary)'};
-                                       border: 1px solid ${activeFilter === 'keep' ? 'var(--accent-primary)' : 'var(--border-color)'};">
-                            To keep Servers (${serversToKeepCount})
-                        </button>
-                        <button onclick="window.switchActiveInventoryFilter('all')" 
-                                style="padding: 6px 14px; font-size: 0.75rem; font-weight: 600; border-radius: 6px; cursor: pointer; transition: all 0.2s;
-                                       background: ${activeFilter === 'all' ? 'rgba(59, 130, 246, 0.15)' : 'var(--bg-tertiary)'};
-                                       color: ${activeFilter === 'all' ? 'var(--accent-primary)' : 'var(--text-secondary)'};
-                                       border: 1px solid ${activeFilter === 'all' ? 'var(--accent-primary)' : 'var(--border-color)'};">
-                            All active (${allActiveCount})
-                        </button>
+                <div style="padding: 12px 20px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; gap: 16px; background: rgba(255,255,255,0.015);">
+                    <div style="display: flex; align-items: center; gap: 16px;">
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Filter:</div>
+                        <div style="display: flex; gap: 8px;">
+                            <button onclick="window.switchActiveInventoryFilter('keep')" 
+                                    style="padding: 6px 14px; font-size: 0.75rem; font-weight: 600; border-radius: 6px; cursor: pointer; transition: all 0.2s;
+                                           background: ${activeFilter === 'keep' ? 'rgba(59, 130, 246, 0.15)' : 'var(--bg-tertiary)'};
+                                           color: ${activeFilter === 'keep' ? 'var(--accent-primary)' : 'var(--text-secondary)'};
+                                           border: 1px solid ${activeFilter === 'keep' ? 'var(--accent-primary)' : 'var(--border-color)'};">
+                                To keep Servers (${serversToKeepCount})
+                            </button>
+                            <button onclick="window.switchActiveInventoryFilter('all')" 
+                                    style="padding: 6px 14px; font-size: 0.75rem; font-weight: 600; border-radius: 6px; cursor: pointer; transition: all 0.2s;
+                                           background: ${activeFilter === 'all' ? 'rgba(59, 130, 246, 0.15)' : 'var(--bg-tertiary)'};
+                                           color: ${activeFilter === 'all' ? 'var(--accent-primary)' : 'var(--text-secondary)'};
+                                           border: 1px solid ${activeFilter === 'all' ? 'var(--accent-primary)' : 'var(--border-color)'};">
+                                All active (${allActiveCount})
+                            </button>
+                        </div>
                     </div>
+                    <button onclick="window.copyServersToKeep(this)" 
+                            style="padding: 6px 12px; font-size: 0.75rem; font-weight: 600; border-radius: 6px; cursor: pointer; transition: all 0.2s;
+                                   background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); display: flex; align-items: center; gap: 6px; width: auto;">
+                        <i data-lucide="copy" style="width: 12px;"></i> Copy "To Keep" Servers
+                    </button>
                 </div>
                 ` : ''}
                 
@@ -472,6 +479,28 @@ window.switchInventoryTab = (tab) => {
 window.switchActiveInventoryFilter = (filter) => {
     window._activeInventoryFilter = filter;
     window.app.updateDashboard();
+};
+
+window.copyServersToKeep = (btn) => {
+    const servers = window.app.state.servers || [];
+    const names = servers
+        .filter(s => s && s.markedForCancel !== true)
+        .map(s => s.name || '')
+        .filter(name => name.trim() !== '')
+        .sort((a, b) => a.localeCompare(b));
+        
+    const textToCopy = names.join('\n');
+    navigator.clipboard.writeText(textToCopy).then(() => {
+        const origHtml = btn.innerHTML;
+        btn.innerHTML = `<i data-lucide="check" style="width: 12px; height: 12px; color: #10b981;"></i> Copied!`;
+        if (window.lucide) window.lucide.createIcons();
+        setTimeout(() => {
+            btn.innerHTML = origHtml;
+            if (window.lucide) window.lucide.createIcons();
+        }, 1500);
+    }).catch(err => {
+        console.error('Failed to copy server names:', err);
+    });
 };
 
 function renderActiveTable(app, sortedServers) {
