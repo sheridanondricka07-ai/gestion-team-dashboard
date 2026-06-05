@@ -212,7 +212,7 @@ export default async function handler(req, res) {
                 };
                 
                 const notifToken = "8854626437:AAETvyVLsi_NWbiUkeZxqs-r74VoTVGb4KE";
-                const notifChatId = "-4933333573";
+                const notifChatId = "-1003735130681";
                 
                 for (const key in grouped) {
                     const g = grouped[key];
@@ -233,7 +233,12 @@ export default async function handler(req, res) {
                         await fetch(`https://api.telegram.org/bot${notifToken}/sendMessage`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ chat_id: notifChatId, text: text, parse_mode: 'HTML' })
+                            body: JSON.stringify({
+                                chat_id: notifChatId,
+                                message_thread_id: 6,
+                                text: text,
+                                parse_mode: 'HTML'
+                            })
                         });
                         
                         notifiedState[safeDomain] = true;

@@ -27,7 +27,7 @@ async function setFirebaseData(path, data) {
 
 async function sendTelegram(message) {
     const token = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
-    const chatId = "-4933333573";
+    const chatId = "-1003735130681";
     
     try {
         const controller = new AbortController();
@@ -38,6 +38,7 @@ async function sendTelegram(message) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 chat_id: chatId,
+                message_thread_id: 8,
                 text: message,
                 parse_mode: 'HTML'
             }),

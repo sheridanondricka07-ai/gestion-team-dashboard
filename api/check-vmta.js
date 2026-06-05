@@ -4,7 +4,7 @@ const DB_URL = "https://gestion-team-d-default-rtdb.firebaseio.com";
 
 async function sendTelegram(message) {
     const token = "8737550836:AAFK68Ig7xyW3KIvBhI5gpO1bGaPTwUimr0";
-    const chatId = "-5252005797";
+    const chatId = "-1003735130681";
     
     try {
         const controller = new AbortController();
@@ -15,6 +15,7 @@ async function sendTelegram(message) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 chat_id: chatId,
+                message_thread_id: 4,
                 text: message,
                 parse_mode: 'HTML'
             }),

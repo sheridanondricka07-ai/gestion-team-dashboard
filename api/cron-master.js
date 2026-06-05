@@ -45,9 +45,9 @@ async function updateFirebaseData(path, data) {
     }
 }
 
-async function sendTelegram(message) {
+async function sendTelegram(message, topicId = 6) {
     const token = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
-    const chatId = "-4933333573";
+    const chatId = "-1003735130681";
     
     try {
         const controller = new AbortController();
@@ -58,6 +58,7 @@ async function sendTelegram(message) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 chat_id: chatId,
+                message_thread_id: topicId,
                 text: message,
                 parse_mode: 'HTML'
             }),
@@ -189,7 +190,7 @@ export default async function handler(req, res) {
                 report += `⏰ Time: ${new Date().toLocaleString()}\n`;
                 report += `⚙️ Automated Scheduled Check`;
 
-                await sendTelegram(report);
+                await sendTelegram(report, 4);
 
                 results.vmtaTriggered = true;
                 results.vmtaCount = uniqueIps.length;
@@ -269,7 +270,7 @@ export default async function handler(req, res) {
                     report += `The following mappings were updated from Gmail:\n\n`;
                     report += changes.join('\n');
                     report += `\n\n⏰ Time: ${new Date().toLocaleString()}\n⚙️ Automated Scheduled Sync`;
-                    await sendTelegram(report);
+                    await sendTelegram(report, 6);
                 }
                 
                 results.gmailSyncTriggered = true;
@@ -429,7 +430,7 @@ export default async function handler(req, res) {
                                             `⏰ <b>Time:</b> 10:30 AM (Morocco Time)\n\n` +
                                             `🔴 <b>No IPs Found:</b> No delivery data or IP headers were matched in your recent emails (last 90 mins).\n` +
                                             `<i>All target IPs have been marked as DOWN in the dashboard. Please verify test email delivery.</i>`;
-                    await sendTelegram(telegramMessage);
+                    await sendTelegram(telegramMessage, 6);
 
                     results.gmailStatusSyncTriggered = true;
                     results.gmailStatusStats = { totalChecked: targetIps.length, rdnsCount: 0, rpTestCount: 0, spamCount: 0, downCount: targetIps.length };
@@ -526,7 +527,7 @@ export default async function handler(req, res) {
                                             `• 🔴 <b>SPAM:</b> <code>${spamCount}</code> IPs\n` +
                                             `• 🟠 <b>Not Received (DOWN):</b> <code>${downCount}</code> IPs\n\n` +
                                             `⚙️ <i>All IP statuses successfully updated and filled in the dashboard.</i>`;
-                    await sendTelegram(telegramMessage);
+                    await sendTelegram(telegramMessage, 6);
 
                     results.gmailStatusSyncTriggered = true;
                     results.gmailStatusStats = { totalChecked: targetIps.length, rdnsCount, rpTestCount, spamCount, downCount };

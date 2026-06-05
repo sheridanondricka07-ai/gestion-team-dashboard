@@ -11,7 +11,7 @@ let authToken = null;
 
 async function sendTelegram(message) {
     const token = "8854626437:AAETvyVLsi_NWbiUkeZxqs-r74VoTVGb4KE";
-    const chatId = "-5109098387";
+    const chatId = "-1003735130681";
     
     try {
         const controller = new AbortController();
@@ -22,6 +22,7 @@ async function sendTelegram(message) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 chat_id: chatId,
+                message_thread_id: 2,
                 text: message,
                 parse_mode: 'HTML'
             }),
