@@ -341,6 +341,16 @@ window.cancelServerImmediately = async (id) => {
 };
 
 
+window.toggleServerWarmupType = async (serverId) => {
+    const srv = window.app.state.servers.find(s => s.id === serverId);
+    if (srv) {
+        srv.warmupType = srv.warmupType === 'Domain RP' ? 'RDNS' : 'Domain RP';
+        await window.app.saveState();
+        window.app.updateDashboard();
+    }
+};
+
+
 window.updateServerField = async (serverId, field, value) => {
     const srv = window.app.state.servers.find(s => s.id === serverId);
     if (srv) {
@@ -427,6 +437,7 @@ function renderActiveTable(app, sortedServers) {
                     <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); position: sticky; left: 0; background: var(--bg-tertiary); z-index: 10;">Server Name</th>
                     <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Class (IP Ranges)</th>
                     <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Main IP</th>
+                    <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); text-align: center; width: 100px;">Warmup Type</th>
                     <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Entered</th>
                     <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Entity</th>
                     <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Group</th>
@@ -449,6 +460,12 @@ function renderActiveTable(app, sortedServers) {
                             <td contenteditable="true" onblur="updateServerField('${s.id}', 'name', this.innerText)" style="padding: 12px; font-weight: 700; color: ${isMarked ? '#f97316' : 'var(--accent-primary)'}; border-right: 1px solid var(--border-color); position: sticky; left: 0; background: inherit; z-index: 5; cursor: text;">${s.name || '&nbsp;'}</td>
                             <td contenteditable="true" onblur="updateServerField('${s.id}', 'ipClass', this.innerText)" style="padding: 12px; color: var(--text-secondary); max-width: 250px; line-height: 1.4; cursor: text;">${s.ipClass || '&nbsp;'}</td>
                             <td contenteditable="true" onblur="updateServerField('${s.id}', 'mainIp', this.innerText)" style="padding: 12px; font-family: monospace; cursor: text;">${s.mainIp || s.ip || '&nbsp;'}</td>
+                            <td style="padding: 12px; text-align: center;">
+                                <select onchange="updateServerField('${s.id}', 'warmupType', this.value)" style="background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 6px; font-size: 0.7rem; cursor: pointer; outline: none; width: 95px;">
+                                    <option value="RDNS" ${s.warmupType === 'RDNS' || !s.warmupType ? 'selected' : ''}>RDNS</option>
+                                    <option value="Domain RP" ${s.warmupType === 'Domain RP' ? 'selected' : ''}>Domain RP</option>
+                                </select>
+                            </td>
                             <td contenteditable="true" onblur="updateServerField('${s.id}', 'enteredDate', this.innerText)" style="padding: 12px; cursor: text;">${s.enteredDate || '&nbsp;'}</td>
                             <td contenteditable="true" onblur="updateServerField('${s.id}', 'entity', this.innerText)" style="padding: 12px; font-weight: 600; color: var(--accent-primary); cursor: text;">${s.entity || '&nbsp;'}</td>
                             <td contenteditable="true" onblur="updateServerField('${s.id}', 'group', this.innerText)" style="padding: 12px; cursor: text;">${s.group || '&nbsp;'}</td>
@@ -479,7 +496,7 @@ function renderActiveTable(app, sortedServers) {
                         </tr>
                     `;
                 }).join('')}
-                ${sortedServers.length === 0 ? '<tr><td colspan="13" style="padding: 60px; text-align: center; color: var(--text-secondary);">No active servers in inventory.</td></tr>' : ''}
+                ${sortedServers.length === 0 ? '<tr><td colspan="14" style="padding: 60px; text-align: center; color: var(--text-secondary);">No active servers in inventory.</td></tr>' : ''}
             </tbody>
         </table>
     `;
@@ -1732,6 +1749,14 @@ function renderOverview(app, container) {
                                 <div style="display: flex; align-items: center; gap: 8px;">
                                     <i data-lucide="chevron-${isExpanded ? 'down' : 'right'}" style="width: 16px; color: var(--text-secondary);"></i>
                                     <span style="font-weight: 600;">${srv.name} <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.85rem;">(${srvRps.length} RPs)</span></span>
+                                    <span onclick="event.stopPropagation(); toggleServerWarmupType('${srv.id}')" 
+                                          style="cursor: pointer; font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; margin-left: 8px;
+                                                 background: ${srv.warmupType === 'Domain RP' ? 'rgba(139, 92, 246, 0.12)' : 'rgba(16, 185, 129, 0.12)'};
+                                                 color: ${srv.warmupType === 'Domain RP' ? '#a78bfa' : '#34d399'};
+                                                 border: 1px solid ${srv.warmupType === 'Domain RP' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(16, 185, 129, 0.25)'};"
+                                          title="Click to toggle Warmup Mode">
+                                        ${srv.warmupType || 'RDNS'}
+                                    </span>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 12px;">
                                     <span class="action-icon" onclick="event.stopPropagation(); copyServerRps('${srv.id}', this)" title="Copy all RPs in this server">
@@ -1871,6 +1896,14 @@ function renderManagement(app, container) {
                                                 <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
                                                     <i data-lucide="chevron-${isExpanded ? 'down' : 'right'}" style="width: 14px; color: ${isCancel ? '#f97316' : 'var(--text-secondary)'};"></i>
                                                     <span style="font-weight: 600; font-size: 0.85rem; color: ${isCancel ? '#f97316' : 'inherit'};">${srv.name} <span style="color: ${isCancel ? 'rgba(249, 115, 22, 0.8)' : 'var(--text-secondary)'}; font-weight: 400; font-size: 0.75rem;">(${srvRps.length} RPs)</span></span>
+                                                    <span onclick="event.stopPropagation(); toggleServerWarmupType('${srv.id}')" 
+                                                          style="cursor: pointer; font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; margin-left: 8px;
+                                                                 background: ${srv.warmupType === 'Domain RP' ? 'rgba(139, 92, 246, 0.12)' : 'rgba(16, 185, 129, 0.12)'};
+                                                                 color: ${srv.warmupType === 'Domain RP' ? '#a78bfa' : '#34d399'};
+                                                                 border: 1px solid ${srv.warmupType === 'Domain RP' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(16, 185, 129, 0.25)'};"
+                                                          title="Click to toggle Warmup Mode">
+                                                        ${srv.warmupType || 'RDNS'}
+                                                    </span>
                                                 </div>
                                                 <div style="display: flex; gap: 4px; align-items: center;" onclick="event.stopPropagation()">
                                                     <span class="action-icon" onclick="copyServerRps('${srv.id}', this)" title="Copy all RPs in this server">
