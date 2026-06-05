@@ -10,7 +10,7 @@ const SPAMHAUS_PASSWORD = "E1l0&su7d,zVEiP6";
 let authToken = null;
 
 async function sendTelegram(message) {
-    const token = "8854626437:AAETvyVLsi_NWbiUkeZxqs-r74VoTVGb4KE";
+    const token = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
     const chatId = "-1003735130681";
     
     try {

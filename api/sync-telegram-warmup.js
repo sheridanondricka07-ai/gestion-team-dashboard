@@ -211,7 +211,7 @@ export default async function handler(req, res) {
                     return nonZeros[0];
                 };
                 
-                const notifToken = "8854626437:AAETvyVLsi_NWbiUkeZxqs-r74VoTVGb4KE";
+                const notifToken = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
                 const notifChatId = "-1003735130681";
                 
                 for (const key in grouped) {

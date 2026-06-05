@@ -3,7 +3,7 @@ const dns = require('dns').promises;
 const DB_URL = "https://gestion-team-d-default-rtdb.firebaseio.com";
 
 async function sendTelegram(message) {
-    const token = "8737550836:AAFK68Ig7xyW3KIvBhI5gpO1bGaPTwUimr0";
+    const token = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
     const chatId = "-1003735130681";
     
     try {

