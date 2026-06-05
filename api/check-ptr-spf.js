@@ -192,7 +192,7 @@ export default async function handler(req, res) {
         }
 
         const results = [];
-        const chunkSize = 40;
+        const chunkSize = 100;
         
         for (let i = 0; i < uniqueIps.length; i += chunkSize) {
             const chunk = uniqueIps.slice(i, i + chunkSize);
