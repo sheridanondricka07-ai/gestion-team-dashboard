@@ -344,7 +344,14 @@ window.cancelServerImmediately = async (id) => {
 window.toggleServerWarmupType = async (serverId) => {
     const srv = window.app.state.servers.find(s => s.id === serverId);
     if (srv) {
-        srv.warmupType = srv.warmupType === 'Domain RP' ? 'RDNS' : 'Domain RP';
+        const cur = srv.warmupType || 'RDNS';
+        if (cur === 'RDNS') {
+            srv.warmupType = 'RP';
+        } else if (cur === 'RP' || cur === 'Domain RP') {
+            srv.warmupType = 'Switch';
+        } else {
+            srv.warmupType = 'RDNS';
+        }
         await window.app.saveState();
         window.app.updateDashboard();
     }
@@ -463,7 +470,8 @@ function renderActiveTable(app, sortedServers) {
                             <td style="padding: 12px; text-align: center;">
                                 <select onchange="updateServerField('${s.id}', 'warmupType', this.value)" style="background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 6px; font-size: 0.7rem; cursor: pointer; outline: none; width: 95px;">
                                     <option value="RDNS" ${s.warmupType === 'RDNS' || !s.warmupType ? 'selected' : ''}>RDNS</option>
-                                    <option value="Domain RP" ${s.warmupType === 'Domain RP' ? 'selected' : ''}>Domain RP</option>
+                                    <option value="RP" ${s.warmupType === 'RP' || s.warmupType === 'Domain RP' ? 'selected' : ''}>RP</option>
+                                    <option value="Switch" ${s.warmupType === 'Switch' ? 'selected' : ''}>Switch</option>
                                 </select>
                             </td>
                             <td contenteditable="true" onblur="updateServerField('${s.id}', 'enteredDate', this.innerText)" style="padding: 12px; cursor: text;">${s.enteredDate || '&nbsp;'}</td>
@@ -1751,11 +1759,11 @@ function renderOverview(app, container) {
                                     <span style="font-weight: 600;">${srv.name} <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.85rem;">(${srvRps.length} RPs)</span></span>
                                     <span onclick="event.stopPropagation(); toggleServerWarmupType('${srv.id}')" 
                                           style="cursor: pointer; font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; margin-left: 8px;
-                                                 background: ${srv.warmupType === 'Domain RP' ? 'rgba(139, 92, 246, 0.12)' : 'rgba(16, 185, 129, 0.12)'};
-                                                 color: ${srv.warmupType === 'Domain RP' ? '#a78bfa' : '#34d399'};
-                                                 border: 1px solid ${srv.warmupType === 'Domain RP' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(16, 185, 129, 0.25)'};"
+                                                 background: ${(srv.warmupType === 'RP' || srv.warmupType === 'Domain RP') ? 'rgba(139, 92, 246, 0.12)' : (srv.warmupType === 'Switch' ? 'rgba(249, 115, 22, 0.12)' : 'rgba(16, 185, 129, 0.12)')};
+                                                 color: ${(srv.warmupType === 'RP' || srv.warmupType === 'Domain RP') ? '#a78bfa' : (srv.warmupType === 'Switch' ? '#f97316' : '#34d399')};
+                                                 border: 1px solid ${(srv.warmupType === 'RP' || srv.warmupType === 'Domain RP') ? 'rgba(139, 92, 246, 0.25)' : (srv.warmupType === 'Switch' ? 'rgba(249, 115, 22, 0.25)' : 'rgba(16, 185, 129, 0.25)')};"
                                           title="Click to toggle Warmup Mode">
-                                        ${srv.warmupType || 'RDNS'}
+                                        ${srv.warmupType === 'Domain RP' ? 'RP' : (srv.warmupType || 'RDNS')}
                                     </span>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 12px;">
@@ -1898,11 +1906,11 @@ function renderManagement(app, container) {
                                                     <span style="font-weight: 600; font-size: 0.85rem; color: ${isCancel ? '#f97316' : 'inherit'};">${srv.name} <span style="color: ${isCancel ? 'rgba(249, 115, 22, 0.8)' : 'var(--text-secondary)'}; font-weight: 400; font-size: 0.75rem;">(${srvRps.length} RPs)</span></span>
                                                     <span onclick="event.stopPropagation(); toggleServerWarmupType('${srv.id}')" 
                                                           style="cursor: pointer; font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; margin-left: 8px;
-                                                                 background: ${srv.warmupType === 'Domain RP' ? 'rgba(139, 92, 246, 0.12)' : 'rgba(16, 185, 129, 0.12)'};
-                                                                 color: ${srv.warmupType === 'Domain RP' ? '#a78bfa' : '#34d399'};
-                                                                 border: 1px solid ${srv.warmupType === 'Domain RP' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(16, 185, 129, 0.25)'};"
+                                                                 background: ${(srv.warmupType === 'RP' || srv.warmupType === 'Domain RP') ? 'rgba(139, 92, 246, 0.12)' : (srv.warmupType === 'Switch' ? 'rgba(249, 115, 22, 0.12)' : 'rgba(16, 185, 129, 0.12)')};
+                                                                 color: ${(srv.warmupType === 'RP' || srv.warmupType === 'Domain RP') ? '#a78bfa' : (srv.warmupType === 'Switch' ? '#f97316' : '#34d399')};
+                                                                 border: 1px solid ${(srv.warmupType === 'RP' || srv.warmupType === 'Domain RP') ? 'rgba(139, 92, 246, 0.25)' : (srv.warmupType === 'Switch' ? 'rgba(249, 115, 22, 0.25)' : 'rgba(16, 185, 129, 0.25)')};"
                                                           title="Click to toggle Warmup Mode">
-                                                        ${srv.warmupType || 'RDNS'}
+                                                        ${srv.warmupType === 'Domain RP' ? 'RP' : (srv.warmupType || 'RDNS')}
                                                     </span>
                                                 </div>
                                                 <div style="display: flex; gap: 4px; align-items: center;" onclick="event.stopPropagation()">
