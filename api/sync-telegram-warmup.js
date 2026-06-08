@@ -235,7 +235,7 @@ export default async function handler(req, res) {
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 chat_id: notifChatId,
-                                message_thread_id: 6,
+                                message_thread_id: 91,
                                 text: text,
                                 parse_mode: 'HTML'
                             })
