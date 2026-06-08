@@ -127,9 +127,10 @@ export default async function handler(req, res) {
             servers.forEach(s => { if (s && s.allIps) allIps = allIps.concat(s.allIps); });
             const uniqueIps = [...new Set(allIps)];
 
-            if (uniqueIps.length > 0) {
+             if (uniqueIps.length > 0) {
                 const vmtaResults = {};
                 const chunkSize = 10;
+                const vmtaUpdates = {};
 
                 const rdnsMatches = (resolvedPtr, expectedHost) => {
                     if (!resolvedPtr || !expectedHost) return false;
@@ -139,40 +140,84 @@ export default async function handler(req, res) {
                     if (r.endsWith('.' + e) || e.endsWith('.' + r)) return true;
                     return false;
                 };
+
+                const checkIp = async (ip, expectedHost) => {
+                    try {
+                        const ptrs = await dns.reverse(ip);
+                        const resolved = ptrs[0];
+                        let isOk = false;
+                        let autoUpdated = false;
+                        if (resolved) {
+                            if (expectedHost && expectedHost !== '---') {
+                                isOk = rdnsMatches(resolved, expectedHost);
+                                if (!isOk) {
+                                    isOk = true;
+                                    autoUpdated = true;
+                                }
+                            } else {
+                                isOk = true;
+                            }
+                        }
+                        return {
+                            ptr: resolved || 'No PTR record',
+                            status: isOk ? 'OK' : 'ERROR',
+                            autoUpdated,
+                            timestamp: new Date().toLocaleString()
+                        };
+                    } catch (err) {
+                        return {
+                            ptr: 'NXDOMAIN / No PTR',
+                            status: 'ERROR',
+                            autoUpdated: false,
+                            timestamp: new Date().toLocaleString()
+                        };
+                    }
+                };
                 
                 for (let i = 0; i < uniqueIps.length; i += chunkSize) {
                     const chunk = uniqueIps.slice(i, i + chunkSize);
                     await Promise.all(chunk.map(async (ip) => {
                         const safeIp = ip.replace(/\./g, '_');
                         const server = servers.find(s => s.allIps && s.allIps.includes(ip));
+                        const serverIdx = servers.indexOf(server);
                         const expectedHost = server && server.vmtaMap && server.vmtaMap[safeIp];
-                        try {
-                            const ptrs = await dns.reverse(ip);
-                            const resolved = ptrs[0];
-                            let isOk = false;
-                            if (resolved) {
-                                if (expectedHost && expectedHost !== '---') {
-                                    isOk = rdnsMatches(resolved, expectedHost);
-                                } else {
-                                    isOk = true;
-                                }
+                        
+                        const data = await checkIp(ip, expectedHost);
+
+                        if (data.autoUpdated && server && serverIdx !== -1) {
+                            const newDomain = data.ptr.replace(/\.$/, '');
+                            const historyEntry = {
+                                domain: expectedHost,
+                                date: new Date().toISOString().split('T')[0]
+                            };
+                            if (!data.history) data.history = [];
+                            const existingResult = await getFirebaseData(`state/vmtaResults/${safeIp}`);
+                            if (existingResult && existingResult.history) {
+                                data.history = existingResult.history;
                             }
-                            vmtaResults[safeIp] = {
-                                ptr: resolved || 'No PTR record',
-                                status: isOk ? 'OK' : 'ERROR',
-                                timestamp: new Date().toLocaleString()
-                            };
-                        } catch (err) {
-                            vmtaResults[safeIp] = {
-                                ptr: 'NXDOMAIN / No PTR',
-                                status: 'ERROR',
-                                timestamp: new Date().toLocaleString()
-                            };
+                            if (expectedHost && !data.history.some(h => h.domain === expectedHost)) {
+                                data.history.push(historyEntry);
+                            }
+                            vmtaUpdates[`state/servers/${serverIdx}/vmtaMap/${safeIp}`] = newDomain;
                         }
+
+                        vmtaResults[safeIp] = data;
                     }));
                 }
 
                 await updateFirebaseData('state/vmtaResults', vmtaResults);
+
+                for (const [path, value] of Object.entries(vmtaUpdates)) {
+                    try {
+                        await fetch(`${DB_URL}/${path}.json`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(value)
+                        });
+                    } catch (e) {
+                        console.error('Failed to update vmtaMap in cron:', path, e);
+                    }
+                }
                 
                 // Build Telegram Report
                 let okCount = 0;
