@@ -266,6 +266,7 @@ function renderCanceledServers(app, container) {
                                 <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Revenue</th>
                                 <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Entered</th>
                                 <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); color: #ef4444;">Canceled Date</th>
+                                <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); text-align: center; width: 100px;">Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -280,10 +281,18 @@ function renderCanceledServers(app, container) {
                                         <td style="padding: 12px; color: var(--accent-primary); font-weight: 700;">$${s.revenue || '0.00'}</td>
                                         <td style="padding: 12px;">${s.enteredDate || '---'}</td>
                                         <td style="padding: 12px; color: #ef4444; font-weight: 700;">${s.canceledAt || '---'}</td>
+                                        <td style="padding: 12px; text-align: center;">
+                                            <button onclick="restoreCanceledServer('${s.id}')"
+                                                style="padding: 4px 8px; font-size: 0.65rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; width: auto; border-radius: 4px; cursor: pointer;"
+                                                onmouseover="this.style.background='#10b981'; this.style.color='#fff'"
+                                                onmouseout="this.style.background='rgba(16, 185, 129, 0.15)'; this.style.color='#34d399'">
+                                                Back to Prod
+                                            </button>
+                                        </td>
                                     </tr>
                                 `;
                             }).join('')}
-                            ${historyServers.length === 0 ? '<tr><td colspan="7" style="padding: 60px; text-align: center; color: var(--text-secondary);">No canceled servers in archive.</td></tr>' : ''}
+                            ${historyServers.length === 0 ? '<tr><td colspan="8" style="padding: 60px; text-align: center; color: var(--text-secondary);">No canceled servers in archive.</td></tr>' : ''}
                         </tbody>
                     </table>
                 </div>
@@ -339,6 +348,59 @@ window.cancelServerImmediately = async (id) => {
     await window.app.saveState();
     window.app.updateDashboard();
 };
+
+window.restoreCanceledServer = async (id) => {
+    const srv = window.app.state.historyServers.find(s => s.id === id);
+    if (!srv) return;
+    
+    if (!confirm(`Are you sure you want to restore server "${srv.name}" back to active production?`)) {
+        return;
+    }
+    
+    // Safety check: is there another active server with the same name or ID?
+    const exists = window.app.state.servers.find(s => s.name === srv.name || s.id === srv.id);
+    if (exists) {
+        alert(`A server with name "${srv.name}" or ID "${srv.id}" already exists in active inventory! Cannot restore.`);
+        return;
+    }
+    
+    const restored = { ...srv };
+    delete restored.canceledAt;
+    delete restored.revenue;
+    delete restored.originalId;
+    
+    restored.markedForCancel = false;
+    restored.cancelDate = '';
+    restored.cancelNoticeDate = '';
+    restored.reqAt = '';
+    
+    // Remove from history
+    window.app.state.historyServers = window.app.state.historyServers.filter(s => s.id !== id);
+    
+    // Add to active
+    window.app.state.servers.push(restored);
+    
+    await window.app.saveState();
+    window.app.updateDashboard();
+};
+
+window.restoreActiveServerToProd = async (id) => {
+    const srv = window.app.state.servers.find(s => s.id === id);
+    if (!srv) return;
+    
+    if (!confirm(`Are you sure you want to restore server "${srv.name}" back to active production? This will clear all cancellation settings.`)) {
+        return;
+    }
+    
+    srv.markedForCancel = false;
+    srv.cancelDate = '';
+    srv.cancelNoticeDate = '';
+    srv.reqAt = '';
+    
+    await window.app.saveState();
+    window.app.updateDashboard();
+};
+
 
 
 window.toggleServerWarmupType = async (serverId) => {
@@ -551,10 +613,19 @@ function renderActiveTable(app, sortedServers) {
                             <td contenteditable="true" onblur="updateServerField('${s.id}', 'cancelDate', this.innerText)" style="padding: 12px; color: #ef4444; font-weight: 700; background: rgba(239, 68, 68, 0.03); cursor: text;">${s.cancelDate || '&nbsp;'}</td>
                             <td style="padding: 12px; text-align: center;">
                                 <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
-                                    <button onclick="toggleServerCancelMark('${s.id}')" 
-                                        style="padding: 4px 8px; font-size: 0.65rem; background: ${isMarked ? '#ef4444' : 'var(--bg-tertiary)'}; border: 1px solid ${isMarked ? '#ef4444' : 'var(--border-color)'}; color: ${isMarked ? '#fff' : 'var(--text-secondary)'}; width: auto; border-radius: 4px; cursor: pointer;">
-                                        ${isMarked ? 'DECLARED' : 'KEEP'}
-                                    </button>
+                                    ${isMarked ? `
+                                        <button onclick="restoreActiveServerToProd('${s.id}')" 
+                                            style="padding: 4px 8px; font-size: 0.65rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; width: auto; border-radius: 4px; cursor: pointer;"
+                                            onmouseover="this.style.background='#10b981'; this.style.color='#fff'"
+                                            onmouseout="this.style.background='rgba(16, 185, 129, 0.15)'; this.style.color='#34d399'">
+                                            BACK TO PROD
+                                        </button>
+                                    ` : `
+                                        <button onclick="toggleServerCancelMark('${s.id}')" 
+                                            style="padding: 4px 8px; font-size: 0.65rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); width: auto; border-radius: 4px; cursor: pointer;">
+                                            KEEP
+                                        </button>
+                                    `}
                                     <button onclick="cancelServerImmediately('${s.id}')" 
                                         style="padding: 4px 8px; font-size: 0.65rem; background: rgba(239, 68, 68, 0.15); border: 1px solid #ef444433; color: #f87171; width: auto; border-radius: 4px; cursor: pointer;"
                                         onmouseover="this.style.background='#ef4444'; this.style.color='#fff'"
@@ -591,6 +662,7 @@ function renderHistoryTable(app) {
                     <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Revenue</th>
                     <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color);">Entered</th>
                     <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); color: #ef4444;">Canceled Date</th>
+                    <th style="padding: 16px 12px; border-bottom: 2px solid var(--border-color); text-align: center; width: 100px;">Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -605,10 +677,18 @@ function renderHistoryTable(app) {
                             <td style="padding: 12px; color: var(--accent-primary); font-weight: 700;">$${s.revenue || '0.00'}</td>
                             <td style="padding: 12px;">${s.enteredDate || '---'}</td>
                             <td style="padding: 12px; color: #ef4444; font-weight: 700;">${s.canceledAt || '---'}</td>
+                            <td style="padding: 12px; text-align: center;">
+                                <button onclick="restoreCanceledServer('${s.id}')"
+                                    style="padding: 4px 8px; font-size: 0.65rem; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; width: auto; border-radius: 4px; cursor: pointer;"
+                                    onmouseover="this.style.background='#10b981'; this.style.color='#fff'"
+                                    onmouseout="this.style.background='rgba(16, 185, 129, 0.15)'; this.style.color='#34d399'">
+                                    Back to Prod
+                                </button>
+                            </td>
                         </tr>
                     `;
                 }).join('')}
-                ${historyServers.length === 0 ? '<tr><td colspan="7" style="padding: 60px; text-align: center; color: var(--text-secondary);">No canceled servers in archive.</td></tr>' : ''}
+                ${historyServers.length === 0 ? '<tr><td colspan="8" style="padding: 60px; text-align: center; color: var(--text-secondary);">No canceled servers in archive.</td></tr>' : ''}
             </tbody>
         </table>
     `;
