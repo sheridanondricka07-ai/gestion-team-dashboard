@@ -1290,6 +1290,25 @@ window.handleRevPresetChange = (preset) => {
     window.app.updateDashboard();
 };
 
+function getWarmupActiveIpsPerServer(app) {
+    const warmupData = app.state.warmupData || {};
+    const records = Object.values(warmupData);
+    const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
+    const serverActiveIps = {};
+    records.forEach(r => {
+        if (!r.server || !r.ip) return;
+        if (r.timestamp >= twentyFourHoursAgo) {
+            if (!serverActiveIps[r.server]) serverActiveIps[r.server] = new Set();
+            serverActiveIps[r.server].add(r.ip);
+        }
+    });
+    const result = {};
+    Object.keys(serverActiveIps).forEach(srv => {
+        result[srv] = serverActiveIps[srv].size;
+    });
+    return result;
+}
+
 function renderOverview(app, container) {
     const { rps, servers, currentUser, drops, mailers } = app.state;
     const isAdmin = currentUser.role === 'admin';
@@ -1297,6 +1316,7 @@ function renderOverview(app, container) {
     // Filter infra by mailer if not admin
     const myServers = isAdmin ? (servers || []) : (servers || []).filter(s => s && s.mailerId === currentUser.id);
     const myRps = isAdmin ? (rps || []) : (rps || []).filter(r => r && r.mailerId === currentUser.id);
+    const warmupCounts = getWarmupActiveIpsPerServer(app);
 
     // Revenue Analytics
     const now = new Date();
@@ -1898,6 +1918,8 @@ function renderOverview(app, container) {
                 ${myServers.map(srv => {
                     const srvRps = (rps || []).filter(r => r && r.serverId === srv.id);
                     const isExpanded = app.expandedServers.has(srv.id);
+                    const activeWarmupIps = warmupCounts[srv.name] || 0;
+                    const totalSrvIps = (srv.allIps || []).length;
                     return `
                         <div class="server-container" style="background: var(--bg-secondary); margin-bottom: 12px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
                             <div class="server-header" onclick="app.toggleServerExpand('${srv.id}')" style="padding: 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.03);">
@@ -1912,6 +1934,7 @@ function renderOverview(app, container) {
                                           title="Click to toggle Warmup Mode">
                                         ${srv.warmupType === 'Domain RP' ? 'RP' : (srv.warmupType || 'RDNS')}
                                     </span>
+                                    ${totalSrvIps > 0 ? `<span style="font-size: 0.6rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: ${activeWarmupIps > 0 ? 'rgba(245, 158, 11, 0.12)' : 'rgba(107, 114, 128, 0.08)'}; color: ${activeWarmupIps > 0 ? '#f59e0b' : '#6b7280'}; border: 1px solid ${activeWarmupIps > 0 ? 'rgba(245, 158, 11, 0.25)' : 'rgba(107, 114, 128, 0.15)'};" title="${activeWarmupIps} of ${totalSrvIps} IPs active in warmup (last 24h)">${activeWarmupIps > 0 ? '🔥' : '💤'} ${activeWarmupIps}/${totalSrvIps} IPs</span>` : ''}
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 12px;">
                                     <span class="action-icon" onclick="event.stopPropagation(); copyServerRps('${srv.id}', this)" title="Copy all RPs in this server">
@@ -1949,6 +1972,7 @@ function renderManagement(app, container) {
     const { rps, servers, mailers, currentUser } = app.state;
     const role = currentUser.role;
     const isAdmin = role === 'admin';
+    const warmupCounts = getWarmupActiveIpsPerServer(app);
     const activeMailers = (mailers || []).filter(m => m && m.role === 'mailer');
     const query = (app.state.searchQuery || '').toLowerCase();
     
@@ -2045,6 +2069,8 @@ function renderManagement(app, container) {
                                     const isExpanded = app.expandedServers.has(srv.id);
                                     const isCancel = srv.markedForCancel === true;
                                     const cancelStyle = isCancel ? 'border-color: #f97316; background: rgba(249, 115, 22, 0.04);' : '';
+                                    const activeWarmupIps = warmupCounts[srv.name] || 0;
+                                    const totalSrvIps = (srv.allIps || []).length;
                                     return `
                                         <div class="server-container draggable-item" ${isAdmin ? 'draggable="true" ondragstart="handleDragStart(event, \'srv\', \'' + srv.id + '\')"' : ''} style="display: block; padding: 0; margin-bottom: 8px; border-radius: 8px; overflow: hidden; ${cancelStyle}">
                                             <div class="server-header" onclick="app.toggleServerExpand('${srv.id}')" style="cursor: pointer; background: ${isCancel ? 'rgba(249, 115, 22, 0.08)' : 'rgba(255,255,255,0.03)'};">
@@ -2059,6 +2085,7 @@ function renderManagement(app, container) {
                                                           title="Click to toggle Warmup Mode">
                                                         ${srv.warmupType === 'Domain RP' ? 'RP' : (srv.warmupType || 'RDNS')}
                                                     </span>
+                                                    ${totalSrvIps > 0 ? `<span style="font-size: 0.6rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: ${activeWarmupIps > 0 ? 'rgba(245, 158, 11, 0.12)' : 'rgba(107, 114, 128, 0.08)'}; color: ${activeWarmupIps > 0 ? '#f59e0b' : '#6b7280'}; border: 1px solid ${activeWarmupIps > 0 ? 'rgba(245, 158, 11, 0.25)' : 'rgba(107, 114, 128, 0.15)'};" title="${activeWarmupIps} of ${totalSrvIps} IPs active in warmup (last 24h)">${activeWarmupIps > 0 ? '🔥' : '💤'} ${activeWarmupIps}/${totalSrvIps} IPs</span>` : ''}
                                                 </div>
                                                 <div style="display: flex; gap: 4px; align-items: center;" onclick="event.stopPropagation()">
                                                     <span class="action-icon" onclick="copyServerRps('${srv.id}', this)" title="Copy all RPs in this server">
