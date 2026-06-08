@@ -60,28 +60,49 @@ export default async function handler(req, res) {
         return false;
     };
     
+    const vmtaUpdates = {}; // Track vmtaMap updates for auto-sync
+
     const checkIp = async (ip, expectedHost) => {
         try {
-            // Set a timeout for each individual DNS lookup
             const ptrs = await dns.reverse(ip);
             const resolved = ptrs[0];
             let isOk = false;
+            let autoUpdated = false;
+            
             if (resolved) {
-                if (expectedHost && expectedHost !== '---') {
-                    isOk = rdnsMatches(resolved, expectedHost);
-                } else {
+                const cleanHost = resolved.trim().replace(/\.$/, '');
+                let resolvedIps = [];
+                try {
+                    resolvedIps = await dns.resolve4(cleanHost);
+                } catch (e) {
+                    // Ignore resolution failure and leave array empty
+                }
+                
+                if (resolvedIps.includes(ip)) {
                     isOk = true;
+                    // If the active PTR doesn't match the old vmtaMap expected host, auto-update it
+                    if (expectedHost && expectedHost !== '---') {
+                        const matchesExpected = rdnsMatches(resolved, expectedHost);
+                        if (!matchesExpected) {
+                            autoUpdated = true;
+                        }
+                    } else {
+                        autoUpdated = true;
+                    }
                 }
             }
+            
             return {
                 ptr: resolved || 'No PTR record',
                 status: isOk ? 'OK' : 'ERROR',
+                autoUpdated,
                 timestamp: new Date().toLocaleString()
             };
         } catch (err) {
             return {
                 ptr: 'NXDOMAIN / No PTR',
                 status: 'ERROR',
+                autoUpdated: false,
                 timestamp: new Date().toLocaleString(),
                 error: err.code
             };
@@ -95,15 +116,52 @@ export default async function handler(req, res) {
         const chunkResults = await Promise.all(chunk.map(async (ip) => {
             const safeIp = ip.replace(/\./g, '_');
             const server = servers.find(s => s.allIps && s.allIps.includes(ip));
+            const serverIdx = servers.indexOf(server);
             const expectedHost = server && server.vmtaMap && server.vmtaMap[safeIp];
             
             const data = await checkIp(ip, expectedHost);
+
+            // Auto-update vmtaMap if domain changed (valid PTR but didn't match old entry)
+            if (data.autoUpdated && server && serverIdx !== -1) {
+                const newDomain = data.ptr.replace(/\.$/, '');
+                // Track history of old domain
+                const historyEntry = {
+                    domain: expectedHost,
+                    date: new Date().toISOString().split('T')[0]
+                };
+                if (!data.history) data.history = [];
+                // Get existing history from previous results
+                const existingResult = await getFirebaseData(`state/vmtaResults/${safeIp}`);
+                if (existingResult && existingResult.history) {
+                    data.history = existingResult.history;
+                }
+                // Add old domain to history if not already there
+                if (expectedHost && !data.history.some(h => h.domain === expectedHost)) {
+                    data.history.push(historyEntry);
+                }
+                // Queue vmtaMap update
+                vmtaUpdates[`state/servers/${serverIdx}/vmtaMap/${safeIp}`] = newDomain;
+            }
+
             return [safeIp, data];
         }));
         
         chunkResults.forEach(([key, val]) => {
             results[key] = val;
         });
+    }
+
+    // Apply vmtaMap updates to Firebase so next check uses new domains
+    for (const [path, value] of Object.entries(vmtaUpdates)) {
+        try {
+            await fetch(`${DB_URL}/${path}.json`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(value)
+            });
+        } catch (e) {
+            console.error('Failed to update vmtaMap:', path, e);
+        }
     }
 
     let telegramResponse = null;

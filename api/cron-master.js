@@ -147,17 +147,29 @@ export default async function handler(req, res) {
                         const resolved = ptrs[0];
                         let isOk = false;
                         let autoUpdated = false;
+                        
                         if (resolved) {
-                            if (expectedHost && expectedHost !== '---') {
-                                isOk = rdnsMatches(resolved, expectedHost);
-                                if (!isOk) {
-                                    isOk = true;
+                            const cleanHost = resolved.trim().replace(/\.$/, '');
+                            let resolvedIps = [];
+                            try {
+                                resolvedIps = await dns.resolve4(cleanHost);
+                            } catch (e) {
+                                // Ignore resolution failures
+                            }
+                            
+                            if (resolvedIps.includes(ip)) {
+                                isOk = true;
+                                if (expectedHost && expectedHost !== '---') {
+                                    const matchesExpected = rdnsMatches(resolved, expectedHost);
+                                    if (!matchesExpected) {
+                                        autoUpdated = true;
+                                    }
+                                } else {
                                     autoUpdated = true;
                                 }
-                            } else {
-                                isOk = true;
                             }
                         }
+                        
                         return {
                             ptr: resolved || 'No PTR record',
                             status: isOk ? 'OK' : 'ERROR',
