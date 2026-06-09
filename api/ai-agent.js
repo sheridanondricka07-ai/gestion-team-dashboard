@@ -320,7 +320,20 @@ export default async function handler(req, res) {
             const d = g.domain ? g.domain.trim().toLowerCase() : '';
             const ipVal = g.ip ? g.ip.trim() : '';
 
-            const isArchived = sentDomains.has(d) || sentIps.has(ipVal);
+            // Check if there is an active matching entry in RP inventory for this domain + IP
+            const activeInvEntry = rpInventory.find(item => {
+                const invIp = item.rpIp ? item.rpIp.trim() : '';
+                const invDomain = item.rpDomain ? item.rpDomain.trim().toLowerCase() : '';
+                return invIp === ipVal && invDomain === d;
+            });
+
+            let isArchived = false;
+            if (activeInvEntry) {
+                isArchived = !!(activeInvEntry.alreadySent || activeInvEntry.srv === 'SENT');
+            } else {
+                isArchived = !!((d && sentDomains.has(d)) || (ipVal && sentIps.has(ipVal)));
+            }
+
             const isInactive = !isArchived && (latestTimestamp < twentyFourHoursAgo);
 
             if (isArchived) archivedWarmupGroups.push(g);

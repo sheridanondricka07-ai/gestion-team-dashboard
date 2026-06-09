@@ -6610,7 +6610,23 @@ function renderWarmupProgress(app, container) {
         const i = g.ip ? g.ip.trim() : '';
         const s = g.server ? g.server.trim() : '';
         
-        if ((d && sentDomains.has(d)) || (i && sentIps.has(i))) {
+        // Check if there is an active matching entry in RP inventory for this domain + IP
+        const activeInvEntry = rpInventory.find(item => {
+            const invIp = item.rpIp ? item.rpIp.trim() : '';
+            const invDomain = item.rpDomain ? item.rpDomain.trim().toLowerCase() : '';
+            return invIp === i && invDomain === d;
+        });
+
+        let isArchived = false;
+        if (activeInvEntry) {
+            // If active inventory entry exists, archive ONLY if marked sent/SENT
+            isArchived = !!(activeInvEntry.alreadySent || activeInvEntry.srv === 'SENT');
+        } else {
+            // Otherwise, fall back to global sent check (if it was sent in drops or marked sent previously)
+            isArchived = !!((d && sentDomains.has(d)) || (i && sentIps.has(i)));
+        }
+
+        if (isArchived) {
             archivedGroups.push(g);
         } else if (latestTimestamp < twentyFourHoursAgo) {
             inactiveGroups.push(g);
