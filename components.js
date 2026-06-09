@@ -1278,16 +1278,41 @@ window.downloadImacrosFile = () => {
         return;
     }
 
-    let fileName = 'imacros_rotation.txt';
+    const serverNames = [];
     const lines = text.split('\n');
     for (const line of lines) {
         const parts = line.split(',');
         if (parts.length >= 3) {
             const serverName = parts[2].trim();
-            if (serverName && serverName !== 'Unknown' && serverName !== 'Unknown Server') {
-                fileName = `${serverName}.txt`;
-                break;
+            if (serverName && serverName !== 'Unknown' && serverName !== 'Unknown Server' && !serverNames.includes(serverName)) {
+                serverNames.push(serverName);
             }
+        }
+    }
+
+    let fileName = 'imacros_rotation.txt';
+    if (serverNames.length === 1) {
+        fileName = `${serverNames[0]}.txt`;
+    } else if (serverNames.length > 1) {
+        const parsed = serverNames.map(name => {
+            const lastIdx = name.lastIndexOf('_');
+            if (lastIdx !== -1) {
+                return {
+                    prefix: name.substring(0, lastIdx + 1),
+                    suffix: name.substring(lastIdx + 1)
+                };
+            }
+            return { prefix: '', suffix: name };
+        });
+
+        const firstPrefix = parsed[0].prefix;
+        const allSharePrefix = firstPrefix && parsed.every(p => p.prefix === firstPrefix);
+
+        if (allSharePrefix) {
+            const suffixes = parsed.map(p => p.suffix);
+            fileName = `${firstPrefix}${suffixes.join('_')}.txt`;
+        } else {
+            fileName = `${serverNames.join('_')}.txt`;
         }
     }
 
