@@ -6521,11 +6521,16 @@ function renderWarmupProgress(app, container) {
         window._hasFetchedWarmupThisSession = true;
         (async () => {
             try {
+                // Fetch the initial state from Firebase first
+                const snapshot = await window.db.ref('warmupData').once('value');
+                app.state.warmupData = snapshot.val() || {};
+                app.updateDashboard();
+
                 const resp = await fetch('/api/sync-telegram-warmup');
                 const data = await resp.json();
                 if (data.success && data.addedCount > 0) {
-                    const snapshot = await window.db.ref('state/warmupData').once('value');
-                    app.state.warmupData = snapshot.val() || {};
+                    const snapshotUpdate = await window.db.ref('warmupData').once('value');
+                    app.state.warmupData = snapshotUpdate.val() || {};
                     app.updateDashboard();
                 }
             } catch(e) {
@@ -6950,14 +6955,14 @@ window.deleteWarmupGroup = async (domain, server) => {
         }
     });
     
-    await window.db.ref('state/warmupData').set(updatedData);
+    await window.db.ref('warmupData').set(updatedData);
     window.app.state.warmupData = updatedData;
     window.app.updateDashboard();
 };
 
 window.clearAllWarmupData = async () => {
     if (!confirm("Are you sure you want to reset all Warmup Progress data? This cannot be undone.")) return;
-    await window.db.ref('state/warmupData').set(null);
+    await window.db.ref('warmupData').set(null);
     window.app.state.warmupData = {};
     window.app.updateDashboard();
 };
@@ -6993,7 +6998,7 @@ window.fetchTelegramWarmup = async (btn) => {
         const data = await resp.json();
         if (data.success) {
             alert(`Successfully fetched updates! Added ${data.addedCount} new logs. Total: ${data.totalCount}`);
-            const snapshot = await window.db.ref('state/warmupData').once('value');
+            const snapshot = await window.db.ref('warmupData').once('value');
             window.app.state.warmupData = snapshot.val() || {};
             window.app.updateDashboard();
         } else {
@@ -7070,7 +7075,7 @@ window.submitBulkPasteWarmup = async () => {
         return;
     }
     
-    await window.db.ref('state/warmupData').update(newRecords);
+    await window.db.ref('warmupData').update(newRecords);
     
     if (!window.app.state.warmupData) window.app.state.warmupData = {};
     Object.assign(window.app.state.warmupData, newRecords);

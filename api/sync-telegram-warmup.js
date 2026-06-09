@@ -115,7 +115,7 @@ export default async function handler(req, res) {
                         text: msg ? msg.text : null,
                         raw: JSON.stringify(update)
                     };
-                    await fetch(`${DB_URL}/state/warmupRawLogs/${update.update_id}.json`, {
+                    await fetch(`${DB_URL}/warmupRawLogs/${update.update_id}.json`, {
                         method: 'PUT',
                         body: JSON.stringify(logEntry),
                         headers: { 'Content-Type': 'application/json' }
@@ -177,11 +177,11 @@ export default async function handler(req, res) {
         });
         
         if (addedCount > 0) {
-            await saveFirebaseData('state/warmupData', newRecords);
+            await saveFirebaseData('warmupData', newRecords);
         }
         
         // Fetch all warmupData from Firebase to return to client
-        const allData = await getFirebaseData('state/warmupData') || {};
+        const allData = await getFirebaseData('warmupData') || {};
         
         if (addedCount > 0) {
             try {

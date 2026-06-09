@@ -183,16 +183,12 @@ export default async function handler(req, res) {
             return res.status(500).json({ error: 'Failed to authenticate with Spamhaus API' });
         }
 
-        // Step 2: Fetch state
-        const stateRes = await fetch(`${DB_URL}/state.json`);
-        const state = await stateRes.json();
-        
-        if (!state || !state.servers) {
+        // Step 2: Fetch servers
+        const servers = await getFirebaseData('state/servers') || [];
+        if (servers.length === 0) {
             return res.status(400).send('No servers found in state');
         }
-
-        // 4. Get all IPs to check
-        const servers = await getFirebaseData('state/servers') || [];
+        
         let allIps = [];
         servers.forEach(s => {
             if (s && s.allIps) allIps = allIps.concat(s.allIps);

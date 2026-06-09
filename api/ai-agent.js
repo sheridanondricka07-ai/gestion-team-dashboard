@@ -46,7 +46,7 @@ export default async function handler(req, res) {
         const vmtaResults = await getFirebaseData('state/vmtaResults') || {};
         const rpInventory = await getFirebaseData('state/rpInventory') || [];
         const ipDeliveryStatuses = await getFirebaseData('state/ipDeliveryStatuses') || {};
-        const warmupData = await getFirebaseData('state/warmupData') || {};
+        const warmupData = await getFirebaseData('warmupData') || {};
 
         // 3. Calculate exact inventory counts & stats in code to avoid LLM counting hallucinations
         let totalServers = 0;
