@@ -370,9 +370,8 @@ window.restoreCanceledServer = async (id) => {
     delete restored.originalId;
     
     restored.markedForCancel = false;
-    restored.cancelDate = '';
-    restored.cancelNoticeDate = '';
     restored.reqAt = '';
+    // Keep restored.cancelDate and restored.cancelNoticeDate so they don't disappear
     
     // Remove from history
     window.app.state.historyServers = window.app.state.historyServers.filter(s => s.id !== id);
@@ -388,14 +387,13 @@ window.restoreActiveServerToProd = async (id) => {
     const srv = window.app.state.servers.find(s => s.id === id);
     if (!srv) return;
     
-    if (!confirm(`Are you sure you want to restore server "${srv.name}" back to active production? This will clear all cancellation settings.`)) {
+    if (!confirm(`Are you sure you want to restore server "${srv.name}" back to active production?`)) {
         return;
     }
     
     srv.markedForCancel = false;
-    srv.cancelDate = '';
-    srv.cancelNoticeDate = '';
     srv.reqAt = '';
+    // Keep srv.cancelDate and srv.cancelNoticeDate so they don't disappear
     
     await window.app.saveState();
     window.app.updateDashboard();
