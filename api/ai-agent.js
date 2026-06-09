@@ -286,10 +286,26 @@ export default async function handler(req, res) {
 
         const sentDomains = new Set();
         const sentIps = new Set();
+        
+        // 1. From RP Inventory
         rpInventory.forEach(item => {
             if (item.alreadySent || item.srv === 'SENT') {
                 if (item.rpDomain) sentDomains.add(item.rpDomain.trim().toLowerCase());
                 if (item.rpIp) sentIps.add(item.rpIp.trim());
+            }
+        });
+
+        // 2. From drops history (IPs used in actual drops)
+        drops.forEach(d => {
+            if (d.ips && d.ips !== '---') {
+                const ips = d.ips.split(/[\s,|]+/).map(ip => ip.trim()).filter(Boolean);
+                ips.forEach(ip => {
+                    sentIps.add(ip);
+                    const matchedInv = rpInventory.find(item => item.rpIp && item.rpIp.trim() === ip);
+                    if (matchedInv && matchedInv.rpDomain) {
+                        sentDomains.add(matchedInv.rpDomain.trim().toLowerCase());
+                    }
+                });
             }
         });
 
