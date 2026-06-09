@@ -1369,6 +1369,17 @@ window.copyFooterToClipboard = () => {
     alert("Plain text footer copied!");
 };
 
+window.copyFooterHtmlToClipboard = () => {
+    const textarea = document.getElementById('footer-html-result');
+    if (!textarea || !textarea.value) {
+        alert("No HTML to copy!");
+        return;
+    }
+    textarea.select();
+    document.execCommand('copy');
+    alert("HTML footer copied!");
+};
+
 function renderTools(app, container) {
     const { tools } = app.state;
     const role = app.state.currentUser.role;
@@ -1511,6 +1522,9 @@ function renderTools(app, container) {
                             <div style="display: flex; gap: 8px;">
                                 <button onclick="window.copyFooterToClipboard()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
                                     <i data-lucide="copy" style="width: 12px; height: 12px;"></i> Copy Text
+                                </button>
+                                <button onclick="window.copyFooterHtmlToClipboard()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                                    <i data-lucide="code" style="width: 12px; height: 12px;"></i> Copy HTML
                                 </button>
                             </div>
                         </div>
