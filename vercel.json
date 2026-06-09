@@ -24,6 +24,9 @@
     },
     "api/check-postmaster.js": {
       "maxDuration": 60
+    },
+    "api/extract-footer.js": {
+      "maxDuration": 30
     }
   },
   "rewrites": [

@@ -1327,6 +1327,68 @@ window.downloadImacrosFile = () => {
     URL.revokeObjectURL(url);
 };
 
+const RANDOM_SITES = [
+    'wikipedia.org', 'github.com', 'reddit.com', 'stackoverflow.com', 
+    'medium.com', 'npmjs.com', 'wordpress.org', 'vimeo.com', 'tumblr.com', 
+    'imdb.com', 'archive.org', 'w3schools.com', 'mozilla.org', 'git-scm.com', 
+    'lipsum.com', 'sourceforge.net', 'kickstarter.com', 'ted.com', 
+    'nationalgeographic.com', 'bbc.com', 'nytimes.com', 'cnn.com', 
+    'theguardian.com', 'forbes.com', 'bloomberg.com'
+];
+
+window.randomizeFooterUrl = () => {
+    const randSite = RANDOM_SITES[Math.floor(Math.random() * RANDOM_SITES.length)];
+    const input = document.getElementById('footer-url');
+    if (input) {
+        input.value = randSite;
+    }
+};
+
+window.extractFooter = async () => {
+    const input = document.getElementById('footer-url');
+    if (!input || !input.value.trim()) {
+        alert("Please enter a URL or click Random.");
+        return;
+    }
+
+    const btn = document.getElementById('btn-extract-footer');
+    const oldText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<i data-lucide="loader" class="spin" style="width:16px; height:16px; margin-right:6px; vertical-align:middle;"></i> Extracting...`;
+    if (window.lucide) window.lucide.createIcons();
+
+    try {
+        const urlVal = encodeURIComponent(input.value.trim());
+        const response = await fetch(`/api/extract-footer?url=${urlVal}`);
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error || `HTTP error ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        document.getElementById('footer-text-result').value = data.text || '';
+        document.getElementById('footer-html-result').value = data.html || '';
+    } catch (err) {
+        alert("Extraction failed: " + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = oldText;
+        if (window.lucide) window.lucide.createIcons();
+    }
+};
+
+window.copyFooterToClipboard = () => {
+    const textarea = document.getElementById('footer-text-result');
+    if (!textarea || !textarea.value) {
+        alert("No text to copy!");
+        return;
+    }
+    textarea.select();
+    document.execCommand('copy');
+    alert("Plain text footer copied!");
+};
+
 function renderTools(app, container) {
     const { tools } = app.state;
     const role = app.state.currentUser.role;
@@ -1339,6 +1401,9 @@ function renderTools(app, container) {
             </div>
             <div onclick="window.switchToolsTab('imacros')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'imacros' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'imacros' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px;">
                 <i data-lucide="file-cog" style="width: 14px; height: 14px;"></i> Generate imacros File
+            </div>
+            <div onclick="window.switchToolsTab('footer')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'footer' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'footer' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px;">
+                <i data-lucide="scissors" style="width: 14px; height: 14px;"></i> Extract Footer
             </div>
         </div>
         
@@ -1374,7 +1439,7 @@ function renderTools(app, container) {
                         ` : ''}
                     </div>
                 </div>
-            ` : `
+            ` : activeTab === 'imacros' ? `
                 <div style="display: flex; gap: 24px; padding: 24px; flex-wrap: wrap;">
                     <div class="card" style="flex: 1 1 400px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
                         <h3 style="font-size: 1.1rem; margin-top: 0; display: flex; align-items: center; gap: 8px;">
@@ -1438,6 +1503,51 @@ function renderTools(app, container) {
                             </div>
                         </div>
                         <textarea id="imacros-result" readonly placeholder="Results will appear here after generation..." style="flex: 1; min-height: 420px; font-family: monospace; font-size: 0.82rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); resize: none;"></textarea>
+                    </div>
+                </div>
+            ` : `
+                <div style="display: flex; gap: 24px; padding: 24px; flex-wrap: wrap;">
+                    <div class="card" style="flex: 1 1 400px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <h3 style="font-size: 1.1rem; margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                            <i data-lucide="scissors" style="color: var(--accent-primary); width: 20px; height: 20px;"></i>
+                            Footer Extractor
+                        </h3>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Target Website URL / Domain</label>
+                            <div style="display: flex; gap: 8px;">
+                                <input type="text" id="footer-url" placeholder="example.com" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem;">
+                                <button onclick="window.randomizeFooterUrl()" style="padding: 10px 14px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
+                                    <i data-lucide="shuffle" style="width: 14px; height: 14px;"></i> Random
+                                </button>
+                            </div>
+                        </div>
+
+                        <button id="btn-extract-footer" onclick="window.extractFooter()" style="margin-top: 8px; padding: 12px; background: var(--accent-primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                            <i data-lucide="download-cloud" style="width: 16px; height: 16px;"></i> Extract Footer
+                        </button>
+                    </div>
+
+                    <div class="card" style="flex: 1.5 1 500px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                            <h3 style="font-size: 1.1rem; margin: 0; display: flex; align-items: center; gap: 8px;">
+                                <i data-lucide="file-code" style="color: var(--success); width: 20px; height: 20px;"></i>
+                                Extracted Footer
+                            </h3>
+                            <div style="display: flex; gap: 8px;">
+                                <button onclick="window.copyFooterToClipboard()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                                    <i data-lucide="copy" style="width: 12px; height: 12px;"></i> Copy Text
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 10px; flex: 1;">
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Clean Text Version</label>
+                            <textarea id="footer-text-result" readonly placeholder="Plain text version of the footer..." style="height: 120px; font-family: inherit; font-size: 0.85rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); resize: none;"></textarea>
+                            
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Raw HTML Version</label>
+                            <textarea id="footer-html-result" readonly placeholder="HTML structure of the footer..." style="flex: 1; min-height: 200px; font-family: monospace; font-size: 0.82rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); resize: none;"></textarea>
+                        </div>
                     </div>
                 </div>
             `}
