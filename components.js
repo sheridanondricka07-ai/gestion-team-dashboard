@@ -1338,7 +1338,6 @@ const RANDOM_SITES = [
 
 window.extractFooter = async () => {
     const randSite = RANDOM_SITES[Math.floor(Math.random() * RANDOM_SITES.length)];
-    const targetUrl = `https://${randSite}`;
 
     const btn = document.getElementById('btn-extract-footer');
     const sourceLabel = document.getElementById('footer-source-label');
@@ -1348,51 +1347,18 @@ window.extractFooter = async () => {
     if (sourceLabel) sourceLabel.textContent = `Fetching ${randSite}...`;
     if (window.lucide) window.lucide.createIcons();
 
-    const proxies = [
-        `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
-        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`,
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`
-    ];
-
     try {
-        let html = '';
-        let fetched = false;
-        for (const proxyUrl of proxies) {
-            try {
-                const response = await fetch(proxyUrl);
-                if (response.ok) {
-                    html = await response.text();
-                    fetched = true;
-                    break;
-                }
-            } catch (e) { /* try next proxy */ }
-        }
-        if (!fetched) throw new Error('All proxies failed. Try again later.');
-
-        // Extract footer
-        let footerHtml = '';
-        let footerMatch = html.match(/<footer[^>]*>([\s\S]*?)<\/footer>/i);
-        if (!footerMatch) {
-            footerMatch = html.match(/<div[^>]*(?:class|id)=["'][^"']*\bfooter\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+        const response = await fetch(`/api/get-ip-info?url=${encodeURIComponent(randSite)}`);
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error || `HTTP Status ${response.status}`);
         }
 
-        if (footerMatch) {
-            footerHtml = footerMatch[0];
-        } else {
-            footerHtml = '(No <footer> tag found on this page)';
-        }
-
-        // Clean text version
-        let cleanText = footerHtml;
-        cleanText = cleanText.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-        cleanText = cleanText.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-        cleanText = cleanText.replace(/<[^>]+>/g, ' ');
-        cleanText = cleanText.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&copy;/g, '©');
-        cleanText = cleanText.replace(/\s+/g, ' ').trim();
+        const data = await response.json();
         
-        document.getElementById('footer-text-result').value = cleanText;
-        document.getElementById('footer-html-result').value = footerHtml;
-        if (sourceLabel) sourceLabel.textContent = `Source: ${randSite}`;
+        document.getElementById('footer-text-result').value = data.text || '';
+        document.getElementById('footer-html-result').value = data.html || '';
+        if (sourceLabel) sourceLabel.textContent = `Source: ${randSite} (Type: ${data.type})`;
     } catch (err) {
         alert("Extraction failed: " + err.message);
         if (sourceLabel) sourceLabel.textContent = `Failed: ${randSite}`;
