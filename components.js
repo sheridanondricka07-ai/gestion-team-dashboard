@@ -1222,9 +1222,19 @@ window.generateImacrosFile = () => {
         }
 
         if (parts.length >= 2) {
+            const ip = parts[0].trim();
+            const domain = parts[1].trim();
+            let customLimit = null;
+            if (parts.length >= 3) {
+                const parsedLimit = parseInt(parts[2].trim());
+                if (!isNaN(parsedLimit)) {
+                    customLimit = parsedLimit;
+                }
+            }
             parsedPairs.push({
-                ip: parts[0].trim(),
-                domain: parts[1].trim()
+                ip,
+                domain,
+                customLimit
             });
         }
     }
@@ -1234,7 +1244,6 @@ window.generateImacrosFile = () => {
         return;
     }
 
-    const limitHalfPlus3 = Math.floor(limit / 2) + 3;
     const generatedLines = [];
 
     for (let i = 0; i < 500; i++) {
@@ -1249,8 +1258,11 @@ window.generateImacrosFile = () => {
 
         const randNum = Math.floor(Math.random() * (maxMarge - minMarge + 1)) + minMarge;
         
+        const pairLimit = pair.customLimit !== null ? pair.customLimit : limit;
+        const pairLimitHalfPlus3 = Math.floor(pairLimit / 2) + 3;
+
         // domain,id_news,server_name,pmta_wait,ip,limit,random_number,(limit/2)+3,between_drops_wait
-        const row = `${pair.domain},${idNews},${serverName},${pmtaWait},${pair.ip},${limit},${randNum},${limitHalfPlus3},${betweenDropsWait}`;
+        const row = `${pair.domain},${idNews},${serverName},${pmtaWait},${pair.ip},${pairLimit},${randNum},${pairLimitHalfPlus3},${betweenDropsWait}`;
         generatedLines.push(row);
     }
 
