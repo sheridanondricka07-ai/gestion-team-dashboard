@@ -192,7 +192,7 @@ function renderTopBar(app) {
             ${app.state.currentUser.role === 'admin' && app.state.currentView === 'team' ? `
                 <button onclick="showAddMailerModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto;">+ Mailer</button>
             ` : ''}
-            ${app.state.currentUser.role === 'admin' && app.state.currentView === 'tools' ? `
+            ${app.state.currentUser.role === 'admin' && app.state.currentView === 'tools' && (!app.state.toolsActiveTab || app.state.toolsActiveTab === 'hosted') ? `
                 <button onclick="showAddToolModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto;">+ Tool</button>
             ` : ''}
             ${app.state.currentView === 'drops' ? `
@@ -1189,40 +1189,212 @@ window.testTelegramBot = async (btn) => {
     }
 };
 
+window.switchToolsTab = (tab) => {
+    window.app.state.toolsActiveTab = tab;
+    window.app.updateDashboard();
+};
+
+window.generateImacrosFile = () => {
+    const ipsInput = document.getElementById('imacros-ips').value;
+    const idNews = document.getElementById('imacros-id-news').value.trim();
+    const limit = parseInt(document.getElementById('imacros-limit').value) || 0;
+    const minMarge = parseInt(document.getElementById('imacros-marge-min').value) || 0;
+    const maxMarge = parseInt(document.getElementById('imacros-marge-max').value) || 0;
+    const pmtaWait = document.getElementById('imacros-pmta-wait').value.trim();
+    const betweenDropsWait = document.getElementById('imacros-between-drops-wait').value.trim();
+
+    if (!ipsInput.trim()) {
+        alert("Please enter IPs and domains.");
+        return;
+    }
+
+    const rawLines = ipsInput.split('\n');
+    const parsedPairs = [];
+    for (const line of rawLines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        const parts = trimmed.split(';');
+        if (parts.length >= 2) {
+            parsedPairs.push({
+                ip: parts[0].trim(),
+                domain: parts[1].trim()
+            });
+        }
+    }
+
+    if (parsedPairs.length === 0) {
+        alert("Please enter at least one valid IP;domain pair (separated by semicolon).");
+        return;
+    }
+
+    const limitHalfPlus3 = Math.floor(limit / 2) + 3;
+    const generatedLines = [];
+
+    for (let i = 0; i < 500; i++) {
+        const pair = parsedPairs[i % parsedPairs.length];
+        let serverName = 'Unknown';
+        if (window.app.state.servers) {
+            const srv = window.app.state.servers.find(s => s.allIps && s.allIps.includes(pair.ip));
+            if (srv) {
+                serverName = srv.name;
+            }
+        }
+
+        const randNum = Math.floor(Math.random() * (maxMarge - minMarge + 1)) + minMarge;
+        
+        // domain,id_news,server_name,pmta_wait,ip,limit,random_number,(limit/2)+3,between_drops_wait
+        const row = `${pair.domain},${idNews},${serverName},${pmtaWait},${pair.ip},${limit},${randNum},${limitHalfPlus3},${betweenDropsWait}`;
+        generatedLines.push(row);
+    }
+
+    const resultTextarea = document.getElementById('imacros-result');
+    if (resultTextarea) {
+        resultTextarea.value = generatedLines.join('\n');
+    }
+};
+
+window.copyImacrosToClipboard = () => {
+    const textarea = document.getElementById('imacros-result');
+    if (!textarea || !textarea.value) {
+        alert("Generate results first before copying!");
+        return;
+    }
+    textarea.select();
+    document.execCommand('copy');
+    alert("Results copied to clipboard!");
+};
+
+window.downloadImacrosFile = () => {
+    const text = document.getElementById('imacros-result').value;
+    if (!text) {
+        alert("Generate results first before downloading!");
+        return;
+    }
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'imacros_rotation.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+};
+
 function renderTools(app, container) {
     const { tools } = app.state;
     const role = app.state.currentUser.role;
+    const activeTab = app.state.toolsActiveTab || 'hosted';
 
     container.innerHTML = `
-        <div style="padding: 24px;">
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
-                ${(tools || []).map(tool => `
-                    <div class="card" style="padding: 20px; position: relative; display: flex; flex-direction: column; gap: 12px; transition: transform 0.2s; cursor: default;">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                            <div style="width: 42px; height: 42px; border-radius: 10px; background: rgba(59,130,246,0.1); display: flex; align-items: center; justify-content: center; color: var(--accent-primary);">
-                                <i data-lucide="external-link" style="width: 20px;"></i>
-                            </div>
-                            ${role === 'admin' ? `
-                                <button onclick="deleteTool('${tool.id}')" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px;">
-                                    <i data-lucide="trash-2" style="width: 14px;"></i>
-                                </button>
-                            ` : ''}
-                        </div>
-                        <div style="flex: 1;">
-                            <h3 style="font-size: 1rem; margin-bottom: 4px;">${tool.name}</h3>
-                            <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4;">${tool.description || 'No description provided'}</p>
-                        </div>
-                        <a href="${tool.url}" target="_blank" style="margin-top: auto; background: var(--accent-primary); color: white; text-decoration: none; padding: 8px; border-radius: 6px; text-align: center; font-size: 0.85rem; font-weight: 500;">Open Tool</a>
-                    </div>
-                `).join('')}
-                ${(!tools || tools.length === 0) ? `
-                    <div style="grid-column: 1/-1; text-align: center; padding: 60px; background: var(--bg-secondary); border-radius: 12px; border: 1px dashed var(--border-color);">
-                        <i data-lucide="wrench" style="width: 48px; height: 48px; color: var(--text-secondary); margin-bottom: 16px; opacity: 0.3;"></i>
-                        <h3 style="color: var(--text-secondary);">No tools added yet</h3>
-                        ${role === 'admin' ? '<p style="color: var(--text-secondary); font-size: 0.9rem;">Click the "+ Tool" button to add your first web tool.</p>' : ''}
-                    </div>
-                ` : ''}
+        <div style="padding: 16px 24px 0 24px; border-bottom: 1px solid var(--border-color); display: flex; gap: 24px; background: var(--bg-secondary);">
+            <div onclick="window.switchToolsTab('hosted')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'hosted' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'hosted' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px;">
+                <i data-lucide="layout-grid" style="width: 14px; height: 14px;"></i> hosted Tools
             </div>
+            <div onclick="window.switchToolsTab('imacros')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'imacros' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'imacros' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px;">
+                <i data-lucide="file-cog" style="width: 14px; height: 14px;"></i> Generate imacros File
+            </div>
+        </div>
+        
+        <div id="tools-tab-content">
+            ${activeTab === 'hosted' ? `
+                <div style="padding: 24px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
+                        ${(tools || []).map(tool => `
+                            <div class="card" style="padding: 20px; position: relative; display: flex; flex-direction: column; gap: 12px; transition: transform 0.2s; cursor: default;">
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                    <div style="width: 42px; height: 42px; border-radius: 10px; background: rgba(59,130,246,0.1); display: flex; align-items: center; justify-content: center; color: var(--accent-primary);">
+                                        <i data-lucide="external-link" style="width: 20px;"></i>
+                                    </div>
+                                    ${role === 'admin' ? `
+                                        <button onclick="deleteTool('${tool.id}')" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px;">
+                                            <i data-lucide="trash-2" style="width: 14px;"></i>
+                                        </button>
+                                    ` : ''}
+                                </div>
+                                <div style="flex: 1;">
+                                    <h3 style="font-size: 1rem; margin-bottom: 4px;">${tool.name}</h3>
+                                    <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4;">${tool.description || 'No description provided'}</p>
+                                </div>
+                                <a href="${tool.url}" target="_blank" style="margin-top: auto; background: var(--accent-primary); color: white; text-decoration: none; padding: 8px; border-radius: 6px; text-align: center; font-size: 0.85rem; font-weight: 500;">Open Tool</a>
+                            </div>
+                        `).join('')}
+                        ${(!tools || tools.length === 0) ? `
+                            <div style="grid-column: 1/-1; text-align: center; padding: 60px; background: var(--bg-secondary); border-radius: 12px; border: 1px dashed var(--border-color);">
+                                <i data-lucide="wrench" style="width: 48px; height: 48px; color: var(--text-secondary); margin-bottom: 16px; opacity: 0.3;"></i>
+                                <h3 style="color: var(--text-secondary);">No tools added yet</h3>
+                                ${role === 'admin' ? '<p style="color: var(--text-secondary); font-size: 0.9rem;">Click the "+ Tool" button to add your first web tool.</p>' : ''}
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            ` : `
+                <div style="display: flex; gap: 24px; padding: 24px; flex-wrap: wrap;">
+                    <div class="card" style="flex: 1 1 400px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <h3 style="font-size: 1.1rem; margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                            <i data-lucide="sliders" style="color: var(--accent-primary); width: 20px;"></i>
+                            Imacros File Config
+                        </h3>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">IPs / Domains (one pair per line, format: IP;domain)</label>
+                            <textarea id="imacros-ips" placeholder="51.38.72.123;zultranexo.world&#10;51.38.72.126;grinnvolaz.com&#10;51.38.72.127;scoutdive.live&#10;51.75.173.104;clervazin.com&#10;51.75.173.105;justrightmax.world&#10;51.195.146.50;fieldborne.space" style="height: 150px; font-family: monospace; font-size: 0.85rem; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); resize: vertical;"></textarea>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">ID News</label>
+                                <input type="text" id="imacros-id-news" value="25148" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem;">
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Limit</label>
+                                <input type="number" id="imacros-limit" value="10000" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem;">
+                            </div>
+                        </div>
+
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Marge (Min & Max Range)</label>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <input type="number" id="imacros-marge-min" value="5000" placeholder="Min" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem;">
+                                <input type="number" id="imacros-marge-max" value="200000" placeholder="Max" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem;">
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">PMTA Wait</label>
+                                <input type="number" id="imacros-pmta-wait" value="20" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem;">
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Between Drops Wait</label>
+                                <input type="number" id="imacros-between-drops-wait" value="1200" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem;">
+                            </div>
+                        </div>
+
+                        <button onclick="window.generateImacrosFile()" style="margin-top: 8px; padding: 12px; background: var(--accent-primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                            <i data-lucide="play" style="width: 16px; height: 16px;"></i> Generate File
+                        </button>
+                    </div>
+
+                    <div class="card" style="flex: 1.5 1 500px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                            <h3 style="font-size: 1.1rem; margin: 0; display: flex; align-items: center; gap: 8px;">
+                                <i data-lucide="file-text" style="color: var(--success); width: 20px; height: 20px;"></i>
+                                Generated Results (500 Lines)
+                            </h3>
+                            <div style="display: flex; gap: 8px;">
+                                <button onclick="window.copyImacrosToClipboard()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                                    <i data-lucide="copy" style="width: 12px; height: 12px;"></i> Copy
+                                </button>
+                                <button onclick="window.downloadImacrosFile()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                                    <i data-lucide="download" style="width: 12px; height: 12px;"></i> Download
+                                </button>
+                            </div>
+                        </div>
+                        <textarea id="imacros-result" readonly placeholder="Results will appear here after generation..." style="flex: 1; min-height: 420px; font-family: monospace; font-size: 0.82rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); resize: none;"></textarea>
+                    </div>
+                </div>
+            `}
         </div>
     `;
     if (window.lucide) window.lucide.createIcons();
