@@ -1213,7 +1213,14 @@ window.generateImacrosFile = () => {
     for (const line of rawLines) {
         const trimmed = line.trim();
         if (!trimmed) continue;
-        const parts = trimmed.split(';');
+        
+        let parts = [];
+        if (trimmed.includes(';')) {
+            parts = trimmed.split(';');
+        } else {
+            parts = trimmed.split(/\s+/);
+        }
+
         if (parts.length >= 2) {
             parsedPairs.push({
                 ip: parts[0].trim(),
@@ -1223,7 +1230,7 @@ window.generateImacrosFile = () => {
     }
 
     if (parsedPairs.length === 0) {
-        alert("Please enter at least one valid IP;domain pair (separated by semicolon).");
+        alert("Please enter at least one valid IP;domain or IP<space/tab>domain pair.");
         return;
     }
 
