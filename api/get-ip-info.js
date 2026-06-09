@@ -1,6 +1,5 @@
-// IP Provider & ASN Lookup - Multi-Service Fallback
-// AND Website Footer Extractor
-// Uses global fetch (Node 18+)
+const fs = require('fs');
+const path = require('path');
 
 module.exports = async function handler(req, res) {
     // Enable CORS
@@ -17,55 +16,106 @@ module.exports = async function handler(req, res) {
     }
 
     // --- FOOTER EXTRACTOR (GET method) ---
-    if (req.method === 'GET' && req.query.url) {
+    if (req.method === 'GET') {
         try {
-            const { url } = req.query;
-            let targetUrl = url.trim();
-            if (!/^https?:\/\//i.test(targetUrl)) {
-                targetUrl = 'https://' + targetUrl;
+            let domainsList = [];
+            try {
+                const filePath = path.join(process.cwd(), 'domains.txt');
+                if (fs.existsSync(filePath)) {
+                    const content = fs.readFileSync(filePath, 'utf8');
+                    domainsList = content.split('\n').map(d => d.trim()).filter(Boolean);
+                }
+            } catch (e) {
+                console.error('Failed to read domains.txt:', e);
             }
 
-            const response = await fetch(targetUrl, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
-                },
-                signal: AbortSignal.timeout(10000)
-            });
-
-            if (!response.ok) {
-                return res.status(response.status).json({ error: `Failed to fetch website. HTTP Status: ${response.status}` });
+            if (domainsList.length === 0) {
+                domainsList = [
+                    'wikipedia.org', 'github.com', 'reddit.com', 'stackoverflow.com', 
+                    'medium.com', 'npmjs.com', 'wordpress.org', 'vimeo.com', 'tumblr.com', 
+                    'imdb.com', 'archive.org', 'w3schools.com', 'mozilla.org', 'git-scm.com', 
+                    'lipsum.com', 'sourceforge.net', 'kickstarter.com', 'ted.com', 
+                    'nationalgeographic.com', 'bbc.com', 'nytimes.com', 'cnn.com', 
+                    'theguardian.com', 'forbes.com', 'bloomberg.com'
+                ];
             }
 
-            const html = await response.text();
-
-            // 1. Try matching <footer> tag
-            let footerHtml = '';
+            let targetUrl = '';
+            let html = '';
             let type = 'tag';
-            let footerMatch = html.match(/<footer[^>]*>([\s\S]*?)<\/footer>/i);
+            let footerHtml = '';
+            let cleanText = '';
+            let success = false;
+            let attempts = 0;
+            const maxAttempts = 6;
             
-            // 2. Try matching div with class/id containing "footer"
-            if (!footerMatch) {
-                footerMatch = html.match(/<div[^>]*class=["'][^"']*\bfooter\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)
-                          || html.match(/<div[^>]*id=["'][^"']*\bfooter\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
-                type = 'div';
+            const requestedUrl = req.query.url;
+
+            while (!success && attempts < maxAttempts) {
+                attempts++;
+                let currentDomain = '';
+
+                if (requestedUrl && attempts === 1) {
+                    currentDomain = requestedUrl.trim();
+                } else {
+                    currentDomain = domainsList[Math.floor(Math.random() * domainsList.length)];
+                }
+
+                targetUrl = currentDomain;
+                if (!/^https?:\/\//i.test(targetUrl)) {
+                    targetUrl = 'https://' + targetUrl;
+                }
+
+                try {
+                    const response = await fetch(targetUrl, {
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
+                        },
+                        signal: AbortSignal.timeout(6000)
+                    });
+
+                    if (!response.ok) continue;
+
+                    html = await response.text();
+
+                    // Try matching <footer> tag
+                    let footerMatch = html.match(/<footer[^>]*>([\s\S]*?)<\/footer>/i);
+                    type = 'tag';
+
+                    if (!footerMatch) {
+                        footerMatch = html.match(/<div[^>]*class=["'][^"']*\bfooter\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)
+                                  || html.match(/<div[^>]*id=["'][^"']*\bfooter\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+                        type = 'div';
+                    }
+
+                    if (footerMatch) {
+                        footerHtml = footerMatch[0];
+                    } else {
+                        // Fallback: body content or generic div
+                        const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+                        const bodyContent = bodyMatch ? bodyMatch[1] : html;
+                        const cleanBody = cleanHtml(bodyContent);
+                        const fallbackText = cleanBody.substring(Math.max(0, cleanBody.length - 800));
+                        footerHtml = '<div>' + fallbackText + '</div>';
+                        type = 'fallback';
+                    }
+
+                    cleanText = cleanHtml(footerHtml);
+                    
+                    if (cleanText.length > 5) {
+                        success = true;
+                    }
+                } catch (e) {
+                    console.log(`Attempt ${attempts} failed for ${currentDomain}: ${e.message}`);
+                }
             }
 
-            if (footerMatch) {
-                footerHtml = footerMatch[0];
-            } else {
-                // 3. Fallback: body content or generic div
-                const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-                const bodyContent = bodyMatch ? bodyMatch[1] : html;
-                const cleanBody = cleanHtml(bodyContent);
-                const fallbackText = cleanBody.substring(Math.max(0, cleanBody.length - 800));
-                footerHtml = '<div>' + fallbackText + '</div>';
-                type = 'fallback';
+            if (!success) {
+                return res.status(500).json({ error: 'Failed to extract a valid footer after multiple random website attempts.' });
             }
-
-            const cleanText = cleanHtml(footerHtml);
 
             return res.status(200).json({
-                source: targetUrl,
+                source: targetUrl.replace(/^https?:\/\//i, ''),
                 type: type,
                 html: footerHtml,
                 text: cleanText

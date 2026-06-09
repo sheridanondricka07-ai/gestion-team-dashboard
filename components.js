@@ -1327,28 +1327,17 @@ window.downloadImacrosFile = () => {
     URL.revokeObjectURL(url);
 };
 
-const RANDOM_SITES = [
-    'wikipedia.org', 'github.com', 'reddit.com', 'stackoverflow.com', 
-    'medium.com', 'npmjs.com', 'wordpress.org', 'vimeo.com', 'tumblr.com', 
-    'imdb.com', 'archive.org', 'w3schools.com', 'mozilla.org', 'git-scm.com', 
-    'lipsum.com', 'sourceforge.net', 'kickstarter.com', 'ted.com', 
-    'nationalgeographic.com', 'bbc.com', 'nytimes.com', 'cnn.com', 
-    'theguardian.com', 'forbes.com', 'bloomberg.com'
-];
-
 window.extractFooter = async () => {
-    const randSite = RANDOM_SITES[Math.floor(Math.random() * RANDOM_SITES.length)];
-
     const btn = document.getElementById('btn-extract-footer');
     const sourceLabel = document.getElementById('footer-source-label');
     const oldText = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = `<i data-lucide="loader" class="spin" style="width:16px; height:16px; margin-right:6px; vertical-align:middle;"></i> Extracting from ${randSite}...`;
-    if (sourceLabel) sourceLabel.textContent = `Fetching ${randSite}...`;
+    btn.innerHTML = `<i data-lucide="loader" class="spin" style="width:16px; height:16px; margin-right:6px; vertical-align:middle;"></i> Extracting Random Footer...`;
+    if (sourceLabel) sourceLabel.textContent = `Fetching a random website...`;
     if (window.lucide) window.lucide.createIcons();
 
     try {
-        const response = await fetch(`/api/get-ip-info?url=${encodeURIComponent(randSite)}`);
+        const response = await fetch(`/api/get-ip-info`);
         if (!response.ok) {
             const errData = await response.json().catch(() => ({}));
             throw new Error(errData.error || `HTTP Status ${response.status}`);
@@ -1358,10 +1347,10 @@ window.extractFooter = async () => {
         
         document.getElementById('footer-text-result').value = data.text || '';
         document.getElementById('footer-html-result').value = data.html || '';
-        if (sourceLabel) sourceLabel.textContent = `Source: ${randSite} (Type: ${data.type})`;
+        if (sourceLabel) sourceLabel.textContent = `Source: ${data.source} (Type: ${data.type})`;
     } catch (err) {
         alert("Extraction failed: " + err.message);
-        if (sourceLabel) sourceLabel.textContent = `Failed: ${randSite}`;
+        if (sourceLabel) sourceLabel.textContent = `Failed to fetch random footer.`;
     } finally {
         btn.disabled = false;
         btn.innerHTML = oldText;
