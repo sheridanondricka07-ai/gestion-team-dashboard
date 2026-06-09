@@ -1336,29 +1336,19 @@ const RANDOM_SITES = [
     'theguardian.com', 'forbes.com', 'bloomberg.com'
 ];
 
-window.randomizeFooterUrl = () => {
-    const randSite = RANDOM_SITES[Math.floor(Math.random() * RANDOM_SITES.length)];
-    const input = document.getElementById('footer-url');
-    if (input) {
-        input.value = randSite;
-    }
-};
-
 window.extractFooter = async () => {
-    const input = document.getElementById('footer-url');
-    if (!input || !input.value.trim()) {
-        alert("Please enter a URL or click Random.");
-        return;
-    }
+    const randSite = RANDOM_SITES[Math.floor(Math.random() * RANDOM_SITES.length)];
 
     const btn = document.getElementById('btn-extract-footer');
+    const sourceLabel = document.getElementById('footer-source-label');
     const oldText = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = `<i data-lucide="loader" class="spin" style="width:16px; height:16px; margin-right:6px; vertical-align:middle;"></i> Extracting...`;
+    btn.innerHTML = `<i data-lucide="loader" class="spin" style="width:16px; height:16px; margin-right:6px; vertical-align:middle;"></i> Extracting from ${randSite}...`;
+    if (sourceLabel) sourceLabel.textContent = `Fetching ${randSite}...`;
     if (window.lucide) window.lucide.createIcons();
 
     try {
-        const urlVal = encodeURIComponent(input.value.trim());
+        const urlVal = encodeURIComponent(randSite);
         const response = await fetch(`/api/extract-footer?url=${urlVal}`);
         if (!response.ok) {
             const errData = await response.json().catch(() => ({}));
@@ -1369,8 +1359,10 @@ window.extractFooter = async () => {
         
         document.getElementById('footer-text-result').value = data.text || '';
         document.getElementById('footer-html-result').value = data.html || '';
+        if (sourceLabel) sourceLabel.textContent = `Source: ${randSite}`;
     } catch (err) {
         alert("Extraction failed: " + err.message);
+        if (sourceLabel) sourceLabel.textContent = `Failed: ${randSite}`;
     } finally {
         btn.disabled = false;
         btn.innerHTML = oldText;
@@ -1513,19 +1505,13 @@ function renderTools(app, container) {
                             Footer Extractor
                         </h3>
                         
-                        <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Target Website URL / Domain</label>
-                            <div style="display: flex; gap: 8px;">
-                                <input type="text" id="footer-url" placeholder="example.com" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem;">
-                                <button onclick="window.randomizeFooterUrl()" style="padding: 10px 14px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
-                                    <i data-lucide="shuffle" style="width: 14px; height: 14px;"></i> Random
-                                </button>
-                            </div>
-                        </div>
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; margin: 0;">Click the button below to extract a footer from a random website. Each click picks a different site.</p>
 
-                        <button id="btn-extract-footer" onclick="window.extractFooter()" style="margin-top: 8px; padding: 12px; background: var(--accent-primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                            <i data-lucide="download-cloud" style="width: 16px; height: 16px;"></i> Extract Footer
+                        <button id="btn-extract-footer" onclick="window.extractFooter()" style="margin-top: 8px; padding: 14px; background: var(--accent-primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.9rem;">
+                            <i data-lucide="shuffle" style="width: 16px; height: 16px;"></i> Extract Random Footer
                         </button>
+
+                        <div id="footer-source-label" style="font-size: 0.8rem; color: var(--text-secondary); font-style: italic;"></div>
                     </div>
 
                     <div class="card" style="flex: 1.5 1 500px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
