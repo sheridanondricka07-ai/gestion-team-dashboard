@@ -1277,11 +1277,25 @@ window.downloadImacrosFile = () => {
         alert("Generate results first before downloading!");
         return;
     }
+
+    let fileName = 'imacros_rotation.txt';
+    const lines = text.split('\n');
+    for (const line of lines) {
+        const parts = line.split(',');
+        if (parts.length >= 3) {
+            const serverName = parts[2].trim();
+            if (serverName && serverName !== 'Unknown' && serverName !== 'Unknown Server') {
+                fileName = `${serverName}.txt`;
+                break;
+            }
+        }
+    }
+
     const blob = new Blob([text], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'imacros_rotation.txt';
+    a.download = fileName;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
