@@ -6505,6 +6505,35 @@ function renderWarmupProgress(app, container) {
                                 const timeStr = latest ? new Date(latest.timestamp).toLocaleString() : 'Never / > 24h ago';
                                 const latestClean = latest && latest.domain ? latest.domain.trim().toLowerCase() : '';
                                 const isRdns = latest ? (!latest.domain || latestClean === '[rdns]' || latestClean === 'rdns') : false;
+                                let isSwitch = false;
+                                const srv = app.state.servers.find(s => s.name && s.name.toLowerCase() === (g.server || '').toLowerCase());
+                                if (srv && g.domain && g.ip) {
+                                    const ipRdns = getRdns(g.ip, app.state);
+                                    const domainMatches = (d1, d2) => {
+                                        if (!d1 || !d2) return false;
+                                        const clean = d => d.trim().toLowerCase().replace(/\.$/, '');
+                                        const c1 = clean(d1);
+                                        const c2 = clean(d2);
+                                        return c1 === c2 || c1.endsWith('.' + c2) || c2.endsWith('.' + c1);
+                                    };
+                                    const domainIsIpRdns = domainMatches(g.domain, ipRdns);
+                                    if (!domainIsIpRdns) {
+                                        const otherIps = srv.allIps || [];
+                                        for (const otherIp of otherIps) {
+                                            if (otherIp !== g.ip) {
+                                                const otherRdns = getRdns(otherIp, app.state);
+                                                if (domainMatches(g.domain, otherRdns)) {
+                                                    isSwitch = true;
+                                                    break;
+                                                 }
+                                            }
+                                        }
+                                    }
+                                }
+                                if (isSwitch && srv && srv.warmupType !== 'Switch') {
+                                    srv.warmupType = 'Switch';
+                                    window.app.saveState().catch(e => console.error("Error auto-updating server warmupType to Switch:", e));
+                                }
 
                                 return `
                                     <tr style="background: ${idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent'}; border-bottom: 1px solid var(--border-color);">
@@ -6512,6 +6541,7 @@ function renderWarmupProgress(app, container) {
                                             <div style="font-size: 0.85rem;">
                                                 ${g.domain}
                                                 ${isRdns ? `<span style="font-size: 0.6rem; padding: 2px 4px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 4px; color: #3b82f6; margin-left: 6px;" title="No domain in summary. Resolved via IP PTR.">RDNS</span>` : ''}
+                                                ${isSwitch ? `<span style="font-size: 0.6rem; padding: 2px 4px; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; color: #8b5cf6; margin-left: 6px;" title="This domain is the RDNS of another IP on the same server.">Switch</span>` : ''}
                                             </div>
                                             <div style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 6px; font-weight: 500; display: flex; flex-direction: column; gap: 3px;">
                                                 <div style="display: flex; align-items: center; gap: 4px;" title="First recorded drop date"><i data-lucide="calendar" style="width: 12px; height: 12px;"></i> Started: ${startDateStr}</div>
