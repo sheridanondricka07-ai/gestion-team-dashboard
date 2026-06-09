@@ -1338,6 +1338,7 @@ const RANDOM_SITES = [
 
 window.extractFooter = async () => {
     const randSite = RANDOM_SITES[Math.floor(Math.random() * RANDOM_SITES.length)];
+    const targetUrl = `https://${randSite}`;
 
     const btn = document.getElementById('btn-extract-footer');
     const sourceLabel = document.getElementById('footer-source-label');
@@ -1348,17 +1349,35 @@ window.extractFooter = async () => {
     if (window.lucide) window.lucide.createIcons();
 
     try {
-        const urlVal = encodeURIComponent(randSite);
-        const response = await fetch(`/api/extract-footer?url=${urlVal}`);
-        if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            throw new Error(errData.error || `HTTP error ${response.status}`);
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+        const response = await fetch(proxyUrl);
+        if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+
+        const html = await response.text();
+
+        // Extract footer
+        let footerHtml = '';
+        let footerMatch = html.match(/<footer[^>]*>([\s\S]*?)<\/footer>/i);
+        if (!footerMatch) {
+            footerMatch = html.match(/<div[^>]*(?:class|id)=["'][^"']*\bfooter\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
         }
 
-        const data = await response.json();
+        if (footerMatch) {
+            footerHtml = footerMatch[0];
+        } else {
+            footerHtml = '(No <footer> tag found on this page)';
+        }
+
+        // Clean text version
+        let cleanText = footerHtml;
+        cleanText = cleanText.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+        cleanText = cleanText.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+        cleanText = cleanText.replace(/<[^>]+>/g, ' ');
+        cleanText = cleanText.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&copy;/g, '©');
+        cleanText = cleanText.replace(/\s+/g, ' ').trim();
         
-        document.getElementById('footer-text-result').value = data.text || '';
-        document.getElementById('footer-html-result').value = data.html || '';
+        document.getElementById('footer-text-result').value = cleanText;
+        document.getElementById('footer-html-result').value = footerHtml;
         if (sourceLabel) sourceLabel.textContent = `Source: ${randSite}`;
     } catch (err) {
         alert("Extraction failed: " + err.message);
