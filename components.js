@@ -1348,12 +1348,26 @@ window.extractFooter = async () => {
     if (sourceLabel) sourceLabel.textContent = `Fetching ${randSite}...`;
     if (window.lucide) window.lucide.createIcons();
 
-    try {
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
-        const response = await fetch(proxyUrl);
-        if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+    const proxies = [
+        `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
+        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`
+    ];
 
-        const html = await response.text();
+    try {
+        let html = '';
+        let fetched = false;
+        for (const proxyUrl of proxies) {
+            try {
+                const response = await fetch(proxyUrl);
+                if (response.ok) {
+                    html = await response.text();
+                    fetched = true;
+                    break;
+                }
+            } catch (e) { /* try next proxy */ }
+        }
+        if (!fetched) throw new Error('All proxies failed. Try again later.');
 
         // Extract footer
         let footerHtml = '';
