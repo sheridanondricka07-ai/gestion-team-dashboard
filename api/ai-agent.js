@@ -190,8 +190,14 @@ export default async function handler(req, res) {
             return `- Rank ${idx + 1}: Server "${s.name}" - Total Rev: $${s.totalRev.toLocaleString('en-US', { minimumFractionDigits: 2 })} | Drops: ${s.count} | EPC: $${epc} | CPM: $${cpm}`;
         }).join('\n');
 
-        // Pre-compute revenue by VMTA TLD (domain extension)
-        // Build a quick IP -> VMTA domain lookup from all servers
+        // Pre-compute revenue by SENDING DOMAIN (from drop's returnPath field)
+        // Build RP domain set for classification (RP vs RDNS)
+        const rpDomainSet = new Set();
+        rpInventory.forEach(item => {
+            if (item && item.rpDomain) rpDomainSet.add(item.rpDomain.trim().toLowerCase());
+        });
+
+        // Build IP -> VMTA domain lookup for RDNS fallback
         const ipToVmtaDomain = {};
         servers.forEach(s => {
             if (!s || !s.vmtaMap) return;
@@ -203,62 +209,101 @@ export default async function handler(req, res) {
             });
         });
 
-        const tldRevStats = {};
-        const vmtaDomainRevStats = {};
+        // Helper: extract domain from returnPath (e.g. "bounce@mysite.com" -> "mysite.com")
+        const extractRpDomain = (rpVal) => {
+            if (!rpVal) return null;
+            const clean = rpVal.trim().toLowerCase();
+            if (!clean || clean === 'n/a' || clean === '---') return null;
+            // If it contains @, take the part after @
+            if (clean.includes('@')) return clean.split('@').pop();
+            return clean;
+        };
+
+        // Helper: match against known RP domains
+        const matchRpDomain = (domStr) => {
+            if (!domStr) return null;
+            for (const rpDom of rpDomainSet) {
+                if (domStr === rpDom || domStr.endsWith('.' + rpDom)) return rpDom;
+            }
+            return null;
+        };
+
+        const sendingDomainRevStats = {};   // Revenue per sending domain
+        const sendingTldRevStats = {};       // Revenue per sending domain TLD
+        let totalRpRevenue = 0;
+        let totalRdnsRevenue = 0;
+        let rpDropCount = 0;
+        let rdnsDropCount = 0;
+
         drops.forEach(d => {
             if (!d) return;
             const rev = parseFloat(d.rev || 0);
             const clicks = parseFloat(d.clicks || 0);
             const totalOut = parseFloat(d.totalOut || 0);
 
-            // Get IPs for this drop
-            let dropIps = [];
-            if (d.ips && d.ips !== '---') {
-                dropIps = d.ips.split(/[\s,|]+/).map(ip => ip.trim()).filter(Boolean);
-            }
+            const rpVal = extractRpDomain(d.returnPath);
+            const matchedRp = rpVal ? matchRpDomain(rpVal) : null;
 
-            // Get unique TLDs and domains from those IPs
-            const tlds = new Set();
-            const domains = new Set();
-            dropIps.forEach(ip => {
-                const vmtaDomain = ipToVmtaDomain[ip];
-                if (vmtaDomain) {
-                    const parts = vmtaDomain.split('.');
-                    if (parts.length >= 2) {
-                        tlds.add('.' + parts[parts.length - 1]);
-                        domains.add(parts.slice(-2).join('.'));
+            let sendingDomain = null;
+            let sendType = 'RDNS';
+
+            if (matchedRp) {
+                // This drop used an RP (custom domain)
+                sendingDomain = matchedRp;
+                sendType = 'Domain (RP)';
+                totalRpRevenue += rev;
+                rpDropCount++;
+            } else if (rpVal) {
+                // Has a returnPath but doesn't match known RP — still a domain
+                sendingDomain = rpVal;
+                sendType = 'Domain (Unknown RP)';
+                totalRdnsRevenue += rev;
+                rdnsDropCount++;
+            } else {
+                // No returnPath — RDNS drop, try to resolve domain from IPs
+                totalRdnsRevenue += rev;
+                rdnsDropCount++;
+                let dropIps = [];
+                if (d.ips && d.ips !== '---') {
+                    dropIps = d.ips.split(/[\s,|]+/).map(ip => ip.trim()).filter(Boolean);
+                }
+                // Use first resolvable VMTA domain as the RDNS sending domain
+                for (const ip of dropIps) {
+                    if (ipToVmtaDomain[ip]) {
+                        sendingDomain = ipToVmtaDomain[ip];
+                        break;
                     }
                 }
-            });
+                if (!sendingDomain) sendingDomain = 'Unknown (RDNS)';
+                sendType = 'RDNS';
+            }
 
-            if (tlds.size === 0) return;
+            // Aggregate by sending domain
+            if (!sendingDomainRevStats[sendingDomain]) {
+                sendingDomainRevStats[sendingDomain] = { totalRev: 0, totalClicks: 0, totalOut: 0, count: 0, type: sendType };
+            }
+            sendingDomainRevStats[sendingDomain].totalRev += rev;
+            sendingDomainRevStats[sendingDomain].totalClicks += clicks;
+            sendingDomainRevStats[sendingDomain].totalOut += totalOut;
+            sendingDomainRevStats[sendingDomain].count += 1;
 
-            // Attribute revenue proportionally among TLDs used in this drop
-            const tldShare = 1 / tlds.size;
-            tlds.forEach(tld => {
-                if (!tldRevStats[tld]) {
-                    tldRevStats[tld] = { totalRev: 0, totalClicks: 0, totalOut: 0, count: 0 };
+            // Aggregate by TLD of sending domain
+            if (sendingDomain && sendingDomain !== 'Unknown (RDNS)') {
+                const parts = sendingDomain.split('.');
+                if (parts.length >= 2) {
+                    const tld = '.' + parts[parts.length - 1];
+                    if (!sendingTldRevStats[tld]) {
+                        sendingTldRevStats[tld] = { totalRev: 0, totalClicks: 0, totalOut: 0, count: 0 };
+                    }
+                    sendingTldRevStats[tld].totalRev += rev;
+                    sendingTldRevStats[tld].totalClicks += clicks;
+                    sendingTldRevStats[tld].totalOut += totalOut;
+                    sendingTldRevStats[tld].count += 1;
                 }
-                tldRevStats[tld].totalRev += rev * tldShare;
-                tldRevStats[tld].totalClicks += clicks * tldShare;
-                tldRevStats[tld].totalOut += totalOut * tldShare;
-                tldRevStats[tld].count += 1;
-            });
-
-            // Attribute revenue proportionally among VMTA domains used
-            const domShare = 1 / domains.size;
-            domains.forEach(dom => {
-                if (!vmtaDomainRevStats[dom]) {
-                    vmtaDomainRevStats[dom] = { totalRev: 0, totalClicks: 0, totalOut: 0, count: 0 };
-                }
-                vmtaDomainRevStats[dom].totalRev += rev * domShare;
-                vmtaDomainRevStats[dom].totalClicks += clicks * domShare;
-                vmtaDomainRevStats[dom].totalOut += totalOut * domShare;
-                vmtaDomainRevStats[dom].count += 1;
-            });
+            }
         });
 
-        const tldRevBreakdown = Object.entries(tldRevStats)
+        const tldRevBreakdown = Object.entries(sendingTldRevStats)
             .sort((a, b) => b[1].totalRev - a[1].totalRev)
             .map(([tld, stats], idx) => {
                 const epc = stats.totalClicks > 0 ? (stats.totalRev / stats.totalClicks).toFixed(2) : '0.00';
@@ -266,13 +311,13 @@ export default async function handler(req, res) {
                 return `- Rank ${idx + 1}: ${tld} - Total Rev: $${stats.totalRev.toLocaleString('en-US', { minimumFractionDigits: 2 })} | Drops: ${stats.count} | EPC: $${epc} | CPM: $${cpm}`;
             }).join('\n');
 
-        const vmtaDomainRevBreakdown = Object.entries(vmtaDomainRevStats)
+        const sendingDomainRevBreakdown = Object.entries(sendingDomainRevStats)
             .sort((a, b) => b[1].totalRev - a[1].totalRev)
-            .slice(0, 30)
+            .slice(0, 40)
             .map(([dom, stats], idx) => {
                 const epc = stats.totalClicks > 0 ? (stats.totalRev / stats.totalClicks).toFixed(2) : '0.00';
                 const cpm = stats.totalOut > 0 ? ((stats.totalRev * 1000) / stats.totalOut).toFixed(2) : '0.00';
-                return `- Rank ${idx + 1}: ${dom} - Total Rev: $${stats.totalRev.toLocaleString('en-US', { minimumFractionDigits: 2 })} | Drops: ${stats.count} | EPC: $${epc} | CPM: $${cpm}`;
+                return `- Rank ${idx + 1}: ${dom} [${stats.type}] - Total Rev: $${stats.totalRev.toLocaleString('en-US', { minimumFractionDigits: 2 })} | Drops: ${stats.count} | EPC: $${epc} | CPM: $${cpm}`;
             }).join('\n');
 
         const formattedDrops = drops.slice(-50).map(d => {
@@ -542,6 +587,8 @@ SUMMARY STATISTICS (EXACT PRE-COMPUTED COUNTS — USE THESE, DO NOT RECOUNT):
 - Total Active Warmup Groups: ${activeWarmupGroups.length}
 - Total Inactive Warmup Groups: ${inactiveWarmupGroups.length}
 - Total Archived Warmup Groups: ${archivedWarmupGroups.length}
+- Revenue from Domain (RP) Drops: $${totalRpRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })} (${rpDropCount} drops)
+- Revenue from RDNS Drops: $${totalRdnsRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })} (${rdnsDropCount} drops)
 
 DOMAIN WARMUP INTELLIGENCE (LEARNED STRATEGY / SCHEMA):
 ------------------
@@ -584,13 +631,15 @@ TOP PERFORMING SERVERS (PRE-COMPUTED BY REVENUE — USE THESE FOR SERVER REVENUE
 ------------------
 ${topServersBreakdown || 'No top server statistics computed.'}
 
-REVENUE BY DOMAIN EXTENSION / TLD (PRE-COMPUTED — TOP TO FLOP — USE THESE EXACT NUMBERS):
+REVENUE BY SENDING DOMAIN EXTENSION / TLD (PRE-COMPUTED FROM DROP RETURNPATH — TOP TO FLOP — USE THESE EXACT NUMBERS):
 ------------------
+This is based on the actual sending domain used in each drop (from the returnPath field). Each drop is classified as Domain (RP) if the returnPath matches a known RP domain, or RDNS if no returnPath.
 ${tldRevBreakdown || 'No revenue data by domain extension available.'}
 
-REVENUE BY VMTA DOMAIN (PRE-COMPUTED — TOP TO FLOP — USE THESE EXACT NUMBERS):
+REVENUE BY SENDING DOMAIN (PRE-COMPUTED FROM DROP RETURNPATH — TOP TO FLOP — USE THESE EXACT NUMBERS):
 ------------------
-${vmtaDomainRevBreakdown || 'No revenue data by VMTA domain available.'}
+Breakdown per individual sending domain. Each entry shows the domain name, its type [Domain (RP) or RDNS], and revenue stats.
+${sendingDomainRevBreakdown || 'No revenue data by sending domain available.'}
 
 CURRENT REAL-TIME CONTEXT DATA:
 ------------------
@@ -638,7 +687,7 @@ GUIDELINES:
     j. CRITICAL: Each line in the code block must start exactly with the domainIncluded. Do NOT prepend or prefix any server IPs, server names, or any other metadata to the record lines. Do not use brackets, quotes, or placeholders.
     k. Include limits/warnings in your response if applicable: if record type is Arecord and the number of IPs > 49, warn the user. If record type is Include and the number of IPs > 99, warn the user.
 11. If the user asks about domain warmup progress, start date, duration of warmup, drops count, total sent, last drop size, or warmup strategy/recommendations, refer directly to the ACTIVE DOMAIN WARMUP GROUPS, INACTIVE DOMAIN WARMUP GROUPS, ARCHIVED DOMAIN WARMUP GROUPS, and DOMAIN WARMUP INTELLIGENCE sections above. Respond with details about start date, duration in days, and recommendations computed from historical data.
-12. If the user asks about revenue by domain name extension, TLD, domain extension performance, or which extensions are most/least profitable, look at the REVENUE BY DOMAIN EXTENSION / TLD section above. If they ask about revenue per specific VMTA domain, look at the REVENUE BY VMTA DOMAIN section. Present ranked results with revenue, drops count, EPC, and CPM in a table format.`;
+12. If the user asks about revenue by domain name extension, TLD, domain extension performance, or which extensions are most/least profitable, look at the REVENUE BY SENDING DOMAIN EXTENSION / TLD section above. If they ask about revenue per specific sending domain, look at the REVENUE BY SENDING DOMAIN section. Each domain is tagged as [Domain (RP)] if it matched a known RP domain, or [RDNS] if the drop had no returnPath. Also use the summary stats for RP vs RDNS revenue comparison. Present ranked results with revenue, drops count, EPC, and CPM in a table format.`;
 
         let responseText = '';
 
