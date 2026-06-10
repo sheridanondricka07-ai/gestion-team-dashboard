@@ -190,6 +190,91 @@ export default async function handler(req, res) {
             return `- Rank ${idx + 1}: Server "${s.name}" - Total Rev: $${s.totalRev.toLocaleString('en-US', { minimumFractionDigits: 2 })} | Drops: ${s.count} | EPC: $${epc} | CPM: $${cpm}`;
         }).join('\n');
 
+        // Pre-compute revenue by VMTA TLD (domain extension)
+        // Build a quick IP -> VMTA domain lookup from all servers
+        const ipToVmtaDomain = {};
+        servers.forEach(s => {
+            if (!s || !s.vmtaMap) return;
+            Object.entries(s.vmtaMap).forEach(([safeIp, domain]) => {
+                if (domain && domain !== '---') {
+                    const ip = safeIp.replace(/_/g, '.');
+                    ipToVmtaDomain[ip] = domain;
+                }
+            });
+        });
+
+        const tldRevStats = {};
+        const vmtaDomainRevStats = {};
+        drops.forEach(d => {
+            if (!d) return;
+            const rev = parseFloat(d.rev || 0);
+            const clicks = parseFloat(d.clicks || 0);
+            const totalOut = parseFloat(d.totalOut || 0);
+
+            // Get IPs for this drop
+            let dropIps = [];
+            if (d.ips && d.ips !== '---') {
+                dropIps = d.ips.split(/[\s,|]+/).map(ip => ip.trim()).filter(Boolean);
+            }
+
+            // Get unique TLDs and domains from those IPs
+            const tlds = new Set();
+            const domains = new Set();
+            dropIps.forEach(ip => {
+                const vmtaDomain = ipToVmtaDomain[ip];
+                if (vmtaDomain) {
+                    const parts = vmtaDomain.split('.');
+                    if (parts.length >= 2) {
+                        tlds.add('.' + parts[parts.length - 1]);
+                        domains.add(parts.slice(-2).join('.'));
+                    }
+                }
+            });
+
+            if (tlds.size === 0) return;
+
+            // Attribute revenue proportionally among TLDs used in this drop
+            const tldShare = 1 / tlds.size;
+            tlds.forEach(tld => {
+                if (!tldRevStats[tld]) {
+                    tldRevStats[tld] = { totalRev: 0, totalClicks: 0, totalOut: 0, count: 0 };
+                }
+                tldRevStats[tld].totalRev += rev * tldShare;
+                tldRevStats[tld].totalClicks += clicks * tldShare;
+                tldRevStats[tld].totalOut += totalOut * tldShare;
+                tldRevStats[tld].count += 1;
+            });
+
+            // Attribute revenue proportionally among VMTA domains used
+            const domShare = 1 / domains.size;
+            domains.forEach(dom => {
+                if (!vmtaDomainRevStats[dom]) {
+                    vmtaDomainRevStats[dom] = { totalRev: 0, totalClicks: 0, totalOut: 0, count: 0 };
+                }
+                vmtaDomainRevStats[dom].totalRev += rev * domShare;
+                vmtaDomainRevStats[dom].totalClicks += clicks * domShare;
+                vmtaDomainRevStats[dom].totalOut += totalOut * domShare;
+                vmtaDomainRevStats[dom].count += 1;
+            });
+        });
+
+        const tldRevBreakdown = Object.entries(tldRevStats)
+            .sort((a, b) => b[1].totalRev - a[1].totalRev)
+            .map(([tld, stats], idx) => {
+                const epc = stats.totalClicks > 0 ? (stats.totalRev / stats.totalClicks).toFixed(2) : '0.00';
+                const cpm = stats.totalOut > 0 ? ((stats.totalRev * 1000) / stats.totalOut).toFixed(2) : '0.00';
+                return `- Rank ${idx + 1}: ${tld} - Total Rev: $${stats.totalRev.toLocaleString('en-US', { minimumFractionDigits: 2 })} | Drops: ${stats.count} | EPC: $${epc} | CPM: $${cpm}`;
+            }).join('\n');
+
+        const vmtaDomainRevBreakdown = Object.entries(vmtaDomainRevStats)
+            .sort((a, b) => b[1].totalRev - a[1].totalRev)
+            .slice(0, 30)
+            .map(([dom, stats], idx) => {
+                const epc = stats.totalClicks > 0 ? (stats.totalRev / stats.totalClicks).toFixed(2) : '0.00';
+                const cpm = stats.totalOut > 0 ? ((stats.totalRev * 1000) / stats.totalOut).toFixed(2) : '0.00';
+                return `- Rank ${idx + 1}: ${dom} - Total Rev: $${stats.totalRev.toLocaleString('en-US', { minimumFractionDigits: 2 })} | Drops: ${stats.count} | EPC: $${epc} | CPM: $${cpm}`;
+            }).join('\n');
+
         const formattedDrops = drops.slice(-50).map(d => {
             if (!d) return null;
             return `- Date: ${d.date}, Mailer: ${d.mailerName}, Server: ${d.servers || 'N/A'}, Offer: ${d.offer}, OfferID: ${d.offerId || extractOfferId(d.offer)}, EPC: $${d.epc || 0}, CPM: $${d.cpm || 0}, Rev: $${d.rev || 0}`;
@@ -499,6 +584,14 @@ TOP PERFORMING SERVERS (PRE-COMPUTED BY REVENUE — USE THESE FOR SERVER REVENUE
 ------------------
 ${topServersBreakdown || 'No top server statistics computed.'}
 
+REVENUE BY DOMAIN EXTENSION / TLD (PRE-COMPUTED — TOP TO FLOP — USE THESE EXACT NUMBERS):
+------------------
+${tldRevBreakdown || 'No revenue data by domain extension available.'}
+
+REVENUE BY VMTA DOMAIN (PRE-COMPUTED — TOP TO FLOP — USE THESE EXACT NUMBERS):
+------------------
+${vmtaDomainRevBreakdown || 'No revenue data by VMTA domain available.'}
+
 CURRENT REAL-TIME CONTEXT DATA:
 ------------------
 TODAY'S DATE/TIME: ${new Date().toLocaleString()}
@@ -544,7 +637,8 @@ GUIDELINES:
     i. Present the generated records inside a copyable code block using HTML tags: <pre><code>[records]</code></pre>
     j. CRITICAL: Each line in the code block must start exactly with the domainIncluded. Do NOT prepend or prefix any server IPs, server names, or any other metadata to the record lines. Do not use brackets, quotes, or placeholders.
     k. Include limits/warnings in your response if applicable: if record type is Arecord and the number of IPs > 49, warn the user. If record type is Include and the number of IPs > 99, warn the user.
-11. If the user asks about domain warmup progress, start date, duration of warmup, drops count, total sent, last drop size, or warmup strategy/recommendations, refer directly to the ACTIVE DOMAIN WARMUP GROUPS, INACTIVE DOMAIN WARMUP GROUPS, ARCHIVED DOMAIN WARMUP GROUPS, and DOMAIN WARMUP INTELLIGENCE sections above. Respond with details about start date, duration in days, and recommendations computed from historical data.`;
+11. If the user asks about domain warmup progress, start date, duration of warmup, drops count, total sent, last drop size, or warmup strategy/recommendations, refer directly to the ACTIVE DOMAIN WARMUP GROUPS, INACTIVE DOMAIN WARMUP GROUPS, ARCHIVED DOMAIN WARMUP GROUPS, and DOMAIN WARMUP INTELLIGENCE sections above. Respond with details about start date, duration in days, and recommendations computed from historical data.
+12. If the user asks about revenue by domain name extension, TLD, domain extension performance, or which extensions are most/least profitable, look at the REVENUE BY DOMAIN EXTENSION / TLD section above. If they ask about revenue per specific VMTA domain, look at the REVENUE BY VMTA DOMAIN section. Present ranked results with revenue, drops count, EPC, and CPM in a table format.`;
 
         let responseText = '';
 
