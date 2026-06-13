@@ -4,10 +4,10 @@
 // 3. Paste your config here:
 const firebaseConfig = {
     apiKey: "AIzaSyAmlb9zRzuMKvKVv6lPnKFJo7l4utjCO_c",
-    authDomain: "gestion-team-d.firebaseapp.com",
-    databaseURL: "https://gestion-team-d-default-rtdb.firebaseio.com",
-    projectId: "gestion-team-d",
-    storageBucket: "gestion-team-d.firebasestorage.app",
+    authDomain: "gestion-team-e.firebaseapp.com",
+    databaseURL: "https://gestion-team-e-default-rtdb.firebaseio.com",
+    projectId: "gestion-team-e",
+    storageBucket: "gestion-team-e.firebasestorage.app",
     messagingSenderId: "581748244383",
     appId: "1:581748244383:web:59651051c0a234fb8347aa"
 };
@@ -130,7 +130,8 @@ class TeamApp {
         if (needsSave) {
             this.state.servers = serversToKeep;
             this.state.historyServers = historyToAdd;
-            await this.saveState();
+            await this.saveNode('servers');
+            await this.saveNode('historyServers');
         }
 
         // Run Proactive Alerts for upcoming dates
@@ -181,7 +182,7 @@ class TeamApp {
             }
         }
 
-        if (needsSave) await this.saveState();
+        if (needsSave) await this.saveNode('servers');
     }
 
     async sendTelegramNotification(message) {
@@ -260,7 +261,7 @@ class TeamApp {
             if ((!existingServer.ip || existingServer.ip === '0.0.0.0') && (serverData.mainIp || ips[0])) {
                 existingServer.ip = serverData.mainIp || ips[0];
             }
-            await this.saveState();
+            await this.saveNode('servers');
         } else {
             // Create new server
             const newServer = {
@@ -284,7 +285,7 @@ class TeamApp {
                 cancelDate: serverData.cancelDate || ''
             };
             this.state.servers.push(newServer);
-            await this.saveState();
+            await this.saveNode('servers');
             this.updateDashboard();
         }
 
@@ -302,7 +303,7 @@ class TeamApp {
             .then(async (data) => {
                 if (data.results) {
                     this.state.vmtaResults = { ...this.state.vmtaResults, ...data.results };
-                    await this.saveState();
+                    await this.saveNode('vmtaResults');
                     this.updateDashboard();
                 }
             })
@@ -355,7 +356,8 @@ class TeamApp {
         }
 
         if (added.length > 0) {
-            await this.saveState();
+            await this.saveNode('rps');
+            await this.saveNode('rpInventory');
         }
     }
 
@@ -369,8 +371,7 @@ class TeamApp {
             mailer_id: data.mailer_id || 'N/A'
         };
         this.state.mailers.push(mailer);
-        await this.saveState();
-        this.updateDashboard();
+        await this.saveNode('mailers');
     }
 
     async deleteMailer(mailerId) {
@@ -386,21 +387,25 @@ class TeamApp {
                 }
             });
             this.state.mailers = this.state.mailers.filter(m => m.id !== mailerId);
-            await this.saveState();
+            await this.saveNode('servers');
+            await this.saveNode('rps');
+            await this.saveNode('rpInventory');
+            await this.saveNode('mailers');
         });
     }
 
     async updateRPIps(rpId, ips) {
         const rp = this.state.rps.find(r => r.id === rpId);
         if (rp) rp.assignedIps = ips;
-        await this.saveState();
+        await this.saveNode('rps');
+        await this.saveNode('rpInventory');
     }
 
     async updateMailer(id, updates) {
         const index = this.state.mailers.findIndex(m => m.id === id);
         if (index !== -1) {
             this.state.mailers[index] = { ...this.state.mailers[index], ...updates };
-            await this.saveState();
+            await this.saveNode('mailers');
         }
     }
 
@@ -469,7 +474,7 @@ class TeamApp {
             timestamp: now.getTime()
         };
         this.state.drops.push(drop);
-        await this.saveState();
+        await this.saveNode('drops');
         await this.sendDropToTelegram(drop, 'NEW DROP');
     }
 
@@ -494,7 +499,7 @@ class TeamApp {
                 totalOut, rev, clicks, cpm, epc,
                 servers: updates.ips ? this.detectServers(updates.ips) : current.servers
             };
-            await this.saveState();
+            await this.saveNode('drops');
             await this.sendDropToTelegram(this.state.drops[index], 'EDITED DROP');
         }
     }
@@ -541,7 +546,7 @@ class TeamApp {
     async deleteDrop(dropId) {
         this.showConfirm("Permanently delete this drop record?", async () => {
             this.state.drops = this.state.drops.filter(d => d.id !== dropId);
-            await this.saveState();
+            await this.saveNode('drops');
         });
     }
 
@@ -566,7 +571,9 @@ class TeamApp {
                 });
             }
         }
-        await this.saveState();
+        await this.saveNode('rps');
+        await this.saveNode('rpInventory');
+        await this.saveNode('servers');
     }
 
     checkRpServerConflict(rpDomain, targetServerName, domainIncluded = null) {
@@ -650,7 +657,8 @@ class TeamApp {
             if (!serverId) { rp.assignedIps = []; rp.status = 'stock'; }
             else { rp.status = 'active'; }
         }
-        await this.saveState();
+        await this.saveNode('rps');
+        await this.saveNode('rpInventory');
     }
 
     async deleteServer(serverId) {
@@ -659,7 +667,9 @@ class TeamApp {
                 if (rp.serverId === serverId) { rp.serverId = null; rp.mailerId = null; rp.assignedIps = []; rp.status = 'stock'; }
             });
             this.state.servers = this.state.servers.filter(s => s.id !== serverId);
-            await this.saveState();
+            await this.saveNode('rps');
+            await this.saveNode('rpInventory');
+            await this.saveNode('servers');
         });
     }
 
@@ -671,7 +681,8 @@ class TeamApp {
                 this.state.rpInventory = (this.state.rpInventory || []).filter(item => (item.rpDomain || '').trim().toLowerCase() !== domain);
             }
             this.state.rps = this.state.rps.filter(r => r.id !== rpId);
-            await this.saveState();
+            await this.saveNode('rps');
+            await this.saveNode('rpInventory');
         });
     }
 
@@ -706,140 +717,13 @@ class TeamApp {
             if (typeof window.db !== 'undefined') {
                 console.log("Connecting to Firebase Database...");
                 this.state.dbConnected = true;
-                window.db.ref('state').on('value', (snapshot) => {
-                    console.log("Data received from Firebase");
+
+                // 1. Fetch initial state once
+                window.db.ref('state').once('value', (snapshot) => {
+                    console.log("Initial state data received from Firebase");
                     const cloudData = snapshot.val();
                     if (cloudData) {
-                        const currentUser = this.state.currentUser;
-                        const currentView = this.state.currentView; // Preserve local view
-                        
-                        // Check if only spamhausProgress changed — if so, update bar without full re-render
-                        const oldProgress = JSON.stringify(this.state.spamhausProgress || {});
-                        const newProgress = JSON.stringify(cloudData.spamhausProgress || {});
-                        const progressChanged = oldProgress !== newProgress;
-
-                        // Check if only rpSpfProgress changed — if so, update bar without full re-render
-                        const oldSpfProgress = JSON.stringify(this.state.rpSpfProgress || {});
-                        const newSpfProgress = JSON.stringify(cloudData.rpSpfProgress || {});
-                        const spfProgressChanged = oldSpfProgress !== newSpfProgress;
-                        
-                        // Preserve local UI filters during Firebase sync
-                        const rpFilterServer = this.state.rpFilterServer || ['all'];
-                        const rpFilterSpfType = this.state.rpFilterSpfType || 'all';
-                        const rpFilterRpType = this.state.rpFilterRpType || 'all';
-                        const rpFilterSent = this.state.rpFilterSent || 'all';
-                        const rpFilterSpfStatus = this.state.rpFilterSpfStatus || 'all';
-                        const rpSearch = typeof this.state.rpSearch !== 'undefined' ? this.state.rpSearch : '';
-                        const rpFilterServerDropdownOpen = !!this.state.rpFilterServerDropdownOpen;
-                        const searchQuery = typeof this.state.searchQuery !== 'undefined' ? this.state.searchQuery : '';
-                        
-                        this.state = { 
-                            ...this.state, 
-                            ...cloudData, 
-                            currentUser, 
-                            currentView, 
-                            dbConnected: true,
-                            rpFilterServer,
-                            rpFilterSpfType,
-                            rpFilterRpType,
-                            rpFilterSent,
-                            rpFilterSpfStatus,
-                            rpSearch,
-                            rpFilterServerDropdownOpen,
-                            searchQuery
-                        };
-                        // SAFETY: Firebase may return null for these — always ensure safe defaults
-                        if (!this.state.servers) this.state.servers = [];
-                        if (!this.state.mailers) this.state.mailers = [];
-                        if (!this.state.drops) this.state.drops = [];
-                        if (!this.state.historyServers) this.state.historyServers = [];
-                        if (!this.state.tools) this.state.tools = [];
-                        if (!this.state.rps) this.state.rps = [];
-                        if (!this.state.rpInventory) this.state.rpInventory = [];
-                        if (!this.state.warmupData) this.state.warmupData = {};
-
-                        if (!this.state.spamhausProgress) this.state.spamhausProgress = { status: 'idle', current: 0, total: 0 };
-                        if (!this.state.rpSpfProgress) this.state.rpSpfProgress = { status: 'idle', current: 0, total: 0 };
-                        if (!this.state.spamhaus) this.state.spamhaus = {};
-                        
-                        // Patch missing Mailer IDs for known team members
-                        let patched = false;
-                        const knownIds = {
-                            'Jaefar LAAKEL HEMDANOU': '3134',
-                            'Salma EL KARTIT': '3329',
-                            'Ayoub GHAILAN': '3335',
-                            'Inssaf EL HAOUASS': '2310'
-                        };
-                        
-                        if (this.state.mailers) {
-                            this.state.mailers.forEach(m => {
-                                if (m) {
-                                    const cleanName = (m.name || '').trim();
-                                    if (knownIds[cleanName] && (!m.mailer_id || m.mailer_id === 'N/A')) {
-                                        m.mailer_id = knownIds[cleanName];
-                                        patched = true;
-                                    }
-                                }
-                            });
-                        }
-                        
-                        // Also patch existing drops that show "N/A" or lack offerId
-                        if (this.state.drops && Array.isArray(this.state.drops)) {
-                            this.state.drops.forEach(d => {
-                                if (d) {
-                                    const cleanName = (d.mailerName || '').trim();
-                                    if (knownIds[cleanName] && (!d.mailerId || d.mailerId === 'N/A')) {
-                                        d.mailerId = knownIds[cleanName];
-                                        patched = true;
-                                    }
-                                    if (typeof d.servers === 'undefined') {
-                                        const matched = this.detectServers(d.ips);
-                                        d.servers = (matched && matched.length > 0) ? matched : ['N/A'];
-                                        patched = true;
-                                    }
-                                    if (d.offer && typeof d.offerId === 'undefined') {
-                                        const oid = this.extractOfferId(d.offer);
-                                        d.offerId = oid || 'N/A';
-                                        patched = true;
-                                    }
-                                }
-                            });
-                        }
-                        
-                        // We run syncRpsAndInventory to fix local UI state, 
-                        // but we MUST NOT saveState() back to Firebase automatically here, 
-                        // otherwise it creates a massive infinite data loop.
-                        this.syncRpsAndInventory();
-                        
-                        // If scan is running and only progress changed, just update the bar
-                        if (progressChanged && cloudData.spamhausProgress && cloudData.spamhausProgress.status === 'running') {
-                            const bar = document.querySelector('#spamhaus-progress .progress-bar');
-                            const text = document.querySelector('#spamhaus-progress-text');
-                            const container = document.getElementById('spamhaus-progress');
-                            if (bar && cloudData.spamhausProgress.total > 0) {
-                                const pct = Math.round((cloudData.spamhausProgress.current / cloudData.spamhausProgress.total) * 100);
-                                bar.style.width = pct + '%';
-                                if (text) text.textContent = `${pct}% (${cloudData.spamhausProgress.current}/${cloudData.spamhausProgress.total})`;
-                                if (container) container.classList.add('progress-active');
-                                return; // Skip full re-render
-                            }
-                        }
-
-                        // If SPF check is running and only progress changed, update the SPF progress bar
-                        if (spfProgressChanged && cloudData.rpSpfProgress && cloudData.rpSpfProgress.status === 'running') {
-                            const bar = document.querySelector('#rp-spf-progress-container .progress-bar');
-                            const text = document.querySelector('#rp-spf-progress-text');
-                            if (bar && cloudData.rpSpfProgress.total > 0) {
-                                const pct = Math.round((cloudData.rpSpfProgress.current / cloudData.rpSpfProgress.total) * 100);
-                                bar.style.width = pct + '%';
-                                if (text) text.textContent = `${pct}% (${cloudData.rpSpfProgress.current}/${cloudData.rpSpfProgress.total})`;
-                                return; // Skip full re-render
-                            }
-                        }
-                        
-                        this.updateDashboard();
-                        if (!this.state.currentUser && !document.getElementById('login-form')) renderLogin(this);
-
+                        this.mergeCloudData(cloudData);
                         if (!this.hasCheckedCancellations) {
                             this.hasCheckedCancellations = true;
                             this.runMaintenanceEngine();
@@ -858,6 +742,71 @@ class TeamApp {
                     }
                     this.checkAuth();
                 });
+
+                // 2. Set up real-time progress listeners (lightweight nodes)
+                window.db.ref('state/spamhausProgress').on('value', (snapshot) => {
+                    const progress = snapshot.val();
+                    if (progress) {
+                        this.state.spamhausProgress = progress;
+                        if (progress.status === 'running') {
+                            const bar = document.querySelector('#spamhaus-progress .progress-bar');
+                            const text = document.querySelector('#spamhaus-progress-text');
+                            const container = document.getElementById('spamhaus-progress');
+                            if (bar && progress.total > 0) {
+                                const pct = Math.round((progress.current / progress.total) * 100);
+                                bar.style.width = pct + '%';
+                                if (text) text.textContent = `${pct}% (${progress.current}/${progress.total})`;
+                                if (container) container.classList.add('progress-active');
+                            }
+                        } else {
+                            const container = document.getElementById('spamhaus-progress');
+                            if (container) container.classList.remove('progress-active');
+                            this.updateDashboard();
+                        }
+                    }
+                });
+
+                window.db.ref('state/rpSpfProgress').on('value', (snapshot) => {
+                    const progress = snapshot.val();
+                    if (progress) {
+                        this.state.rpSpfProgress = progress;
+                        if (progress.status === 'running') {
+                            const bar = document.querySelector('#rp-spf-progress-container .progress-bar');
+                            const text = document.querySelector('#rp-spf-progress-text');
+                            if (bar && progress.total > 0) {
+                                const pct = Math.round((progress.current / progress.total) * 100);
+                                bar.style.width = pct + '%';
+                                if (text) text.textContent = `${pct}% (${progress.current}/${progress.total})`;
+                            }
+                        } else {
+                            this.updateDashboard();
+                        }
+                    }
+                });
+
+                window.db.ref('state/rpAutoDetectProgress').on('value', (snapshot) => {
+                    const progress = snapshot.val();
+                    if (progress) {
+                        this.state.rpAutoDetectProgress = progress;
+                        this.updateDashboard();
+                    }
+                });
+
+                // 3. Periodic silent background sync every 5 minutes
+                setInterval(() => {
+                    if (this.state.dbConnected && !this.state.syncing) {
+                        console.log("Background periodic syncing...");
+                        window.db.ref('state').once('value').then(snapshot => {
+                            const cloudData = snapshot.val();
+                            if (cloudData) {
+                                this.mergeCloudData(cloudData);
+                                this.state.lastSynced = new Date().toLocaleTimeString();
+                                this.updateDashboard();
+                            }
+                        }).catch(err => console.error("Silent background sync failed:", err));
+                    }
+                }, 300000);
+
             } else {
                 console.warn("No Database Connection. Falling back to Local Storage.");
                 this.state.dbConnected = false;
@@ -871,6 +820,130 @@ class TeamApp {
         } catch (err) {
             console.error("Critical App Error:", err);
             document.body.innerHTML = `<div style="padding:40px; color:var(--text-primary); text-align:center;"><h2>Critical Error</h2><p>${err.message}</p></div>`;
+        }
+    }
+
+    mergeCloudData(cloudData) {
+        if (!cloudData) return;
+        const currentUser = this.state.currentUser;
+        const currentView = this.state.currentView; // Preserve local view
+        
+        // Preserve local UI filters during Firebase sync
+        const rpFilterServer = this.state.rpFilterServer || ['all'];
+        const rpFilterSpfType = this.state.rpFilterSpfType || 'all';
+        const rpFilterRpType = this.state.rpFilterRpType || 'all';
+        const rpFilterSent = this.state.rpFilterSent || 'all';
+        const rpFilterSpfStatus = this.state.rpFilterSpfStatus || 'all';
+        const rpSearch = typeof this.state.rpSearch !== 'undefined' ? this.state.rpSearch : '';
+        const rpFilterServerDropdownOpen = !!this.state.rpFilterServerDropdownOpen;
+        const searchQuery = typeof this.state.searchQuery !== 'undefined' ? this.state.searchQuery : '';
+        
+        this.state = { 
+            ...this.state, 
+            ...cloudData, 
+            currentUser, 
+            currentView, 
+            dbConnected: true,
+            rpFilterServer,
+            rpFilterSpfType,
+            rpFilterRpType,
+            rpFilterSent,
+            rpFilterSpfStatus,
+            rpSearch,
+            rpFilterServerDropdownOpen,
+            searchQuery
+        };
+        // SAFETY: Firebase may return null for these — always ensure safe defaults
+        if (!this.state.servers) this.state.servers = [];
+        if (!this.state.mailers) this.state.mailers = [];
+        if (!this.state.drops) this.state.drops = [];
+        if (!this.state.historyServers) this.state.historyServers = [];
+        if (!this.state.tools) this.state.tools = [];
+        if (!this.state.rps) this.state.rps = [];
+        if (!this.state.rpInventory) this.state.rpInventory = [];
+        if (!this.state.warmupData) this.state.warmupData = {};
+
+        if (!this.state.spamhausProgress) this.state.spamhausProgress = { status: 'idle', current: 0, total: 0 };
+        if (!this.state.rpSpfProgress) this.state.rpSpfProgress = { status: 'idle', current: 0, total: 0 };
+        if (!this.state.spamhaus) this.state.spamhaus = {};
+        
+        // Patch missing Mailer IDs for known team members
+        const knownIds = {
+            'Jaefar LAAKEL HEMDANOU': '3134',
+            'Salma EL KARTIT': '3329',
+            'Ayoub GHAILAN': '3335',
+            'Inssaf EL HAOUASS': '2310'
+        };
+        
+        if (this.state.mailers) {
+            this.state.mailers.forEach(m => {
+                if (m) {
+                    const cleanName = (m.name || '').trim();
+                    if (knownIds[cleanName] && (!m.mailer_id || m.mailer_id === 'N/A')) {
+                        m.mailer_id = knownIds[cleanName];
+                    }
+                }
+            });
+        }
+        
+        // Also patch existing drops that show "N/A" or lack offerId
+        if (this.state.drops && Array.isArray(this.state.drops)) {
+            this.state.drops.forEach(d => {
+                if (d) {
+                    const cleanName = (d.mailerName || '').trim();
+                    if (knownIds[cleanName] && (!d.mailerId || d.mailerId === 'N/A')) {
+                        d.mailerId = knownIds[cleanName];
+                    }
+                    if (typeof d.servers === 'undefined') {
+                        const matched = this.detectServers(d.ips);
+                        d.servers = (matched && matched.length > 0) ? matched : ['N/A'];
+                    }
+                    if (d.offer && typeof d.offerId === 'undefined') {
+                        const oid = this.extractOfferId(d.offer);
+                        d.offerId = oid || 'N/A';
+                    }
+                }
+            });
+        }
+        
+        this.syncRpsAndInventory();
+        this.updateDashboard();
+        if (!this.state.currentUser && !document.getElementById('login-form')) renderLogin(this);
+    }
+
+    async syncData() {
+        if (!this.state.dbConnected) return;
+        console.log("Manually syncing data from Firebase...");
+        this.state.syncing = true;
+        this.updateDashboard();
+        try {
+            const snapshot = await window.db.ref('state').once('value');
+            const cloudData = snapshot.val();
+            if (cloudData) {
+                this.mergeCloudData(cloudData);
+                this.state.lastSynced = new Date().toLocaleTimeString();
+            }
+        } catch (e) {
+            console.error("Sync error:", e);
+        } finally {
+            this.state.syncing = false;
+            this.updateDashboard();
+        }
+    }
+
+    async saveNode(nodeName) {
+        if (this.state.dbConnected) {
+            try {
+                this.syncRpsAndInventory();
+                const val = this.state[nodeName];
+                if (val !== undefined) {
+                    await window.db.ref(`state/${nodeName}`).set(val);
+                }
+            } catch (e) {
+                console.error(`Error saving node ${nodeName}:`, e);
+            }
+        } else {
+            await this.saveState();
         }
     }
 
@@ -918,7 +991,7 @@ class TeamApp {
         }
     }
 
-    setDropSort(key) {
+    async setDropSort(key) {
         if (this.state.dropSort.key === key) {
             if (this.state.dropSort.order === 'desc') {
                 this.state.dropSort.order = 'asc';
@@ -932,7 +1005,7 @@ class TeamApp {
             this.state.dropSort.order = 'desc';
         }
         this.updateDashboard();
-        if (this.state.dbConnected) this.saveState();
+        if (this.state.dbConnected) await this.saveNode('dropSort');
     }
 
     async resetApp() {
@@ -981,12 +1054,12 @@ class TeamApp {
     async addTool(tool) {
         tool.id = 'tool_' + Date.now();
         this.state.tools.push(tool);
-        await this.saveState();
+        await this.saveNode('tools');
     }
 
     async deleteTool(id) {
         this.state.tools = this.state.tools.filter(t => t.id !== id);
-        await this.saveState();
+        await this.saveNode('tools');
     }
 
     async updateProfile(userData) {
@@ -994,7 +1067,7 @@ class TeamApp {
         if (userIndex !== -1) {
             this.state.mailers[userIndex] = { ...this.state.mailers[userIndex], ...userData };
             this.state.currentUser = this.state.mailers[userIndex];
-            await this.saveState();
+            await this.saveNode('mailers');
             this.updateDashboard();
         }
     }
@@ -1028,7 +1101,11 @@ class TeamApp {
         this.state.statuses[safeIp][date] = status;
         
         try {
-            await this.saveState();
+            if (this.state.dbConnected) {
+                await window.db.ref(`state/statuses/${safeIp}/${date}`).set(status);
+            } else {
+                await this.saveState();
+            }
         } catch(e) {
             console.error("Firebase save error:", e);
         }
@@ -1036,16 +1113,22 @@ class TeamApp {
 
     async bulkUpdateIPStatuses(ips, status, date) {
         if (!this.state.statuses) this.state.statuses = {};
+        const updates = {};
         ips.forEach(ip => {
             const trimmedIp = ip.trim();
             if (!trimmedIp) return;
             const safeIp = trimmedIp.replace(/\./g, '_');
             if (!this.state.statuses[safeIp]) this.state.statuses[safeIp] = {};
             this.state.statuses[safeIp][date] = status;
+            updates[`statuses/${safeIp}/${date}`] = status;
         });
         
         try {
-            await this.saveState();
+            if (this.state.dbConnected) {
+                await window.db.ref('state').update(updates);
+            } else {
+                await this.saveState();
+            }
         } catch(e) {
             console.error("Firebase save error:", e);
             throw e;
@@ -1054,15 +1137,20 @@ class TeamApp {
 
     async batchUpdateIPStatuses(updates, statusId) {
         if (!this.state.statuses) this.state.statuses = {};
-        
+        const dbUpdates = {};
         updates.forEach(({ ip, date }) => {
             const safeIp = ip.replace(/\./g, '_');
             if (!this.state.statuses[safeIp]) this.state.statuses[safeIp] = {};
             this.state.statuses[safeIp][date] = statusId;
+            dbUpdates[`statuses/${safeIp}/${date}`] = statusId;
         });
         
         try {
-            await this.saveState();
+            if (this.state.dbConnected) {
+                await window.db.ref('state').update(dbUpdates);
+            } else {
+                await this.saveState();
+            }
         } catch(e) {
             console.error("Firebase save error:", e);
             throw e;
@@ -1298,7 +1386,8 @@ class TeamApp {
             alreadySent: !!data.alreadySent
         };
         this.state.rpInventory.push(item);
-        await this.saveState();
+        await this.saveNode('rps');
+        await this.saveNode('rpInventory');
     }
 
     async deleteRPInventoryItem(id) {
@@ -1309,7 +1398,8 @@ class TeamApp {
             this.state.rps = (this.state.rps || []).filter(rp => (rp.domain || '').trim().toLowerCase() !== domain);
         }
         this.state.rpInventory = this.state.rpInventory.filter(item => item.id !== id);
-        await this.saveState();
+        await this.saveNode('rps');
+        await this.saveNode('rpInventory');
     }
 
     async updateRPInventoryItem(id, updates) {
@@ -1317,7 +1407,8 @@ class TeamApp {
         const idx = this.state.rpInventory.findIndex(item => item.id === id);
         if (idx !== -1) {
             this.state.rpInventory[idx] = { ...this.state.rpInventory[idx], ...updates };
-            await this.saveState();
+            await this.saveNode('rps');
+            await this.saveNode('rpInventory');
         }
     }
 
@@ -1374,7 +1465,8 @@ class TeamApp {
         });
 
         if (addedCount > 0) {
-            await this.saveState();
+            await this.saveNode('rps');
+            await this.saveNode('rpInventory');
         }
 
         if (alerts.length > 0) {
@@ -1479,7 +1571,8 @@ class TeamApp {
         }
 
         this.state.rpAutoDetecting = false;
-        this.saveState();
+        await this.saveNode('rps');
+        await this.saveNode('rpInventory');
         this.updateDashboard();
         alert(`Auto-detect complete!\n${filled} of ${items.length} RPs filled.`);
     }

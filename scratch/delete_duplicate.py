@@ -1,7 +1,7 @@
 import urllib.request
 import json
 
-url_get = "https://gestion-team-c-default-rtdb.firebaseio.com/state/rps.json"
+url_get = "https://gestion-team-e-default-rtdb.firebaseio.com/state/rps.json"
 try:
     # 1. Fetch rps
     with urllib.request.urlopen(url_get) as response:
@@ -30,7 +30,7 @@ try:
     print(f"New RPs count: {len(deduped)} (removed {removed_count} duplicates)")
     
     # 3. Write back using PUT request
-    url_put = "https://gestion-team-c-default-rtdb.firebaseio.com/state/rps.json"
+    url_put = "https://gestion-team-e-default-rtdb.firebaseio.com/state/rps.json"
     req = urllib.request.Request(
         url_put, 
         data=json.dumps(deduped).encode('utf-8'), 

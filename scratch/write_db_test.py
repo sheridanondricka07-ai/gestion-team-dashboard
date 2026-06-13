@@ -1,7 +1,7 @@
 import urllib.request
 import json
 
-DB_URL = "https://gestion-team-c-default-rtdb.firebaseio.com"
+DB_URL = "https://gestion-team-e-default-rtdb.firebaseio.com"
 
 # Fetch existing data
 try:

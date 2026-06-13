@@ -1,5 +1,5 @@
 async function run() {
-    const DB_URL = "https://gestion-team-c-default-rtdb.firebaseio.com";
+    const DB_URL = "https://gestion-team-e-default-rtdb.firebaseio.com";
     try {
         const resp = await fetch(`${DB_URL}/state/statuses.json`);
         const data = await resp.json();

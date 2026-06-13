@@ -8,5 +8,8 @@
     "imap-simple": "^5.1.0",
     "mailparser": "^3.6.5",
     "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "vercel": "^54.13.0"
   }
 }

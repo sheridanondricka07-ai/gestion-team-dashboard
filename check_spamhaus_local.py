@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 # CONFIGURATION
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_FILE = os.path.join(BASE_DIR, "spamhaus_scan.log")
-DB_URL = "https://gestion-team-d-default-rtdb.firebaseio.com/state"
+DB_URL = "https://gestion-team-e-default-rtdb.firebaseio.com/state"
 SERVERS_URL = f"{DB_URL}/servers.json"
 PROGRESS_URL = f"{DB_URL}/spamhausProgress.json"
 HISTORY_URL = f"{DB_URL}/spamhausHistory.json"

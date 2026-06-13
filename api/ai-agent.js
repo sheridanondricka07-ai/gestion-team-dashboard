@@ -1,4 +1,4 @@
-const DB_URL = "https://gestion-team-d-default-rtdb.firebaseio.com";
+const DB_URL = "https://gestion-team-e-default-rtdb.firebaseio.com";
 
 function extractOfferId(offerStr) {
     if (!offerStr) return '';
@@ -28,7 +28,7 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { message, history } = req.body || {};
+        const { message, history, systemPrompt: clientSystemPrompt } = req.body || {};
 
         if (!message) {
             return res.status(400).json({ error: 'Message is required' });
@@ -38,8 +38,10 @@ export default async function handler(req, res) {
         const aiConfig = await getFirebaseData('state/aiConfig') || {};
         const apiKey = aiConfig.geminiApiKey;
 
-        // 2. Fetch current application state for context
-        const servers = await getFirebaseData('state/servers') || [];
+        let systemPrompt = clientSystemPrompt;
+        if (!systemPrompt) {
+            // 2. Fetch current application state for context
+            const servers = await getFirebaseData('state/servers') || [];
         const drops = await getFirebaseData('state/drops') || [];
         const mailers = await getFirebaseData('state/mailers') || [];
         const spamhaus = await getFirebaseData('state/spamhaus') || {};
@@ -688,6 +690,7 @@ GUIDELINES:
     k. Include limits/warnings in your response if applicable: if record type is Arecord and the number of IPs > 49, warn the user. If record type is Include and the number of IPs > 99, warn the user.
 11. If the user asks about domain warmup progress, start date, duration of warmup, drops count, total sent, last drop size, or warmup strategy/recommendations, refer directly to the ACTIVE DOMAIN WARMUP GROUPS, INACTIVE DOMAIN WARMUP GROUPS, ARCHIVED DOMAIN WARMUP GROUPS, and DOMAIN WARMUP INTELLIGENCE sections above. Respond with details about start date, duration in days, and recommendations computed from historical data.
 12. If the user asks about revenue by domain name extension, TLD, domain extension performance, or which extensions are most/least profitable, look at the REVENUE BY SENDING DOMAIN EXTENSION / TLD section above. If they ask about revenue per specific sending domain, look at the REVENUE BY SENDING DOMAIN section. Each domain is tagged as [Domain (RP)] if it matched a known RP domain, or [RDNS] if the drop had no returnPath. Also use the summary stats for RP vs RDNS revenue comparison. Present ranked results with revenue, drops count, EPC, and CPM in a table format.`;
+        }
 
         let responseText = '';
 

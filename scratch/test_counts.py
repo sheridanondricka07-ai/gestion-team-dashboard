@@ -2,9 +2,9 @@ import urllib.request
 import json
 
 def test():
-    spam = json.loads(urllib.request.urlopen('https://gestion-team-c-default-rtdb.firebaseio.com/state/spamhaus.json').read().decode())
-    servers = json.loads(urllib.request.urlopen('https://gestion-team-c-default-rtdb.firebaseio.com/state/servers.json').read().decode())
-    vmta = json.loads(urllib.request.urlopen('https://gestion-team-c-default-rtdb.firebaseio.com/state/vmtaResults.json').read().decode()) or {}
+    spam = json.loads(urllib.request.urlopen('https://gestion-team-e-default-rtdb.firebaseio.com/state/spamhaus.json').read().decode())
+    servers = json.loads(urllib.request.urlopen('https://gestion-team-e-default-rtdb.firebaseio.com/state/servers.json').read().decode())
+    vmta = json.loads(urllib.request.urlopen('https://gestion-team-e-default-rtdb.firebaseio.com/state/vmtaResults.json').read().decode()) or {}
     
     lines = []
     for s in servers:

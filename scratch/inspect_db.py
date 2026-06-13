@@ -1,7 +1,7 @@
 import urllib.request
 import json
 
-url = "https://gestion-team-c-default-rtdb.firebaseio.com/state.json"
+url = "https://gestion-team-e-default-rtdb.firebaseio.com/state.json"
 try:
     with urllib.request.urlopen(url) as response:
         state = json.loads(response.read().decode())

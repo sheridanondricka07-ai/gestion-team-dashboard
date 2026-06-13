@@ -1,7 +1,7 @@
 const dns = require('dns').promises;
 const https = require('https');
 
-const DB_URL = "https://gestion-team-d-default-rtdb.firebaseio.com";
+const DB_URL = "https://gestion-team-e-default-rtdb.firebaseio.com";
 
 async function getFirebaseData(path) {
     try {
