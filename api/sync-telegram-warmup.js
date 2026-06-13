@@ -93,13 +93,28 @@ function parseMessage(text, timestamp) {
     };
 }
 
+async function parseRequestBody(req) {
+    if (req.body) return req.body;
+    const buffers = [];
+    for await (const chunk of req) {
+        buffers.push(chunk);
+    }
+    const rawBody = Buffer.concat(buffers).toString('utf8');
+    if (!rawBody) return null;
+    try {
+        return JSON.parse(rawBody);
+    } catch (e) {
+        return null;
+    }
+}
+
 export default async function handler(req, res) {
     try {
         let results = [];
         
         if (req.method === 'POST') {
             // Webhook mode: a single update object is sent in the body
-            const update = req.body;
+            const update = await parseRequestBody(req);
             if (update && update.update_id) {
                 results = [update];
                 
@@ -269,3 +284,9 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: e.message });
     }
 }
+
+export const config = {
+    api: {
+        bodyParser: false,
+    },
+};
