@@ -794,7 +794,7 @@ class TeamApp {
 
                 // 3. Periodic silent background sync every 5 minutes
                 setInterval(() => {
-                    if (this.state.dbConnected && !this.state.syncing) {
+                    if (this.state.dbConnected && !this.state.syncing && !document.hidden) {
                         console.log("Background periodic syncing...");
                         window.db.ref('state').once('value').then(snapshot => {
                             const cloudData = snapshot.val();
