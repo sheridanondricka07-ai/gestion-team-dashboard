@@ -111,12 +111,14 @@ async function parseRequestBody(req) {
 export default async function handler(req, res) {
     try {
         let results = [];
+        let isTelegramWebhook = false;
         
         if (req.method === 'POST') {
             // Webhook mode: a single update object is sent in the body
             const update = await parseRequestBody(req);
             if (update && update.update_id) {
                 results = [update];
+                isTelegramWebhook = true;
                 
                 // Write debug log of raw payload
                 try {
@@ -271,6 +273,13 @@ export default async function handler(req, res) {
             } catch (err) {
                 console.error("Error during notification check:", err);
             }
+        }
+        
+        if (isTelegramWebhook) {
+            return res.status(200).json({ 
+                success: true, 
+                addedCount 
+            });
         }
         
         return res.status(200).json({ 
