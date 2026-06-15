@@ -1221,37 +1221,61 @@ window.generateImacrosFile = () => {
 
     const rawLines = ipsInput.split('\n');
     const parsedPairs = [];
+    const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+
     for (const line of rawLines) {
         const trimmed = line.trim();
         if (!trimmed) continue;
         
         let parts = [];
         if (trimmed.includes(';')) {
-            parts = trimmed.split(';');
+            parts = trimmed.split(';').map(p => p.trim());
         } else {
-            parts = trimmed.split(/\s+/);
+            parts = trimmed.split(/\s+/).map(p => p.trim());
         }
 
         if (parts.length >= 2) {
-            const ip = parts[0].trim();
-            const domain = parts[1].trim();
+            let ip = '';
+            let domain = '';
+            let serverName = null;
             let customLimit = null;
-            if (parts.length >= 3) {
-                const parsedLimit = parseInt(parts[2].trim());
-                if (!isNaN(parsedLimit)) {
-                    customLimit = parsedLimit;
+
+            // Check if first part is NOT an IP, but second part IS an IP
+            if (!ipRegex.test(parts[0]) && ipRegex.test(parts[1])) {
+                serverName = parts[0];
+                ip = parts[1];
+                domain = parts[2] || '';
+                if (parts.length >= 4) {
+                    const parsedLimit = parseInt(parts[3]);
+                    if (!isNaN(parsedLimit)) {
+                        customLimit = parsedLimit;
+                    }
+                }
+            } else {
+                // Standard: IP;domain or IP;domain;limit
+                ip = parts[0];
+                domain = parts[1];
+                if (parts.length >= 3) {
+                    const parsedLimit = parseInt(parts[2]);
+                    if (!isNaN(parsedLimit)) {
+                        customLimit = parsedLimit;
+                    }
                 }
             }
-            parsedPairs.push({
-                ip,
-                domain,
-                customLimit
-            });
+
+            if (ip && domain) {
+                parsedPairs.push({
+                    ip,
+                    domain,
+                    serverName,
+                    customLimit
+                });
+            }
         }
     }
 
     if (parsedPairs.length === 0) {
-        alert("Please enter at least one valid IP;domain or IP<space/tab>domain pair.");
+        alert("Please enter at least one valid IP;domain, server;IP;domain, or space-separated pair.");
         return;
     }
 
@@ -1259,8 +1283,9 @@ window.generateImacrosFile = () => {
 
     for (let i = 0; i < 500; i++) {
         const pair = parsedPairs[i % parsedPairs.length];
-        let serverName = 'Unknown';
-        if (window.app.state.servers) {
+        let serverName = pair.serverName || 'Unknown';
+        
+        if (serverName === 'Unknown' && window.app.state.servers) {
             const srv = window.app.state.servers.find(s => s.allIps && s.allIps.includes(pair.ip));
             if (srv) {
                 serverName = srv.name;
