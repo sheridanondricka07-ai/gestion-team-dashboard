@@ -3495,6 +3495,25 @@ window.copyUnassignedServerIps = (el) => {
 };
 
 function renderSpamhaus(app, container) {
+    if (!app.state.spamhausHistory && app.state.dbConnected) {
+        container.innerHTML = `
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 300px; gap: 16px; color: var(--text-secondary);">
+                <i data-lucide="loader" class="spin" style="width: 32px; height: 32px; color: var(--accent-primary);"></i>
+                <span>Loading Spamhaus History...</span>
+            </div>
+        `;
+        if (window.lucide) window.lucide.createIcons();
+
+        window.db.ref('spamhausHistory').once('value').then(snapshot => {
+            app.state.spamhausHistory = snapshot.val() || {};
+            app.updateDashboard();
+        }).catch(err => {
+            console.error("Failed to load Spamhaus history:", err);
+            container.innerHTML = `<div style="padding: 24px; color: var(--error);">Failed to load Spamhaus history: ${err.message}</div>`;
+        });
+        return;
+    }
+
     const { servers, spamhausHistory } = app.state;
     
     // Get available dates from history and sort them

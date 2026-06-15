@@ -240,7 +240,7 @@ export default async function handler(req, res) {
         // Fetch yesterday's history for comparison
         const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
         const yesterdayKey = yesterday.toISOString().split('T')[0];
-        const yesterdayData = await getFirebaseData(`state/spamhausHistory/${yesterdayKey}`) || {};
+        const yesterdayData = await getFirebaseData(`spamhausHistory/${yesterdayKey}`) || {};
         const yesterdayResults = yesterdayData.results || {};
 
         for (const ip of uniqueIps) {
@@ -261,7 +261,7 @@ export default async function handler(req, res) {
         }
 
         const dateKey = new Date().toISOString().split('T')[0];
-        await setFirebaseData(`state/spamhausHistory/${dateKey}`, {
+        await setFirebaseData(`spamhausHistory/${dateKey}`, {
             timestamp: Date.now(),
             results: finalResults,
             summary: {

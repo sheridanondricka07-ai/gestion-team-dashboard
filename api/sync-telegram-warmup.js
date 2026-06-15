@@ -120,7 +120,8 @@ export default async function handler(req, res) {
                 results = [update];
                 isTelegramWebhook = true;
                 
-                // Write debug log of raw payload
+                // Write debug log of raw payload (Disabled to prevent massive Firebase storage/bandwidth usage)
+                /*
                 try {
                     const msg = update.message || update.edited_message || update.channel_post;
                     const logEntry = {
@@ -140,6 +141,7 @@ export default async function handler(req, res) {
                 } catch (e) {
                     console.error("Failed to write raw debug log:", e);
                 }
+                */
             } else if (update && update.text) {
                 // Direct POST of message text from external script
                 const fakeMessageId = "ext_" + Date.now() + "_" + Math.floor(Math.random() * 1000);

@@ -836,6 +836,7 @@ class TeamApp {
         const currentUser = this.state.currentUser;
         const currentView = this.state.currentView; // Preserve local view
         const warmupData = this.state.warmupData; // Preserve local warmupData
+        const spamhausHistory = this.state.spamhausHistory; // Preserve local spamhausHistory
         
         // Preserve local UI filters during Firebase sync
         const rpFilterServer = this.state.rpFilterServer || ['all'];
@@ -861,7 +862,8 @@ class TeamApp {
             rpSearch,
             rpFilterServerDropdownOpen,
             searchQuery,
-            warmupData: warmupData || this.state.warmupData || {}
+            warmupData: warmupData || this.state.warmupData || {},
+            spamhausHistory: spamhausHistory || this.state.spamhausHistory || null
         };
         // SAFETY: Firebase may return null for these — always ensure safe defaults
         if (!this.state.servers) this.state.servers = [];
@@ -975,6 +977,7 @@ class TeamApp {
                 delete toSave.currentUser;
                 delete toSave.dbConnected;
                 delete toSave.warmupData;
+                delete toSave.spamhausHistory;
                 delete toSave.rpFilterServer;
                 delete toSave.rpFilterSpfType;
                 delete toSave.rpFilterRpType;
