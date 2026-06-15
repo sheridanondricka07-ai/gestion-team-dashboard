@@ -358,6 +358,7 @@ class TeamApp {
         if (added.length > 0) {
             await this.saveNode('rps');
             await this.saveNode('rpInventory');
+            this.updateDashboard();
         }
     }
 
@@ -392,6 +393,7 @@ class TeamApp {
             await this.saveNode('rps');
             await this.saveNode('rpInventory');
             await this.saveNode('mailers');
+            this.updateDashboard();
         });
     }
 
@@ -400,6 +402,7 @@ class TeamApp {
         if (rp) rp.assignedIps = ips;
         await this.saveNode('rps');
         await this.saveNode('rpInventory');
+        this.updateDashboard();
     }
 
     async updateMailer(id, updates) {
@@ -575,6 +578,7 @@ class TeamApp {
         await this.saveNode('rps');
         await this.saveNode('rpInventory');
         await this.saveNode('servers');
+        this.updateDashboard();
     }
 
     checkRpServerConflict(rpDomain, targetServerName, domainIncluded = null) {
@@ -660,6 +664,7 @@ class TeamApp {
         }
         await this.saveNode('rps');
         await this.saveNode('rpInventory');
+        this.updateDashboard();
     }
 
     async deleteServer(serverId) {
@@ -671,6 +676,7 @@ class TeamApp {
             await this.saveNode('rps');
             await this.saveNode('rpInventory');
             await this.saveNode('servers');
+            this.updateDashboard();
         });
     }
 
@@ -684,6 +690,7 @@ class TeamApp {
             this.state.rps = this.state.rps.filter(r => r.id !== rpId);
             await this.saveNode('rps');
             await this.saveNode('rpInventory');
+            this.updateDashboard();
         });
     }
 
@@ -1392,6 +1399,7 @@ class TeamApp {
         this.state.rpInventory.push(item);
         await this.saveNode('rps');
         await this.saveNode('rpInventory');
+        this.updateDashboard();
     }
 
     async deleteRPInventoryItem(id) {
@@ -1404,6 +1412,7 @@ class TeamApp {
         this.state.rpInventory = this.state.rpInventory.filter(item => item.id !== id);
         await this.saveNode('rps');
         await this.saveNode('rpInventory');
+        this.updateDashboard();
     }
 
     async updateRPInventoryItem(id, updates) {
@@ -1413,6 +1422,7 @@ class TeamApp {
             this.state.rpInventory[idx] = { ...this.state.rpInventory[idx], ...updates };
             await this.saveNode('rps');
             await this.saveNode('rpInventory');
+            this.updateDashboard();
         }
     }
 
@@ -1471,6 +1481,7 @@ class TeamApp {
         if (addedCount > 0) {
             await this.saveNode('rps');
             await this.saveNode('rpInventory');
+            this.updateDashboard();
         }
 
         if (alerts.length > 0) {
