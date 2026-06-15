@@ -315,7 +315,7 @@ button:active {
 /* Drag & Drop Areas */
 .resource-manager {
     display: grid;
-    grid-template-columns: 300px 1fr;
+    grid-template-columns: 330px 1fr;
     gap: var(--spacing-xl);
     height: calc(100vh - 180px);
 }
@@ -404,6 +404,7 @@ button:active {
 .draggable-item .item-name {
     flex: 1;
     font-weight: 500;
+    font-size: 0.8rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
