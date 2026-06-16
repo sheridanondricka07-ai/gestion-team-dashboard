@@ -800,7 +800,7 @@ class TeamApp {
                     }
                 });
 
-                // 3. Periodic silent background sync every 5 minutes
+                // 3. Periodic silent background sync every 10 minutes (conserves bandwidth)
                 setInterval(() => {
                     if (this.state.dbConnected && !this.state.syncing && !document.hidden) {
                         console.log("Background periodic syncing...");
@@ -813,7 +813,7 @@ class TeamApp {
                             }
                         }).catch(err => console.error("Silent background sync failed:", err));
                     }
-                }, 300000);
+                }, 600000);
 
             } else {
                 console.warn("No Database Connection. Falling back to Local Storage.");

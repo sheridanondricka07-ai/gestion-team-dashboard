@@ -199,10 +199,13 @@ export default async function handler(req, res) {
             await saveFirebaseData('warmupData', newRecords);
         }
         
-        // Fetch all warmupData from Firebase to return to client
-        const allData = await getFirebaseData('warmupData') || {};
+        // Fetch all warmupData from Firebase to return to client (Only when not in Telegram webhook mode to save bandwidth)
+        let allData = {};
+        if (!isTelegramWebhook) {
+            allData = await getFirebaseData('warmupData') || {};
+        }
         
-        if (addedCount > 0) {
+        if (addedCount > 0 && !isTelegramWebhook) {
             try {
                 const notifiedState = await getFirebaseData('state/warmupNotified') || {};
                 let newNotified = false;
