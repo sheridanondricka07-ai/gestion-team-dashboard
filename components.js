@@ -7628,7 +7628,7 @@ function renderWarmupProgress(app, container) {
                                         </td>
                                         <td style="padding: 14px 12px; color: var(--text-secondary); font-size: 0.7rem;">${timeStr}</td>
                                         <td style="padding: 14px 12px; text-align: center;">
-                                            <button onclick="deleteWarmupGroup('${g.domain}', '${g.server}')" title="Delete Group Logs" style="padding: 4px; background:transparent; border:none; color: #ef4444; cursor:pointer;">
+                                            <button onclick="deleteWarmupGroup(this)" data-domain="${(g.domain || '').replace(/"/g, '&quot;')}" data-server="${(g.server || '').replace(/"/g, '&quot;')}" title="Delete Group Logs" style="padding: 4px; background:transparent; border:none; color: #ef4444; cursor:pointer;">
                                                 <i data-lucide="trash-2" style="width: 14px; height:14px;"></i>
                                             </button>
                                         </td>
@@ -7683,7 +7683,9 @@ window.copyInactiveIps = () => {
     });
 };
 
-window.deleteWarmupGroup = async (domain, server) => {
+window.deleteWarmupGroup = async (btn) => {
+    const domain = btn.dataset.domain;
+    const server = btn.dataset.server;
     if (!confirm(`Are you sure you want to delete all warmup logs for "${domain}" on server "${server}"?`)) return;
     const currentData = window.app.state.warmupData || {};
     const updatedData = {};
