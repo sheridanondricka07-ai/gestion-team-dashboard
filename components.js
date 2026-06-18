@@ -7390,11 +7390,17 @@ function renderWarmupProgress(app, container) {
         }
     });
 
+    const highVolGroups = groups.filter(g => {
+        const last3 = g.records.slice(0, 3);
+        return last3.some(r => (parseInt(r.outVal) || 0) > 19000);
+    });
+
     if (!app.state.warmupActiveTab || app.state.warmupActiveTab === 'active') app.state.warmupActiveTab = 'active12';
     let currentGroups = active12Groups;
     if (app.state.warmupActiveTab === 'active24') currentGroups = active24Groups;
     if (app.state.warmupActiveTab === 'archived') currentGroups = archivedGroups;
     if (app.state.warmupActiveTab === 'inactive') currentGroups = inactiveGroups;
+    if (app.state.warmupActiveTab === 'highvol') currentGroups = highVolGroups;
 
     const filteredGroups = currentGroups.filter(g => {
         const matchSearch = g.domain.toLowerCase().includes(search) || 
@@ -7416,6 +7422,15 @@ function renderWarmupProgress(app, container) {
     const totalInactive = inactiveGroups.length;
     const totalLogs = rawRecords.length;
     const maxOut = rawRecords.reduce((max, r) => r.outVal > max ? r.outVal : max, 0);
+    const totalSent24h = rawRecords
+        .filter(r => r.timestamp >= twentyFourHoursAgo)
+        .reduce((sum, r) => sum + (parseInt(r.outVal) || 0), 0);
+    const maxOut24h = rawRecords
+        .filter(r => r.timestamp >= twentyFourHoursAgo)
+        .reduce((max, r) => {
+            const val = parseInt(r.outVal) || 0;
+            return val > max ? val : max;
+        }, 0);
 
     const serversList = Array.from(new Set(rawRecords.map(r => r.server).filter(s => s)));
 
@@ -7460,8 +7475,8 @@ function renderWarmupProgress(app, container) {
                         <i data-lucide="bar-chart-2" style="width: 24px; height: 24px;"></i>
                     </div>
                     <div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Total Logs / Drops</div>
-                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin-top: 4px;">${totalLogs}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Total Sent (OUT) Last 24 Hours</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin-top: 4px;">${totalSent24h.toLocaleString()}</div>
                     </div>
                 </div>
                 <div class="card" style="padding: 20px; display: flex; align-items: center; gap: 16px;">
@@ -7469,8 +7484,8 @@ function renderWarmupProgress(app, container) {
                         <i data-lucide="zap" style="width: 24px; height: 24px;"></i>
                     </div>
                     <div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Max Warmup Out</div>
-                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin-top: 4px;">${maxOut.toLocaleString()}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Last 24 Hours Max Warmup Out</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin-top: 4px;">${maxOut24h.toLocaleString()}</div>
                     </div>
                 </div>
             </div>
@@ -7485,6 +7500,9 @@ function renderWarmupProgress(app, container) {
                 </div>
                 <div onclick="window.app.state.warmupActiveTab = 'inactive'; window.app.updateDashboard();" style="padding: 10px 16px; cursor: pointer; font-weight: 600; font-size: 0.85rem; border-bottom: 2px solid ${app.state.warmupActiveTab === 'inactive' ? 'var(--accent-primary)' : 'transparent'}; color: ${app.state.warmupActiveTab === 'inactive' ? 'var(--accent-primary)' : 'var(--text-secondary)'}; transition: all 0.2s;">
                     Inactive (> 24h) <span style="background: ${app.state.warmupActiveTab === 'inactive' ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-tertiary)'}; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; margin-left: 6px;">${totalInactive}</span>
+                </div>
+                <div onclick="window.app.state.warmupActiveTab = 'highvol'; window.app.updateDashboard();" style="padding: 10px 16px; cursor: pointer; font-weight: 600; font-size: 0.85rem; border-bottom: 2px solid ${app.state.warmupActiveTab === 'highvol' ? 'var(--accent-primary)' : 'transparent'}; color: ${app.state.warmupActiveTab === 'highvol' ? 'var(--accent-primary)' : 'var(--text-secondary)'}; transition: all 0.2s;">
+                    Out > 19000 (3 Drops) <span style="background: ${app.state.warmupActiveTab === 'highvol' ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-tertiary)'}; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; margin-left: 6px;">${highVolGroups.length}</span>
                 </div>
                 <div onclick="window.app.state.warmupActiveTab = 'archived'; window.app.updateDashboard();" style="padding: 10px 16px; cursor: pointer; font-weight: 600; font-size: 0.85rem; border-bottom: 2px solid ${app.state.warmupActiveTab === 'archived' ? 'var(--accent-primary)' : 'transparent'}; color: ${app.state.warmupActiveTab === 'archived' ? 'var(--accent-primary)' : 'var(--text-secondary)'}; transition: all 0.2s;">
                     Archived (Sent) <span style="background: ${app.state.warmupActiveTab === 'archived' ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-tertiary)'}; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; margin-left: 6px;">${totalArchived}</span>
@@ -7546,7 +7564,7 @@ function renderWarmupProgress(app, container) {
                                 
                                 const rec = window.getWarmupRecommendation ? window.getWarmupRecommendation(totalOutAllTime, repOut, intel) : null;
                                 let recHtml = '';
-                                if (rec && (app.state.warmupActiveTab === 'active12' || app.state.warmupActiveTab === 'active24')) {
+                                if (rec && (app.state.warmupActiveTab === 'active12' || app.state.warmupActiveTab === 'active24' || app.state.warmupActiveTab === 'highvol')) {
                                     recHtml = `<div style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 4px;">${rec.text} <span style="opacity: 0.7;">(${rec.sub})</span></div>`;
                                 }
                                 
