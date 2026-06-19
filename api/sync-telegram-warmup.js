@@ -216,8 +216,8 @@ async function processAutoWarmup(allData, newRecords) {
             allData = prunedData;
         }
 
-        // 2. Check for stopped warmups (> 4 hours since last drop, but < 48 hours to avoid ancient targets)
-        const fourHoursAgo = Date.now() - (4 * 60 * 60 * 1000);
+        // 2. Check for stopped warmups (> 6 hours since last drop, but < 24 hours to avoid ancient targets)
+        const sixHoursAgo = Date.now() - (6 * 60 * 60 * 1000);
         const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
 
         const absoluteLatest = {};
@@ -261,12 +261,12 @@ async function processAutoWarmup(allData, newRecords) {
             const safeKey = `${safeDomain}_${actualServer}`;
             const stoppedNotifKey = `${safeKey}_stopped`;
 
-            if (latestDrop.timestamp && latestDrop.timestamp > fourHoursAgo) {
+            if (latestDrop.timestamp && latestDrop.timestamp > sixHoursAgo) {
                 if (autoNotifiedState[stoppedNotifKey]) {
                     delete autoNotifiedState[stoppedNotifKey];
                     newNotified = true;
                 }
-            } else if (latestDrop.timestamp && latestDrop.timestamp <= fourHoursAgo && latestDrop.timestamp > twentyFourHoursAgo) {
+            } else if (latestDrop.timestamp && latestDrop.timestamp <= sixHoursAgo && latestDrop.timestamp > twentyFourHoursAgo) {
                 if (!autoNotifiedState[stoppedNotifKey]) {
                     const notifToken = UPGRADE_BOT_TOKEN;
                     const notifChatId = "-5317343683";
@@ -276,7 +276,7 @@ async function processAutoWarmup(allData, newRecords) {
                                  `👤 User: <b>${latestDrop.user || 'Unknown'}</b>\n` +
                                  `📌 IP: <code>${latestDrop.ip || 'Unknown'}</code>\n` +
                                  `🌐 Domain: <b>${actualDomain || 'N/A'}</b>\n\n` +
-                                 `❌ <i>No drops recorded in the last 4 hours (last drop was ${new Date(latestDrop.timestamp).toLocaleString()}). Please check if stopped.</i>`;
+                                 `❌ <i>No drops recorded in the last 6 hours (last drop was ${new Date(latestDrop.timestamp).toLocaleString()}). Please check if stopped.</i>`;
 
                     try {
                         await fetch(`https://api.telegram.org/bot${notifToken}/sendMessage`, {
