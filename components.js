@@ -7506,6 +7506,18 @@ function renderWarmupProgress(app, container) {
         }
     });
 
+    const classSet = new Set();
+    active24Groups.forEach(g => {
+        const ip = (g.ip || '').trim();
+        if (ip && ip !== '---') {
+            const parts = ip.split('.');
+            if (parts.length === 4) {
+                classSet.add(`${parts[0]}.${parts[1]}.${parts[2]}`);
+            }
+        }
+    });
+    const ipClassesCount = classSet.size;
+
     const serversList = Array.from(new Set(rawRecords.map(r => r.server).filter(s => s)));
 
     const intel = window.computeWarmupIntelligence ? window.computeWarmupIntelligence() : null;
@@ -7574,6 +7586,10 @@ function renderWarmupProgress(app, container) {
                         <div style="display: flex; align-items: center; gap: 6px; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.2); padding: 6px 10px; border-radius: 8px;" title="RP Extern (IP included via SPF domain)">
                             <span style="font-weight: 700; color: #f59e0b; font-size: 1rem;">${countRpExtern}</span>
                             <span style="font-size: 0.65rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">RP Extern</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px; background: rgba(6, 182, 212, 0.08); border: 1px solid rgba(6, 182, 212, 0.2); padding: 6px 10px; border-radius: 8px;" title="Unique Class C IP Subnets (first 3 octets A.B.C.*)">
+                            <span style="font-weight: 700; color: #06b6d4; font-size: 1rem;">${ipClassesCount}</span>
+                            <span style="font-size: 0.65rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">IP Classes</span>
                         </div>
                     </div>
                 </div>
