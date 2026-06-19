@@ -1286,7 +1286,12 @@ window.generateImacrosFile = () => {
         let serverName = pair.serverName || 'Unknown';
         
         if (serverName === 'Unknown' && window.app.state.servers) {
-            const srv = window.app.state.servers.find(s => s.allIps && s.allIps.includes(pair.ip));
+            const srv = window.app.state.servers.find(s => {
+                const ips = [...(s.allIps || [])];
+                if (s.ip) ips.push(s.ip);
+                if (s.mainIp) ips.push(s.mainIp);
+                return ips.map(x => (x || '').trim()).includes(pair.ip.trim());
+            });
             if (srv) {
                 serverName = srv.name;
             }

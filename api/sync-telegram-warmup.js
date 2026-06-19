@@ -1,6 +1,116 @@
 const DB_URL = "https://gestion-team-e-default-rtdb.firebaseio.com";
 const BOT_TOKEN = "8827415405:AAH-sAnTE7rz_i4XSTFG6tjBX0g0BYPyn6E";
 const UPGRADE_BOT_TOKEN = "8975320309:AAFQmIeTKMbxQMv4c8_UHSczUYYZ9mcJ8FA";
+const dns = require('dns').promises;
+
+function ipInCidr(ip, cidr) {
+    const [range, bitsStr] = cidr.split('/');
+    if (!bitsStr) {
+        return ip === range;
+    }
+    const bits = parseInt(bitsStr, 10);
+    if (isNaN(bits)) return ip === range;
+
+    const ipParts = ip.split('.').map(Number);
+    const rangeParts = range.split('.').map(Number);
+
+    if (ipParts.length !== 4 || rangeParts.length !== 4) return false;
+
+    const ipNum = ((ipParts[0] * 256 + ipParts[1]) * 256 + ipParts[2]) * 256 + ipParts[3];
+    const rangeNum = ((rangeParts[0] * 256 + rangeParts[1]) * 256 + rangeParts[2]) * 256 + rangeParts[3];
+    const mask = bits === 0 ? 0 : (0xFFFFFFFF << (32 - bits));
+
+    return (ipNum & mask) === (rangeNum & mask);
+}
+
+async function getSpfRecord(domain) {
+    try {
+        const records = await dns.resolveTxt(domain);
+        const spfRecords = records
+            .map(chunks => chunks.join(''))
+            .filter(record => record.toLowerCase().startsWith('v=spf1'));
+        if (spfRecords.length === 0) return null;
+        return spfRecords[0];
+    } catch (err) {
+        return null;
+    }
+}
+
+async function detectAndAddNewRp(domain, ip, serverName) {
+    if (!domain || domain.toLowerCase() === '[rdns]' || domain.toLowerCase() === 'rdns') {
+        return;
+    }
+
+    try {
+        const rpInventory = await getFirebaseData('state/rpInventory') || [];
+        const rps = await getFirebaseData('state/rps') || [];
+        const servers = await getFirebaseData('state/servers') || [];
+
+        const cleanDom = domain.toLowerCase().trim();
+        
+        // Check if already exists in rpInventory
+        const exists = rpInventory.some(item => (item.rpDomain || '').toLowerCase().trim() === cleanDom);
+        if (exists) return;
+
+        // Determine RP Type (intern or extern) by checking SPF
+        let rpType = 'extern';
+        const spf = await getSpfRecord(cleanDom);
+        if (spf) {
+            const terms = spf.toLowerCase().split(/\s+/);
+            let hasDirectIp = false;
+            for (let term of terms) {
+                if (['+', '-', '~', '?'].includes(term[0])) term = term.slice(1);
+                if (term.startsWith('ip4:')) {
+                    const cidr = term.substring(4);
+                    if (ipInCidr(ip, cidr)) {
+                        hasDirectIp = true;
+                        break;
+                    }
+                }
+            }
+            if (hasDirectIp) {
+                rpType = 'intern';
+            }
+        }
+
+        // Add to rpInventory
+        const nextId = rpInventory.reduce((max, item) => Math.max(max, parseInt(item.id, 10) || 0), 0) + 1;
+        const newRpItem = {
+            id: nextId,
+            rpDomain: cleanDom,
+            domainIncluded: cleanDom,
+            subdomainIncluded: cleanDom,
+            spfType: 'Include',
+            srv: serverName,
+            rpType: rpType,
+            alreadySent: false,
+            spfStatus: 'OK',
+            spfCheckedAt: new Date().toISOString()
+        };
+        rpInventory.push(newRpItem);
+        await putFirebaseData('state/rpInventory', rpInventory);
+
+        // Add to rps
+        const attachedServer = servers.find(s => s.name === serverName);
+        const serverId = attachedServer ? attachedServer.id : null;
+        const mailerId = attachedServer ? (attachedServer.mailerId || null) : null;
+        const nextRpId = rps.reduce((max, r) => Math.max(max, parseInt(r.id, 10) || 0), 0) + 1;
+        
+        const newRpInRps = {
+            id: nextRpId,
+            domain: cleanDom,
+            serverId: serverId,
+            mailerId: mailerId,
+            status: 'active'
+        };
+        rps.push(newRpInRps);
+        await putFirebaseData('state/rps', rps);
+
+        console.log(`Automatically added new RP domain ${cleanDom} (${rpType}) for server ${serverName}`);
+    } catch (e) {
+        console.error("Error in detectAndAddNewRp:", e);
+    }
+}
 
 async function getFirebaseData(path) {
     try {
@@ -56,9 +166,35 @@ async function processAutoWarmup(allData, newRecords) {
         let newNotified = false;
         let newQueue = false;
 
+        // 1. Prune warmupData older than 30 days to optimize Firebase storage space
+        const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+        let pruneCount = 0;
+        const prunedData = {};
+        let dataChanged = false;
+        
+        Object.entries(allData).forEach(([key, val]) => {
+            if (val && val.timestamp && val.timestamp < thirtyDaysAgo) {
+                dataChanged = true;
+                pruneCount++;
+            } else {
+                prunedData[key] = val;
+            }
+        });
+        
+        if (dataChanged) {
+            console.log(`Pruned ${pruneCount} old warmup records.`);
+            await putFirebaseData('warmupData', prunedData);
+            allData = prunedData;
+        }
+
         const grouped = {};
+        const cutoff = Date.now() - (24 * 60 * 60 * 1000);
+        
         Object.values(allData).forEach(r => {
             if (!r.domain && !r.ip && !r.server) return;
+            // Pre-filter: Only check drops from the last 24 hours
+            if (r.timestamp && r.timestamp < cutoff) return;
+
             const key = `${r.domain || ''}_${r.server || ''}_${r.ip || ''}`;
             if (!grouped[key]) grouped[key] = { ...r, records: [] };
             grouped[key].records.push(r);
@@ -81,12 +217,11 @@ async function processAutoWarmup(allData, newRecords) {
             g.records.sort((a, b) => b.timestamp - a.timestamp);
             if (g.records.length < 3) continue;
 
-            // Check if 3 last drops succeeded (OUT >= 0.95 * IN) and occurred within the last 24 hours
+            // Check if 3 last drops succeeded (OUT >= 0.95 * IN)
             let success = true;
-            const cutoff = Date.now() - (24 * 60 * 60 * 1000);
             for (let i = 0; i < 3; i++) {
                 const r = g.records[i];
-                if (r.timestamp < cutoff) {
+                if (!r.timestamp || r.timestamp < cutoff) {
                     success = false;
                     break;
                 }
@@ -103,14 +238,20 @@ async function processAutoWarmup(allData, newRecords) {
                 const LEVELS = [50, 100, 200, 300, 500, 760, 1000, 1500, 2000, 3000, 5000, 7000, 8000, 10000, 15000, 19000, 21000, 26000, 30000];
                 const nextTarget = LEVELS.find(l => l > latestVal) || latestVal;
                 
-                const cleanDomain = (g.domain || g.ip || g.server || 'unknown');
+                const isRdns = !g.domain || g.domain.toLowerCase().trim() === '[rdns]' || g.domain.toLowerCase().trim() === 'rdns';
+                const cleanDomain = isRdns ? (g.ip || 'unknown') : (g.domain || g.ip || 'unknown');
                 const safeDomain = cleanDomain.replace(/[\.\#\$\[\]]/g, '_');
                 const safeKey = `${safeDomain}_${g.server}_${nextTarget}`;
+
+                // Auto-detect and register domain in RPs inventory if it's a new custom domain
+                if (!isRdns && g.domain) {
+                    await detectAndAddNewRp(g.domain, g.ip, g.server);
+                }
 
                 if (!autoNotifiedState[safeKey]) {
                     // Queue first message (send_size)
                     const msg1 = `update ${g.server} send_size for ${cleanDomain} to ${nextTarget}`;
-                    const queueId1 = "q_" + Date.now() + "_" + Math.floor(Math.random() * 1000) + "_1";
+                    const queueId1 = "q_" + safeKey + "_send_size";
                     
                     maxSendAt = Math.max(Date.now(), maxSendAt + 5000);
                     queueState[queueId1] = {
@@ -122,7 +263,7 @@ async function processAutoWarmup(allData, newRecords) {
                     // Queue second message (test_after)
                     const testAfterVal = Math.round((nextTarget / 2) + 3);
                     const msg2 = `update ${g.server} test_after for ${cleanDomain} to ${testAfterVal}`;
-                    const queueId2 = "q_" + Date.now() + "_" + Math.floor(Math.random() * 1000) + "_2";
+                    const queueId2 = "q_" + safeKey + "_test_after";
                     
                     maxSendAt = maxSendAt + 5000;
                     queueState[queueId2] = {
