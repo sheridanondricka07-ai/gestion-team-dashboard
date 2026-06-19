@@ -66,8 +66,6 @@ async function processAutoWarmup(allData) {
         for (const key in grouped) {
             const g = grouped[key];
             
-            // Only server s_wmn3_2245 for now
-            if (g.server !== 's_wmn3_2245') continue;
 
             g.records.sort((a, b) => b.timestamp - a.timestamp);
             if (g.records.length < 3) continue;
