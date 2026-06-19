@@ -218,7 +218,7 @@ async function processAutoWarmup(allData, newRecords) {
 
         // 2. Check for stopped warmups (> 4 hours since last drop, but < 48 hours to avoid ancient targets)
         const fourHoursAgo = Date.now() - (4 * 60 * 60 * 1000);
-        const fortyEightHoursAgo = Date.now() - (48 * 60 * 60 * 1000);
+        const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
 
         const absoluteLatest = {};
         Object.values(allData).forEach(r => {
@@ -229,12 +229,36 @@ async function processAutoWarmup(allData, newRecords) {
             }
         });
 
+        const servers = await getFirebaseData('state/servers') || [];
+
         for (const key in absoluteLatest) {
             const latestDrop = absoluteLatest[key];
-            const isRdns = !latestDrop.domain || latestDrop.domain.toLowerCase().trim() === '[rdns]' || latestDrop.domain.toLowerCase().trim() === 'rdns';
-            const cleanDomain = isRdns ? (latestDrop.ip || 'unknown') : (latestDrop.domain || latestDrop.ip || 'unknown');
+            
+            // Fix swapped server and domain names if any
+            let actualServer = latestDrop.server || 'Unknown';
+            let actualDomain = latestDrop.domain || 'N/A';
+            
+            if (actualServer.includes('.') || (!actualServer.startsWith('sh_') && !actualServer.startsWith('s_'))) {
+                actualDomain = actualServer;
+                actualServer = 'Unknown';
+            }
+            
+            if ((actualServer === 'Unknown' || !actualServer) && latestDrop.ip) {
+                const srv = servers.find(s => {
+                    const ips = [...(s.allIps || [])];
+                    if (s.ip) ips.push(s.ip);
+                    if (s.mainIp) ips.push(s.mainIp);
+                    return ips.map(x => (x || '').trim()).includes(latestDrop.ip.trim());
+                });
+                if (srv) {
+                    actualServer = srv.name;
+                }
+            }
+
+            const isRdns = !actualDomain || actualDomain.toLowerCase().trim() === '[rdns]' || actualDomain.toLowerCase().trim() === 'rdns';
+            const cleanDomain = isRdns ? (latestDrop.ip || 'unknown') : (actualDomain || latestDrop.ip || 'unknown');
             const safeDomain = cleanDomain.replace(/[\.\#\$\[\]]/g, '_');
-            const safeKey = `${safeDomain}_${latestDrop.server}`;
+            const safeKey = `${safeDomain}_${actualServer}`;
             const stoppedNotifKey = `${safeKey}_stopped`;
 
             if (latestDrop.timestamp && latestDrop.timestamp > fourHoursAgo) {
@@ -242,16 +266,16 @@ async function processAutoWarmup(allData, newRecords) {
                     delete autoNotifiedState[stoppedNotifKey];
                     newNotified = true;
                 }
-            } else if (latestDrop.timestamp && latestDrop.timestamp <= fourHoursAgo && latestDrop.timestamp > fortyEightHoursAgo) {
+            } else if (latestDrop.timestamp && latestDrop.timestamp <= fourHoursAgo && latestDrop.timestamp > twentyFourHoursAgo) {
                 if (!autoNotifiedState[stoppedNotifKey]) {
                     const notifToken = UPGRADE_BOT_TOKEN;
                     const notifChatId = "-5317343683";
 
                     const text = `⚠️ <b>Warmup Stopped Alert!</b>\n\n` +
-                                 `🖥 Server: <b>${latestDrop.server || 'Unknown'}</b>\n` +
+                                 `🖥 Server: <b>${actualServer || 'Unknown'}</b>\n` +
                                  `👤 User: <b>${latestDrop.user || 'Unknown'}</b>\n` +
                                  `📌 IP: <code>${latestDrop.ip || 'Unknown'}</code>\n` +
-                                 `🌐 Domain: <b>${latestDrop.domain || 'N/A'}</b>\n\n` +
+                                 `🌐 Domain: <b>${actualDomain || 'N/A'}</b>\n\n` +
                                  `❌ <i>No drops recorded in the last 4 hours (last drop was ${new Date(latestDrop.timestamp).toLocaleString()}). Please check if stopped.</i>`;
 
                     try {
