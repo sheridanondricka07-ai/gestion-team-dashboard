@@ -7432,6 +7432,80 @@ function renderWarmupProgress(app, container) {
             return val > max ? val : max;
         }, 0);
 
+    let countRdns = 0;
+    let countSwitch = 0;
+    let countRpIntern = 0;
+    let countRpExtern = 0;
+
+    active24Groups.forEach(g => {
+        const latest = g.records[0];
+        const latestClean = latest && latest.domain ? latest.domain.trim().toLowerCase() : '';
+        const isRdns = latest ? (!latest.domain || latestClean === '[rdns]' || latestClean === 'rdns') : false;
+        
+        if (isRdns) {
+            countRdns++;
+            return;
+        }
+
+        let isSwitch = false;
+        const srv = app.state.servers.find(s => s.name && s.name.toLowerCase() === (g.server || '').toLowerCase());
+        if (srv && g.domain && g.ip) {
+            const ipRdns = getRdns(g.ip, app.state);
+            const domainMatches = (d1, d2) => {
+                if (!d1 || !d2) return false;
+                const clean = d => d.trim().toLowerCase().replace(/\.$/, '');
+                const c1 = clean(d1);
+                const c2 = clean(d2);
+                return c1 === c2 || c1.endsWith('.' + c2) || c2.endsWith('.' + c1);
+            };
+            const domainIsIpRdns = domainMatches(g.domain, ipRdns);
+            if (!domainIsIpRdns) {
+                const otherIps = srv.allIps || [];
+                for (const otherIp of otherIps) {
+                    if (otherIp !== g.ip) {
+                        const otherRdns = getRdns(otherIp, app.state);
+                        if (domainMatches(g.domain, otherRdns)) {
+                            isSwitch = true;
+                            break;
+                         }
+                    }
+                }
+            }
+        }
+
+        if (isSwitch) {
+            countSwitch++;
+            return;
+        }
+
+        const invEntry = rpInventory.find(item => item.rpDomain && item.rpDomain.trim().toLowerCase() === g.domain.trim().toLowerCase());
+        let rpType = '';
+        if (invEntry) {
+            rpType = (invEntry.rpType || '').toLowerCase().trim();
+            if (!rpType) {
+                const domInc = (invEntry.domainIncluded || '').toLowerCase().trim();
+                const rpDom = (invEntry.rpDomain || '').toLowerCase().trim();
+                if (domInc && rpDom) {
+                    rpType = (domInc === rpDom) ? 'intern' : 'extern';
+                }
+            }
+        }
+        
+        if (!rpType && g.domain && g.domain !== '---' && g.domain.toLowerCase() !== 'unknown') {
+            const domainLower = g.domain.trim().toLowerCase();
+            const cached = window._spfCache && window._spfCache[domainLower];
+            if (cached && cached.found) {
+                rpType = cached.rpType;
+            }
+        }
+
+        if (rpType === 'intern') {
+            countRpIntern++;
+        } else if (rpType === 'extern') {
+            countRpExtern++;
+        }
+    });
+
     const serversList = Array.from(new Set(rawRecords.map(r => r.server).filter(s => s)));
 
     const intel = window.computeWarmupIntelligence ? window.computeWarmupIntelligence() : null;
@@ -7479,13 +7553,28 @@ function renderWarmupProgress(app, container) {
                         <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin-top: 4px;">${totalSent24h.toLocaleString()}</div>
                     </div>
                 </div>
-                <div class="card" style="padding: 20px; display: flex; align-items: center; gap: 16px;">
-                    <div style="background: rgba(245, 158, 11, 0.1); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #f59e0b;">
-                        <i data-lucide="zap" style="width: 24px; height: 24px;"></i>
+                <div class="card" style="padding: 20px; display: flex; flex-direction: column; justify-content: center; gap: 10px;">
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                        <i data-lucide="pie-chart" style="width: 14px; height: 14px; color: var(--accent-primary);"></i>
+                        Last 24 Hours Distribution
                     </div>
-                    <div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Last 24 Hours Max Warmup Out</div>
-                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin-top: 4px;">${maxOut24h.toLocaleString()}</div>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 6px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); padding: 6px 10px; border-radius: 8px;" title="RDNS (No domain in Telegram log, resolved via IP PTR)">
+                            <span style="font-weight: 700; color: #3b82f6; font-size: 1rem;">${countRdns}</span>
+                            <span style="font-size: 0.65rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">RDNS</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px; background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.2); padding: 6px 10px; border-radius: 8px;" title="Switch (Domain is the RDNS of another IP on same server)">
+                            <span style="font-weight: 700; color: #8b5cf6; font-size: 1rem;">${countSwitch}</span>
+                            <span style="font-size: 0.65rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Switch</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); padding: 6px 10px; border-radius: 8px;" title="RP Intern (IP directly in SPF)">
+                            <span style="font-weight: 700; color: #10b981; font-size: 1rem;">${countRpIntern}</span>
+                            <span style="font-size: 0.65rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">RP Intern</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.2); padding: 6px 10px; border-radius: 8px;" title="RP Extern (IP included via SPF domain)">
+                            <span style="font-weight: 700; color: #f59e0b; font-size: 1rem;">${countRpExtern}</span>
+                            <span style="font-size: 0.65rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">RP Extern</span>
+                        </div>
                     </div>
                 </div>
             </div>
