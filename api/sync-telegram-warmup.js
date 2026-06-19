@@ -24,6 +24,140 @@ async function saveFirebaseData(path, data) {
     }
 }
 
+async function putFirebaseData(path, data) {
+    try {
+        await fetch(`${DB_URL}/${path}.json`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        return true;
+    } catch (e) {
+        console.error("Firebase put error:", e);
+        return false;
+    }
+}
+
+async function processAutoWarmup(allData) {
+    try {
+        const autoNotifiedState = await getFirebaseData('state/autoWarmupNotified') || {};
+        const queueState = await getFirebaseData('state/autoWarmupQueue') || {};
+        
+        let newNotified = false;
+        let newQueue = false;
+
+        const grouped = {};
+        Object.values(allData).forEach(r => {
+            if (!r.domain && !r.ip && !r.server) return;
+            const key = `${r.domain || ''}_${r.server || ''}_${r.ip || ''}`;
+            if (!grouped[key]) grouped[key] = { ...r, records: [] };
+            grouped[key].records.push(r);
+        });
+
+        for (const key in grouped) {
+            const g = grouped[key];
+            
+            // Only server s_wmn3_2245 for now
+            if (g.server !== 's_wmn3_2245') continue;
+
+            g.records.sort((a, b) => b.timestamp - a.timestamp);
+            if (g.records.length < 3) continue;
+
+            // Check if 3 last drops succeeded (OUT >= 0.95 * IN)
+            let success = true;
+            for (let i = 0; i < 3; i++) {
+                const r = g.records[i];
+                const inVal = parseInt(r.inVal, 10) || 0;
+                const outVal = parseInt(r.outVal, 10) || 0;
+                if (inVal <= 0 || outVal < inVal * 0.95) {
+                    success = false;
+                    break;
+                }
+            }
+
+            if (success) {
+                const latestVal = parseInt(g.records[0].inVal, 10) || 0;
+                const LEVELS = [50, 100, 200, 300, 500, 760, 1000, 1500, 2000, 3000, 5000, 7000, 8000, 10000, 15000, 19000, 21000, 26000, 30000];
+                const nextTarget = LEVELS.find(l => l > latestVal) || latestVal;
+                
+                const cleanDomain = (g.domain || g.ip || g.server || 'unknown');
+                const safeDomain = cleanDomain.replace(/[\.\#\$\[\]]/g, '_');
+                const safeKey = `${safeDomain}_${g.server}_${nextTarget}`;
+
+                if (!autoNotifiedState[safeKey]) {
+                    // Send first message immediately
+                    const msg1 = `update ${g.server} send_size for ${cleanDomain} to ${nextTarget}`;
+                    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chat_id: "-1003229248256",
+                            text: msg1
+                        })
+                    });
+
+                    // Queue second message for 1 minute later
+                    const testAfterVal = Math.round((nextTarget / 2) + 3);
+                    const msg2 = `update ${g.server} test_after for ${cleanDomain} to ${testAfterVal}`;
+                    const queueId = "q_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+                    queueState[queueId] = {
+                        chat_id: "-1003229248256",
+                        text: msg2,
+                        sendAt: Date.now() + 60000
+                    };
+
+                    autoNotifiedState[safeKey] = true;
+                    newNotified = true;
+                    newQueue = true;
+                }
+            }
+        }
+
+        if (newNotified) {
+            await putFirebaseData('state/autoWarmupNotified', autoNotifiedState);
+        }
+
+        if (newQueue) {
+            await putFirebaseData('state/autoWarmupQueue', queueState);
+        }
+    } catch (e) {
+        console.error("Error in processAutoWarmup:", e);
+    }
+}
+
+async function processAutoWarmupQueue() {
+    try {
+        const queueState = await getFirebaseData('state/autoWarmupQueue') || {};
+        const now = Date.now();
+        let changed = false;
+
+        for (const queueId in queueState) {
+            const item = queueState[queueId];
+            if (item && item.sendAt <= now) {
+                // Send queued message
+                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: item.chat_id,
+                        text: item.text
+                    })
+                });
+
+                // Remove from queue
+                delete queueState[queueId];
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            await putFirebaseData('state/autoWarmupQueue', queueState);
+        }
+    } catch (e) {
+        console.error("Error in processAutoWarmupQueue:", e);
+    }
+}
+
 function parseMessage(text, timestamp) {
     if (!text || !text.includes('Server Deployment Summary')) return null;
     
@@ -197,86 +331,92 @@ export default async function handler(req, res) {
         
         if (addedCount > 0) {
             await saveFirebaseData('warmupData', newRecords);
-        }
-        
-        // Fetch all warmupData from Firebase to return to client (Only when not in Telegram webhook mode to save bandwidth)
+        }        // Fetch all warmupData from Firebase if needed (when new records are added or not in webhook mode)
         let allData = {};
-        if (!isTelegramWebhook) {
+        if (addedCount > 0 || !isTelegramWebhook) {
             allData = await getFirebaseData('warmupData') || {};
         }
         
-        if (addedCount > 0 && !isTelegramWebhook) {
-            try {
-                const notifiedState = await getFirebaseData('state/warmupNotified') || {};
-                let newNotified = false;
-                
-                const grouped = {};
-                Object.values(allData).forEach(r => {
-                    if (!r.domain && !r.ip && !r.server) return;
-                    const key = `${r.domain || ''}_${r.server || ''}_${r.ip || ''}`;
-                    if (!grouped[key]) grouped[key] = { ...r, records: [] };
-                    grouped[key].records.push(r);
-                });
-                
-                const getRepOut = (drops) => {
-                    const nonZeros = drops.filter(v => v > 0);
-                    if (nonZeros.length === 0) return 0;
-                    if (nonZeros.length === 1) return nonZeros[0];
-                    nonZeros.sort((a, b) => b - a);
-                    for (let i = 0; i < nonZeros.length; i++) {
-                        for (let j = i + 1; j < nonZeros.length; j++) {
-                            const maxVal = Math.max(nonZeros[i], nonZeros[j]);
-                            const minVal = Math.min(nonZeros[i], nonZeros[j]);
-                            if (maxVal > 0 && (maxVal - minVal) / maxVal <= 0.3) return maxVal;
+        // Process delayed auto target upgrades
+        await processAutoWarmupQueue();
+
+        if (addedCount > 0) {
+            // Run the auto target upgrade checks
+            await processAutoWarmup(allData);
+
+            if (!isTelegramWebhook) {
+                try {
+                    const notifiedState = await getFirebaseData('state/warmupNotified') || {};
+                    let newNotified = false;
+                    
+                    const grouped = {};
+                    Object.values(allData).forEach(r => {
+                        if (!r.domain && !r.ip && !r.server) return;
+                        const key = `${r.domain || ''}_${r.server || ''}_${r.ip || ''}`;
+                        if (!grouped[key]) grouped[key] = { ...r, records: [] };
+                        grouped[key].records.push(r);
+                    });
+                    
+                    const getRepOut = (drops) => {
+                        const nonZeros = drops.filter(v => v > 0);
+                        if (nonZeros.length === 0) return 0;
+                        if (nonZeros.length === 1) return nonZeros[0];
+                        nonZeros.sort((a, b) => b - a);
+                        for (let i = 0; i < nonZeros.length; i++) {
+                            for (let j = i + 1; j < nonZeros.length; j++) {
+                                const maxVal = Math.max(nonZeros[i], nonZeros[j]);
+                                const minVal = Math.min(nonZeros[i], nonZeros[j]);
+                                if (maxVal > 0 && (maxVal - minVal) / maxVal <= 0.3) return maxVal;
+                            }
+                        }
+                        return nonZeros[0];
+                    };
+                    
+                    const notifToken = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
+                    const notifChatId = "-1003735130681";
+                    
+                    for (const key in grouped) {
+                        const g = grouped[key];
+                        g.records.sort((a, b) => b.timestamp - a.timestamp);
+                        const allOuts = g.records.map(r => r.outVal);
+                        const repOut = getRepOut(allOuts);
+                        
+                        const safeDomain = (g.domain || g.ip || g.server || 'unknown').replace(/[\.\#\$\[\]]/g, '_');
+                        
+                        if (repOut > 25900 && !notifiedState[safeDomain]) {
+                            const text = `🎯 <b>Warmup Target Reached!</b>\n\n` + 
+                                         `🌐 Domain: <b>${g.domain || 'N/A'}</b>\n` +
+                                         `📌 IP: <code>${g.ip || 'Unknown'}</code>\n` + 
+                                         `🖥 Server: ${g.server || 'Unknown'}\n` + 
+                                         `📊 Rep Out: <b>${repOut}</b>\n\n` + 
+                                         `<i>Target (>25900) achieved.</i>`;
+                                         
+                            await fetch(`https://api.telegram.org/bot${notifToken}/sendMessage`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    chat_id: notifChatId,
+                                    message_thread_id: 91,
+                                    text: text,
+                                    parse_mode: 'HTML'
+                                })
+                            });
+                            
+                            notifiedState[safeDomain] = true;
+                            newNotified = true;
                         }
                     }
-                    return nonZeros[0];
-                };
-                
-                const notifToken = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
-                const notifChatId = "-1003735130681";
-                
-                for (const key in grouped) {
-                    const g = grouped[key];
-                    g.records.sort((a, b) => b.timestamp - a.timestamp);
-                    const allOuts = g.records.map(r => r.outVal);
-                    const repOut = getRepOut(allOuts);
                     
-                    const safeDomain = (g.domain || g.ip || g.server || 'unknown').replace(/[\.\#\$\[\]]/g, '_');
-                    
-                    if (repOut > 25900 && !notifiedState[safeDomain]) {
-                        const text = `🎯 <b>Warmup Target Reached!</b>\n\n` + 
-                                     `🌐 Domain: <b>${g.domain || 'N/A'}</b>\n` +
-                                     `📌 IP: <code>${g.ip || 'Unknown'}</code>\n` + 
-                                     `🖥 Server: ${g.server || 'Unknown'}\n` + 
-                                     `📊 Rep Out: <b>${repOut}</b>\n\n` + 
-                                     `<i>Target (>25900) achieved.</i>`;
-                                     
-                        await fetch(`https://api.telegram.org/bot${notifToken}/sendMessage`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                chat_id: notifChatId,
-                                message_thread_id: 91,
-                                text: text,
-                                parse_mode: 'HTML'
-                            })
+                    if (newNotified) {
+                        await fetch(`${DB_URL}/state/warmupNotified.json`, {
+                            method: 'PUT',
+                            body: JSON.stringify(notifiedState),
+                            headers: { 'Content-Type': 'application/json' }
                         });
-                        
-                        notifiedState[safeDomain] = true;
-                        newNotified = true;
                     }
+                } catch (err) {
+                    console.error("Error during notification check:", err);
                 }
-                
-                if (newNotified) {
-                    await fetch(`${DB_URL}/state/warmupNotified.json`, {
-                        method: 'PUT',
-                        body: JSON.stringify(notifiedState),
-                        headers: { 'Content-Type': 'application/json' }
-                    });
-                }
-            } catch (err) {
-                console.error("Error during notification check:", err);
             }
         }
         
