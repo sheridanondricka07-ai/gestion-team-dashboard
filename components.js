@@ -7617,23 +7617,48 @@ function renderWarmupProgress(app, container) {
                                 let isRpExtern = false;
                                 if (!isRdns && !isSwitch) {
                                     const invEntry = rpInventory.find(item => item.rpDomain && item.rpDomain.trim().toLowerCase() === g.domain.trim().toLowerCase());
+                                    let rpType = '';
                                     if (invEntry) {
-                                        const rpType = (invEntry.rpType || '').toLowerCase().trim();
-                                        if (rpType === 'intern') {
-                                            isRpIntern = true;
-                                        } else if (rpType === 'extern') {
-                                            isRpExtern = true;
-                                        } else {
+                                        rpType = (invEntry.rpType || '').toLowerCase().trim();
+                                        if (!rpType) {
                                             const domInc = (invEntry.domainIncluded || '').toLowerCase().trim();
                                             const rpDom = (invEntry.rpDomain || '').toLowerCase().trim();
                                             if (domInc && rpDom) {
-                                                if (domInc === rpDom) {
-                                                    isRpIntern = true;
-                                                } else {
-                                                    isRpExtern = true;
-                                                }
+                                                rpType = (domInc === rpDom) ? 'intern' : 'extern';
                                             }
                                         }
+                                    }
+                                    
+                                    // Fallback to fetch SPF info dynamically if not found in inventory
+                                    if (!rpType && g.domain && g.domain !== '---' && g.domain.toLowerCase() !== 'unknown') {
+                                        const domainLower = g.domain.trim().toLowerCase();
+                                        if (!window._spfCache) window._spfCache = {};
+                                        const cached = window._spfCache[domainLower];
+                                        if (cached && cached.found) {
+                                            rpType = cached.rpType;
+                                        } else if (cached === undefined) {
+                                            window._spfCache[domainLower] = null; // mark loading
+                                            (async () => {
+                                                try {
+                                                    const resp = await fetch(`/api/extract-spf-info?domain=${encodeURIComponent(domainLower)}`);
+                                                    const data = await resp.json();
+                                                     if (data && data.success && data.found) {
+                                                         window._spfCache[domainLower] = data;
+                                                         window.app.updateDashboard();
+                                                     } else {
+                                                         window._spfCache[domainLower] = { found: false };
+                                                     }
+                                                } catch (e) {
+                                                    window._spfCache[domainLower] = { found: false };
+                                                }
+                                            })();
+                                        }
+                                    }
+
+                                    if (rpType === 'intern') {
+                                        isRpIntern = true;
+                                    } else if (rpType === 'extern') {
+                                        isRpExtern = true;
                                     }
                                 }
 
