@@ -244,9 +244,8 @@ async function processAutoWarmup(allData, newRecords) {
                 }
             } else if (latestDrop.timestamp && latestDrop.timestamp <= fourHoursAgo && latestDrop.timestamp > fortyEightHoursAgo) {
                 if (!autoNotifiedState[stoppedNotifKey]) {
-                    const notifToken = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
-                    const notifChatId = "-1003735130681";
-                    const threadId = 91;
+                    const notifToken = UPGRADE_BOT_TOKEN;
+                    const notifChatId = "-5317343683";
 
                     const text = `⚠️ <b>Warmup Stopped Alert!</b>\n\n` +
                                  `🖥 Server: <b>${latestDrop.server || 'Unknown'}</b>\n` +
@@ -261,7 +260,6 @@ async function processAutoWarmup(allData, newRecords) {
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 chat_id: notifChatId,
-                                message_thread_id: threadId,
                                 text: text,
                                 parse_mode: 'HTML'
                             })
