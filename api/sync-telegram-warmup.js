@@ -1,7 +1,7 @@
 const DB_URL = "https://gestion-team-e-default-rtdb.firebaseio.com";
 const BOT_TOKEN = "8827415405:AAH-sAnTE7rz_i4XSTFG6tjBX0g0BYPyn6E";
 const UPGRADE_BOT_TOKEN = "8975320309:AAFQmIeTKMbxQMv4c8_UHSczUYYZ9mcJ8FA";
-const dns = require('dns').promises;
+import { promises as dns } from 'dns';
 
 function ipInCidr(ip, cidr) {
     const [range, bitsStr] = cidr.split('/');
@@ -721,6 +721,7 @@ export default async function handler(req, res) {
         // Run the auto target upgrade checks (always process, passing newRecords if added)
         await processAutoWarmup(allData, addedCount > 0 ? newRecords : null);
 
+        if (addedCount > 0) {
             if (!isTelegramWebhook) {
                 try {
                     const notifiedState = await getFirebaseData('state/warmupNotified') || {};
