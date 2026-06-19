@@ -99,7 +99,7 @@ async function processAutoWarmup(allData) {
                     
                     maxSendAt = Math.max(Date.now(), maxSendAt + 60000);
                     queueState[queueId1] = {
-                        chat_id: "-1003229248256",
+                        chat_id: "-1002633168986",
                         text: msg1,
                         sendAt: maxSendAt
                     };
@@ -111,7 +111,7 @@ async function processAutoWarmup(allData) {
                     
                     maxSendAt = maxSendAt + 60000;
                     queueState[queueId2] = {
-                        chat_id: "-1003229248256",
+                        chat_id: "-1002633168986",
                         text: msg2,
                         sendAt: maxSendAt
                     };
