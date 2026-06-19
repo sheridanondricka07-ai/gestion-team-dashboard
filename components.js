@@ -7403,10 +7403,11 @@ function renderWarmupProgress(app, container) {
     if (app.state.warmupActiveTab === 'highvol') currentGroups = highVolGroups;
 
     const filteredGroups = currentGroups.filter(g => {
+        const latestUser = (g.records[0] && g.records[0].user) || '';
         const matchSearch = g.domain.toLowerCase().includes(search) || 
                             (g.server || '').toLowerCase().includes(search) || 
                             (g.ip || '').includes(search) ||
-                            g.records.some(r => (r.user || '').toLowerCase().includes(search));
+                            latestUser.toLowerCase().includes(search);
         const matchServer = filterServer === 'all' || g.server === filterServer;
         return matchSearch && matchServer;
     });
