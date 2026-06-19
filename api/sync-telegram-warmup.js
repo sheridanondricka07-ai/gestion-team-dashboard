@@ -233,7 +233,7 @@ async function processAutoWarmup(allData, newRecords) {
                 }
             }
 
-            if (success) {
+             if (success) {
                 const latestVal = parseInt(g.records[0].inVal, 10) || 0;
                 const LEVELS = [50, 100, 200, 300, 500, 760, 1000, 1500, 2000, 3000, 5000, 7000, 8000, 10000, 15000, 19000, 21000, 26000, 30000];
                 const nextTarget = LEVELS.find(l => l > latestVal) || latestVal;
@@ -275,6 +275,78 @@ async function processAutoWarmup(allData, newRecords) {
                     autoNotifiedState[safeKey] = true;
                     newNotified = true;
                     newQueue = true;
+                }
+            } else {
+                // If not success, check if last 2 drops failed (OUT < 0.95 * IN or IN <= 0) and occurred within 24 hours
+                let shouldDowngrade = false;
+                if (g.records.length >= 2) {
+                    let bothFailed = true;
+                    for (let i = 0; i < 2; i++) {
+                        const r = g.records[i];
+                        if (!r.timestamp || r.timestamp < cutoff) {
+                            bothFailed = false;
+                            break;
+                        }
+                        const inVal = parseInt(r.inVal, 10) || 0;
+                        const outVal = parseInt(r.outVal, 10) || 0;
+                        if (inVal > 0 && outVal >= inVal * 0.95) {
+                            bothFailed = false;
+                            break;
+                        }
+                    }
+                    if (bothFailed) {
+                        shouldDowngrade = true;
+                    }
+                }
+
+                if (shouldDowngrade) {
+                    const latestVal = parseInt(g.records[0].inVal, 10) || 0;
+                    const LEVELS = [50, 100, 200, 300, 500, 760, 1000, 1500, 2000, 3000, 5000, 7000, 8000, 10000, 15000, 19000, 21000, 26000, 30000];
+                    
+                    const currentIdx = LEVELS.indexOf(latestVal);
+                    let prevTarget = latestVal;
+                    if (currentIdx > 0) {
+                        prevTarget = LEVELS[currentIdx - 1];
+                    } else if (currentIdx === -1) {
+                        const found = [...LEVELS].reverse().find(l => l < latestVal);
+                        prevTarget = found || LEVELS[0];
+                    }
+
+                    if (prevTarget < latestVal) {
+                        const isRdns = !g.domain || g.domain.toLowerCase().trim() === '[rdns]' || g.domain.toLowerCase().trim() === 'rdns';
+                        const cleanDomain = isRdns ? (g.ip || 'unknown') : (g.domain || g.ip || 'unknown');
+                        const safeDomain = cleanDomain.replace(/[\.\#\$\[\]]/g, '_');
+                        const safeKey = `${safeDomain}_${g.server}_down_${prevTarget}`;
+
+                        if (!autoNotifiedState[safeKey]) {
+                            // Queue first message (send_size downgrade)
+                            const msg1 = `update ${g.server} send_size for ${cleanDomain} to ${prevTarget}`;
+                            const queueId1 = "q_" + safeKey + "_send_size";
+                            
+                            maxSendAt = Math.max(Date.now(), maxSendAt + 5000);
+                            queueState[queueId1] = {
+                                chat_id: "-5317343683",
+                                text: msg1,
+                                sendAt: maxSendAt
+                            };
+
+                            // Queue second message (test_after downgrade)
+                            const testAfterVal = Math.round((prevTarget / 2) + 3);
+                            const msg2 = `update ${g.server} test_after for ${cleanDomain} to ${testAfterVal}`;
+                            const queueId2 = "q_" + safeKey + "_test_after";
+                            
+                            maxSendAt = maxSendAt + 5000;
+                            queueState[queueId2] = {
+                                chat_id: "-5317343683",
+                                text: msg2,
+                                sendAt: maxSendAt
+                            };
+
+                            autoNotifiedState[safeKey] = true;
+                            newNotified = true;
+                            newQueue = true;
+                        }
+                    }
                 }
             }
         }
