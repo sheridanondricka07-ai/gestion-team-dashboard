@@ -489,3 +489,7 @@
 [2026-06-18 09:00:01] Unique IPs to check: 309
 [2026-06-18 09:00:10] Sending Telegram notification...
 [2026-06-18 09:00:10] === SCAN COMPLETE: 100 LISTED, 0 NEW, 1 CLEANED ===
+[2026-06-19 09:00:00] === STARTING SPAMHAUS SCAN WITH COMPARISON ===
+[2026-06-19 09:00:00] Unique IPs to check: 309
+[2026-06-19 09:00:09] Sending Telegram notification...
+[2026-06-19 09:00:10] === SCAN COMPLETE: 87 LISTED, 0 NEW, 13 CLEANED ===

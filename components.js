@@ -7612,9 +7612,37 @@ function renderWarmupProgress(app, container) {
                                         }
                                     }
                                 }
+                                
+                                let isRpIntern = false;
+                                let isRpExtern = false;
+                                if (!isRdns && !isSwitch) {
+                                    const invEntry = rpInventory.find(item => item.rpDomain && item.rpDomain.trim().toLowerCase() === g.domain.trim().toLowerCase());
+                                    if (invEntry) {
+                                        const rpType = (invEntry.rpType || '').toLowerCase().trim();
+                                        if (rpType === 'intern') {
+                                            isRpIntern = true;
+                                        } else if (rpType === 'extern') {
+                                            isRpExtern = true;
+                                        } else {
+                                            const domInc = (invEntry.domainIncluded || '').toLowerCase().trim();
+                                            const rpDom = (invEntry.rpDomain || '').toLowerCase().trim();
+                                            if (domInc && rpDom) {
+                                                if (domInc === rpDom) {
+                                                    isRpIntern = true;
+                                                } else {
+                                                    isRpExtern = true;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
                                 if (isSwitch && srv && srv.warmupType !== 'Switch') {
                                     srv.warmupType = 'Switch';
                                     window.app.saveState().catch(e => console.error("Error auto-updating server warmupType to Switch:", e));
+                                } else if (!isRdns && !isSwitch && (isRpIntern || isRpExtern) && srv && srv.warmupType !== 'RP') {
+                                    srv.warmupType = 'RP';
+                                    window.app.saveState().catch(e => console.error("Error auto-updating server warmupType to RP:", e));
                                 }
 
                                 return `
@@ -7624,6 +7652,8 @@ function renderWarmupProgress(app, container) {
                                                 ${g.domain}
                                                 ${isRdns ? `<span style="font-size: 0.6rem; padding: 2px 4px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 4px; color: #3b82f6; margin-left: 6px;" title="No domain in summary. Resolved via IP PTR.">RDNS</span>` : ''}
                                                 ${isSwitch ? `<span style="font-size: 0.6rem; padding: 2px 4px; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 4px; color: #8b5cf6; margin-left: 6px;" title="This domain is the RDNS of another IP on the same server.">Switch</span>` : ''}
+                                                ${isRpIntern ? `<span style="font-size: 0.6rem; padding: 2px 4px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 4px; color: #10b981; margin-left: 6px;" title="SPF of domain contains the IP directly (RP Intern)">RP Intern</span>` : ''}
+                                                ${isRpExtern ? `<span style="font-size: 0.6rem; padding: 2px 4px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 4px; color: #f59e0b; margin-left: 6px;" title="IP is included inside a domain in the SPF (RP Extern)">RP Extern</span>` : ''}
                                             </div>
                                             <div style="font-size: 0.65rem; color: var(--text-secondary); margin-top: 6px; font-weight: 500; display: flex; flex-direction: column; gap: 3px;">
                                                 <div style="display: flex; align-items: center; gap: 4px;" title="First recorded drop date"><i data-lucide="calendar" style="width: 12px; height: 12px;"></i> Started: ${startDateStr}</div>
