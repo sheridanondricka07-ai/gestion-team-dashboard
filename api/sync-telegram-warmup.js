@@ -81,10 +81,15 @@ async function processAutoWarmup(allData, newRecords) {
             g.records.sort((a, b) => b.timestamp - a.timestamp);
             if (g.records.length < 3) continue;
 
-            // Check if 3 last drops succeeded (OUT >= 0.95 * IN)
+            // Check if 3 last drops succeeded (OUT >= 0.95 * IN) and occurred within the last 24 hours
             let success = true;
+            const cutoff = Date.now() - (24 * 60 * 60 * 1000);
             for (let i = 0; i < 3; i++) {
                 const r = g.records[i];
+                if (r.timestamp < cutoff) {
+                    success = false;
+                    break;
+                }
                 const inVal = parseInt(r.inVal, 10) || 0;
                 const outVal = parseInt(r.outVal, 10) || 0;
                 if (inVal <= 0 || outVal < inVal * 0.95) {
