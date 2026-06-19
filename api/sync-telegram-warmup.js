@@ -149,13 +149,14 @@ async function putFirebaseData(path, data) {
     }
 }
 
-async function sendWarmupReport(server, ip, domain, action, beforeSend, afterSend, reason) {
+async function sendWarmupReport(server, ip, domain, action, beforeSend, afterSend, userName, reason) {
     const notifToken = UPGRADE_BOT_TOKEN;
     const notifChatId = "-5317343683";
 
     const emoji = action === "Upgrade" ? "🚀 <b>Warmup Upgrade</b>" : "📉 <b>Warmup Downgrade</b>";
     const text = `${emoji}\n\n` +
                  `🖥 Server: <b>${server || 'N/A'}</b>\n` +
+                 `👤 User: <b>${userName || 'Unknown'}</b>\n` +
                  `📌 IP: <code>${ip || 'N/A'}</code>\n` +
                  `🌐 Domain: <b>${domain || 'N/A'}</b>\n` +
                  `📈 Send Size: <code>${beforeSend}</code> ➡️ <b>${afterSend}</b>\n\n` +
@@ -386,8 +387,9 @@ async function processAutoWarmup(allData, newRecords) {
                         sendAt: maxSendAt
                     };
 
-                     // Send notification report
-                     await sendWarmupReport(g.server, g.ip, cleanDomain, "Upgrade", latestVal, nextTarget, "Last 3 drops succeeded (OUT >= 95% of IN).");
+                      // Send notification report
+                      const userName = g.records && g.records[0] ? g.records[0].user : "Unknown";
+                      await sendWarmupReport(g.server, g.ip, cleanDomain, "Upgrade", latestVal, nextTarget, userName, "Last 3 drops succeeded (OUT >= 95% of IN).");
 
                     autoNotifiedState[safeKey] = true;
                     newNotified = true;
@@ -460,7 +462,8 @@ async function processAutoWarmup(allData, newRecords) {
                             };
 
                              // Send notification report
-                             await sendWarmupReport(g.server, g.ip, cleanDomain, "Downgrade", latestVal, prevTarget, "Last 2 drops failed (OUT < 95% of IN or IN <= 0).");
+                             const userName = g.records && g.records[0] ? g.records[0].user : "Unknown";
+                             await sendWarmupReport(g.server, g.ip, cleanDomain, "Downgrade", latestVal, prevTarget, userName, "Last 2 drops failed (OUT < 95% of IN or IN <= 0).");
 
                              autoNotifiedState[safeKey] = Date.now();
                              newNotified = true;
