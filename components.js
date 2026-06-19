@@ -1212,7 +1212,7 @@ window.generateImacrosFile = () => {
     const minMarge = parseInt(document.getElementById('imacros-marge-min').value) || 0;
     const maxMarge = parseInt(document.getElementById('imacros-marge-max').value) || 0;
     const pmtaWait = document.getElementById('imacros-pmta-wait').value.trim();
-    const betweenDropsWait = document.getElementById('imacros-between-drops-wait').value.trim();
+
 
     if (!ipsInput.trim()) {
         alert("Please enter IPs and domains.");
@@ -1279,6 +1279,53 @@ window.generateImacrosFile = () => {
         return;
     }
 
+    // Calculate wait_time dynamically:
+    // Base rotation time is 3600 seconds, scaled up to 7200 seconds if servers see high deferred.
+    let maxDeferred = 0;
+    const referencedServers = new Set();
+    parsedPairs.forEach(pair => {
+        let sName = pair.serverName;
+        if ((!sName || sName === 'Unknown') && window.app && window.app.state && window.app.state.servers) {
+            const srv = window.app.state.servers.find(s => {
+                const ips = [...(s.allIps || [])];
+                if (s.ip) ips.push(s.ip);
+                if (s.mainIp) ips.push(s.mainIp);
+                return ips.map(x => (x || '').trim()).includes(pair.ip.trim());
+            });
+            if (srv) sName = srv.name;
+        }
+        if (sName && sName !== 'Unknown') {
+            referencedServers.add(sName);
+        }
+    });
+
+    if (window.app && window.app.state && window.app.state.servers) {
+        window.app.state.servers.forEach(s => {
+            if (referencedServers.has(s.name)) {
+                const def = s.pmtaStatus && typeof s.pmtaStatus.deferred === 'number' ? s.pmtaStatus.deferred : 0;
+                if (def > maxDeferred) {
+                    maxDeferred = def;
+                }
+            }
+        });
+    }
+
+    let rotationTime = 3600;
+    if (maxDeferred > 100) {
+        rotationTime += (maxDeferred - 100) * 5;
+    }
+    if (rotationTime > 7200) rotationTime = 7200;
+    if (rotationTime < 3600) rotationTime = 3600;
+
+    const uniqueDomains = new Set(parsedPairs.map(p => p.domain.toLowerCase().trim())).size || 1;
+    const autoWaitTime = Math.round(rotationTime / uniqueDomains);
+
+    const waitInput = document.getElementById('imacros-between-drops-wait');
+    if (waitInput) {
+        waitInput.value = autoWaitTime;
+    }
+    const betweenDropsWait = autoWaitTime;
+
     const generatedLines = [];
 
     for (let i = 0; i < 500; i++) {
@@ -1302,8 +1349,21 @@ window.generateImacrosFile = () => {
         const pairLimit = pair.customLimit !== null ? pair.customLimit : limit;
         const pairLimitHalfPlus3 = Math.floor(pairLimit / 2) + 3;
 
+        let pmtaWaitVal = 20;
+        if (pairLimit >= 30000) {
+            pmtaWaitVal = 45;
+        } else if (pairLimit >= 19000) {
+            pmtaWaitVal = 40;
+        } else if (pairLimit >= 10000) {
+            pmtaWaitVal = 35;
+        } else if (pairLimit >= 5000) {
+            pmtaWaitVal = 30;
+        } else {
+            pmtaWaitVal = 20;
+        }
+
         // domain,id_news,server_name,pmta_wait,ip,limit,random_number,(limit/2)+3,between_drops_wait
-        const row = `${pair.domain},${idNews},${serverName},${pmtaWait},${pair.ip},${pairLimit},${randNum},${pairLimitHalfPlus3},${betweenDropsWait}`;
+        const row = `${pair.domain},${idNews},${serverName},${pmtaWaitVal},${pair.ip},${pairLimit},${randNum},${pairLimitHalfPlus3},${betweenDropsWait}`;
         generatedLines.push(row);
     }
 

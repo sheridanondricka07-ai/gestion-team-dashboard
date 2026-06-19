@@ -149,6 +149,34 @@ async function putFirebaseData(path, data) {
     }
 }
 
+async function sendWarmupReport(server, ip, domain, action, beforeSend, afterSend, reason) {
+    const notifToken = UPGRADE_BOT_TOKEN;
+    const notifChatId = "-5317343683";
+
+    const emoji = action === "Upgrade" ? "🚀 <b>Warmup Upgrade</b>" : "📉 <b>Warmup Downgrade</b>";
+    const text = `${emoji}\n\n` +
+                 `🖥 Server: <b>${server || 'N/A'}</b>\n` +
+                 `📌 IP: <code>${ip || 'N/A'}</code>\n` +
+                 `🌐 Domain: <b>${domain || 'N/A'}</b>\n` +
+                 `📈 Send Size: <code>${beforeSend}</code> ➡️ <b>${afterSend}</b>\n\n` +
+                 `💬 Reason: ${reason}`;
+
+    try {
+        await fetch(`https://api.telegram.org/bot${notifToken}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: notifChatId,
+                text: text,
+                parse_mode: 'HTML'
+            })
+        });
+    } catch (e) {
+        console.error("Failed to send warmup report to Telegram:", e);
+    }
+}
+
+
 async function processAutoWarmup(allData, newRecords) {
     try {
         const autoNotifiedState = await getFirebaseData('state/autoWarmupNotified') || {};
@@ -187,6 +215,66 @@ async function processAutoWarmup(allData, newRecords) {
             allData = prunedData;
         }
 
+        // 2. Check for stopped warmups (> 4 hours since last drop, but < 48 hours to avoid ancient targets)
+        const fourHoursAgo = Date.now() - (4 * 60 * 60 * 1000);
+        const fortyEightHoursAgo = Date.now() - (48 * 60 * 60 * 1000);
+
+        const absoluteLatest = {};
+        Object.values(allData).forEach(r => {
+            if (!r.domain && !r.ip && !r.server) return;
+            const key = `${r.domain || ''}_${r.server || ''}_${r.ip || ''}`;
+            if (!absoluteLatest[key] || r.timestamp > absoluteLatest[key].timestamp) {
+                absoluteLatest[key] = r;
+            }
+        });
+
+        for (const key in absoluteLatest) {
+            const latestDrop = absoluteLatest[key];
+            const isRdns = !latestDrop.domain || latestDrop.domain.toLowerCase().trim() === '[rdns]' || latestDrop.domain.toLowerCase().trim() === 'rdns';
+            const cleanDomain = isRdns ? (latestDrop.ip || 'unknown') : (latestDrop.domain || latestDrop.ip || 'unknown');
+            const safeDomain = cleanDomain.replace(/[\.\#\$\[\]]/g, '_');
+            const safeKey = `${safeDomain}_${latestDrop.server}`;
+            const stoppedNotifKey = `${safeKey}_stopped`;
+
+            if (latestDrop.timestamp && latestDrop.timestamp > fourHoursAgo) {
+                if (autoNotifiedState[stoppedNotifKey]) {
+                    delete autoNotifiedState[stoppedNotifKey];
+                    newNotified = true;
+                }
+            } else if (latestDrop.timestamp && latestDrop.timestamp <= fourHoursAgo && latestDrop.timestamp > fortyEightHoursAgo) {
+                if (!autoNotifiedState[stoppedNotifKey]) {
+                    const notifToken = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
+                    const notifChatId = "-1003735130681";
+                    const threadId = 91;
+
+                    const text = `⚠️ <b>Warmup Stopped Alert!</b>\n\n` +
+                                 `🖥 Server: <b>${latestDrop.server || 'Unknown'}</b>\n` +
+                                 `👤 User: <b>${latestDrop.user || 'Unknown'}</b>\n` +
+                                 `📌 IP: <code>${latestDrop.ip || 'Unknown'}</code>\n` +
+                                 `🌐 Domain: <b>${latestDrop.domain || 'N/A'}</b>\n\n` +
+                                 `❌ <i>No drops recorded in the last 4 hours (last drop was ${new Date(latestDrop.timestamp).toLocaleString()}). Please check if stopped.</i>`;
+
+                    try {
+                        await fetch(`https://api.telegram.org/bot${notifToken}/sendMessage`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                chat_id: notifChatId,
+                                message_thread_id: threadId,
+                                text: text,
+                                parse_mode: 'HTML'
+                            })
+                        });
+                    } catch (err) {
+                        console.error("Failed to send stopped notification:", err);
+                    }
+
+                    autoNotifiedState[stoppedNotifKey] = true;
+                    newNotified = true;
+                }
+            }
+        }
+
         const grouped = {};
         const cutoff = Date.now() - (24 * 60 * 60 * 1000);
         
@@ -214,8 +302,10 @@ async function processAutoWarmup(allData, newRecords) {
             const g = grouped[key];
             
 
-            g.records.sort((a, b) => b.timestamp - a.timestamp);
-            if (g.records.length < 3) continue;
+             g.records.sort((a, b) => b.timestamp - a.timestamp);
+             if (g.records.length < 3) continue;
+
+
 
             // Check if 3 last drops succeeded (OUT >= 0.95 * IN)
             let success = true;
@@ -234,14 +324,38 @@ async function processAutoWarmup(allData, newRecords) {
             }
 
              if (success) {
-                const latestVal = parseInt(g.records[0].inVal, 10) || 0;
-                const LEVELS = [50, 100, 200, 300, 500, 760, 1000, 1500, 2000, 3000, 5000, 7000, 8000, 10000, 15000, 19000, 21000, 26000, 30000];
-                const nextTarget = LEVELS.find(l => l > latestVal) || latestVal;
-                
-                const isRdns = !g.domain || g.domain.toLowerCase().trim() === '[rdns]' || g.domain.toLowerCase().trim() === 'rdns';
-                const cleanDomain = isRdns ? (g.ip || 'unknown') : (g.domain || g.ip || 'unknown');
-                const safeDomain = cleanDomain.replace(/[\.\#\$\[\]]/g, '_');
-                const safeKey = `${safeDomain}_${g.server}_${nextTarget}`;
+                 // Check if there was a downgrade and enforce a 3-drop cooldown before upgrading again
+                 const isRdns = !g.domain || g.domain.toLowerCase().trim() === '[rdns]' || g.domain.toLowerCase().trim() === 'rdns';
+                 const cleanDomainName = isRdns ? (g.ip || 'unknown') : (g.domain || g.ip || 'unknown');
+                 const safeDomainName = cleanDomainName.replace(/[\.\#\$\[\]]/g, '_');
+                 const downPrefix = `${safeDomainName}_${g.server}_down_`;
+                 
+                 let latestDowngradeTime = 0;
+                 Object.keys(autoNotifiedState).forEach(k => {
+                     if (k.startsWith(downPrefix)) {
+                         const val = autoNotifiedState[k];
+                         const t = typeof val === 'number' ? val : 0;
+                         if (t > latestDowngradeTime) {
+                             latestDowngradeTime = t;
+                         }
+                     }
+                 });
+
+                 if (latestDowngradeTime > 0) {
+                     const dropsAfter = g.records.filter(r => r.timestamp > latestDowngradeTime).length;
+                     if (dropsAfter < 3) {
+                         console.log(`Cooldown active for ${cleanDomainName} on server ${g.server}: only ${dropsAfter} drops since downgrade (need 3). Skipping upgrade check.`);
+                         continue; // Cooldown: must drop at least 3 drops after downgrade before upgrade is evaluated
+                     }
+                 }
+
+                 const latestVal = parseInt(g.records[0].inVal, 10) || 0;
+                 const LEVELS = [50, 100, 200, 300, 500, 760, 1000, 1500, 2000, 3000, 5000, 7000, 8000, 10000, 15000, 19000, 21000, 26000, 30000];
+                 const nextTarget = LEVELS.find(l => l > latestVal) || latestVal;
+                 
+                 const cleanDomain = cleanDomainName;
+                 const safeDomain = safeDomainName;
+                 const safeKey = `${safeDomain}_${g.server}_${nextTarget}`;
 
                 // Auto-detect and register domain in RPs inventory if it's a new custom domain
                 if (!isRdns && g.domain) {
@@ -271,6 +385,9 @@ async function processAutoWarmup(allData, newRecords) {
                         text: msg2,
                         sendAt: maxSendAt
                     };
+
+                     // Send notification report
+                     await sendWarmupReport(g.server, g.ip, cleanDomain, "Upgrade", latestVal, nextTarget, "Last 3 drops succeeded (OUT >= 95% of IN).");
 
                     autoNotifiedState[safeKey] = true;
                     newNotified = true;
@@ -342,9 +459,12 @@ async function processAutoWarmup(allData, newRecords) {
                                 sendAt: maxSendAt
                             };
 
-                            autoNotifiedState[safeKey] = true;
-                            newNotified = true;
-                            newQueue = true;
+                             // Send notification report
+                             await sendWarmupReport(g.server, g.ip, cleanDomain, "Downgrade", latestVal, prevTarget, "Last 2 drops failed (OUT < 95% of IN or IN <= 0).");
+
+                             autoNotifiedState[safeKey] = Date.now();
+                             newNotified = true;
+                             newQueue = true;
                         }
                     }
                 }
@@ -596,9 +716,8 @@ export default async function handler(req, res) {
         // Process delayed auto target upgrades
         await processAutoWarmupQueue();
 
-        if (addedCount > 0) {
-            // Run the auto target upgrade checks
-            await processAutoWarmup(allData, newRecords);
+        // Run the auto target upgrade checks (always process, passing newRecords if added)
+        await processAutoWarmup(allData, addedCount > 0 ? newRecords : null);
 
             if (!isTelegramWebhook) {
                 try {
