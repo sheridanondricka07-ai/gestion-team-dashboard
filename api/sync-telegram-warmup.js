@@ -713,8 +713,7 @@ export default async function handler(req, res) {
             allData = await getFirebaseData('warmupData') || {};
         }
         
-        // Process delayed auto target upgrades
-        await processAutoWarmupQueue();
+
 
         // Run the auto target upgrade checks (always process, passing newRecords if added)
         await processAutoWarmup(allData, addedCount > 0 ? newRecords : null);
