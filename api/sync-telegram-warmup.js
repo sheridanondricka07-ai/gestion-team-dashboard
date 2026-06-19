@@ -220,35 +220,27 @@ async function processAutoWarmup(allData, newRecords) {
         const sixHoursAgo = Date.now() - (6 * 60 * 60 * 1000);
         const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
 
+        const servers = await getFirebaseData('state/servers') || [];
         const absoluteLatest = {};
+
         Object.values(allData).forEach(r => {
             if (!r.domain && !r.ip && !r.server) return;
-            const key = `${r.domain || ''}_${r.server || ''}_${r.ip || ''}`;
-            if (!absoluteLatest[key] || r.timestamp > absoluteLatest[key].timestamp) {
-                absoluteLatest[key] = r;
-            }
-        });
-
-        const servers = await getFirebaseData('state/servers') || [];
-
-        for (const key in absoluteLatest) {
-            const latestDrop = absoluteLatest[key];
             
-            // Fix swapped server and domain names if any
-            let actualServer = latestDrop.server || 'Unknown';
-            let actualDomain = latestDrop.domain || 'N/A';
+            // Resolve actual server and domain names to get the correct safeKey
+            let actualServer = r.server || 'Unknown';
+            let actualDomain = r.domain || 'N/A';
             
             if (actualServer.includes('.') || (!actualServer.startsWith('sh_') && !actualServer.startsWith('s_'))) {
                 actualDomain = actualServer;
                 actualServer = 'Unknown';
             }
             
-            if ((actualServer === 'Unknown' || !actualServer) && latestDrop.ip) {
+            if ((actualServer === 'Unknown' || !actualServer) && r.ip) {
                 const srv = servers.find(s => {
                     const ips = [...(s.allIps || [])];
                     if (s.ip) ips.push(s.ip);
                     if (s.mainIp) ips.push(s.mainIp);
-                    return ips.map(x => (x || '').trim()).includes(latestDrop.ip.trim());
+                    return ips.map(x => (x || '').trim()).includes(r.ip.trim());
                 });
                 if (srv) {
                     actualServer = srv.name;
@@ -256,10 +248,26 @@ async function processAutoWarmup(allData, newRecords) {
             }
 
             const isRdns = !actualDomain || actualDomain.toLowerCase().trim() === '[rdns]' || actualDomain.toLowerCase().trim() === 'rdns';
-            const cleanDomain = isRdns ? (latestDrop.ip || 'unknown') : (actualDomain || latestDrop.ip || 'unknown');
+            const cleanDomain = isRdns ? (r.ip || 'unknown') : (actualDomain || r.ip || 'unknown');
             const safeDomain = cleanDomain.replace(/[\.\#\$\[\]]/g, '_');
             const safeKey = `${safeDomain}_${actualServer}`;
-            const stoppedNotifKey = `${safeKey}_stopped`;
+
+            // Group by resolved safeKey so old/swapped keys and correct keys of the same target don't compete
+            if (!absoluteLatest[safeKey] || r.timestamp > absoluteLatest[safeKey].timestamp) {
+                absoluteLatest[safeKey] = {
+                    ...r,
+                    actualServer,
+                    actualDomain,
+                    cleanDomain,
+                    safeDomain,
+                    stoppedNotifKey: `${safeKey}_stopped`
+                };
+            }
+        });
+
+        for (const safeKey in absoluteLatest) {
+            const latestDrop = absoluteLatest[safeKey];
+            const stoppedNotifKey = latestDrop.stoppedNotifKey;
 
             if (latestDrop.timestamp && latestDrop.timestamp > sixHoursAgo) {
                 if (autoNotifiedState[stoppedNotifKey]) {
@@ -272,10 +280,10 @@ async function processAutoWarmup(allData, newRecords) {
                     const notifChatId = "-5317343683";
 
                     const text = `⚠️ <b>Warmup Stopped Alert!</b>\n\n` +
-                                 `🖥 Server: <b>${actualServer || 'Unknown'}</b>\n` +
+                                 `🖥 Server: <b>${latestDrop.actualServer || 'Unknown'}</b>\n` +
                                  `👤 User: <b>${latestDrop.user || 'Unknown'}</b>\n` +
                                  `📌 IP: <code>${latestDrop.ip || 'Unknown'}</code>\n` +
-                                 `🌐 Domain: <b>${actualDomain || 'N/A'}</b>\n\n` +
+                                 `🌐 Domain: <b>${latestDrop.actualDomain || 'N/A'}</b>\n\n` +
                                  `❌ <i>No drops recorded in the last 6 hours (last drop was ${new Date(latestDrop.timestamp).toLocaleString()}). Please check if stopped.</i>`;
 
                     try {
