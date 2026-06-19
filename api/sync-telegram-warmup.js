@@ -398,7 +398,7 @@ async function processAutoWarmup(allData, newRecords) {
                     const msg1 = `update ${g.server} send_size for ${cleanDomain} to ${nextTarget}`;
                     const queueId1 = "q_" + safeKey + "_send_size";
                     
-                    maxSendAt = Math.max(Date.now(), maxSendAt + 5000);
+                    maxSendAt = Math.max(Date.now(), maxSendAt + 10000);
                     queueState[queueId1] = {
                         chat_id: "-5317343683",
                         text: msg1,
@@ -410,7 +410,7 @@ async function processAutoWarmup(allData, newRecords) {
                     const msg2 = `update ${g.server} test_after for ${cleanDomain} to ${testAfterVal}`;
                     const queueId2 = "q_" + safeKey + "_test_after";
                     
-                    maxSendAt = maxSendAt + 5000;
+                    maxSendAt = maxSendAt + 10000;
                     queueState[queueId2] = {
                         chat_id: "-5317343683",
                         text: msg2,
@@ -472,7 +472,7 @@ async function processAutoWarmup(allData, newRecords) {
                             const msg1 = `update ${g.server} send_size for ${cleanDomain} to ${prevTarget}`;
                             const queueId1 = "q_" + safeKey + "_send_size";
                             
-                            maxSendAt = Math.max(Date.now(), maxSendAt + 5000);
+                            maxSendAt = Math.max(Date.now(), maxSendAt + 10000);
                             queueState[queueId1] = {
                                 chat_id: "-5317343683",
                                 text: msg1,
@@ -484,7 +484,7 @@ async function processAutoWarmup(allData, newRecords) {
                             const msg2 = `update ${g.server} test_after for ${cleanDomain} to ${testAfterVal}`;
                             const queueId2 = "q_" + safeKey + "_test_after";
                             
-                            maxSendAt = maxSendAt + 5000;
+                            maxSendAt = maxSendAt + 10000;
                             queueState[queueId2] = {
                                 chat_id: "-5317343683",
                                 text: msg2,
@@ -546,7 +546,7 @@ async function processAutoWarmupQueue() {
             changed = true;
 
             // Shift any other due/soon-due items forward so they are spaced by at least 5 seconds
-            let nextSendAt = now + 5000;
+            let nextSendAt = now + 10000;
             for (let i = 1; i < items.length; i++) {
                 const item = items[i];
                 if (item.id === itemToSend.id) continue;
@@ -555,7 +555,7 @@ async function processAutoWarmupQueue() {
                     queueState[item.id].sendAt = nextSendAt;
                     changed = true;
                 }
-                nextSendAt += 5000;
+                nextSendAt += 10000;
             }
         }
 
@@ -624,7 +624,7 @@ function parseMessage(text, timestamp) {
     }
     
     if (!server && !ip) return null;
-    
+    if (inVal === 0 && outVal === 0) return null;
     return {
         user,
         server,
@@ -852,3 +852,5 @@ export const config = {
         bodyParser: false,
     },
 };
+
+
