@@ -39,11 +39,20 @@ async function putFirebaseData(path, data) {
     }
 }
 
-async function processAutoWarmup(allData) {
+async function processAutoWarmup(allData, newRecords) {
     try {
         const autoNotifiedState = await getFirebaseData('state/autoWarmupNotified') || {};
         const queueState = await getFirebaseData('state/autoWarmupQueue') || {};
         
+        const updatedKeys = new Set();
+        if (newRecords) {
+            Object.values(newRecords).forEach(r => {
+                if (!r.domain && !r.ip && !r.server) return;
+                const key = `${r.domain || ''}_${r.server || ''}_${r.ip || ''}`;
+                updatedKeys.add(key);
+            });
+        }
+
         let newNotified = false;
         let newQueue = false;
 
@@ -64,6 +73,8 @@ async function processAutoWarmup(allData) {
         });
 
         for (const key in grouped) {
+            if (newRecords && !updatedKeys.has(key)) continue;
+            
             const g = grouped[key];
             
 
@@ -369,7 +380,7 @@ export default async function handler(req, res) {
 
         if (addedCount > 0) {
             // Run the auto target upgrade checks
-            await processAutoWarmup(allData);
+            await processAutoWarmup(allData, newRecords);
 
             if (!isTelegramWebhook) {
                 try {
