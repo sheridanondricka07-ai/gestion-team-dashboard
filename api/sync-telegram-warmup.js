@@ -54,6 +54,14 @@ async function processAutoWarmup(allData) {
             grouped[key].records.push(r);
         });
 
+        // Find the maximum sendAt currently in the queue to schedule after it
+        let maxSendAt = Date.now() - 60000;
+        Object.values(queueState).forEach(item => {
+            if (item && item.sendAt > maxSendAt) {
+                maxSendAt = item.sendAt;
+            }
+        });
+
         for (const key in grouped) {
             const g = grouped[key];
             
@@ -85,25 +93,27 @@ async function processAutoWarmup(allData) {
                 const safeKey = `${safeDomain}_${g.server}_${nextTarget}`;
 
                 if (!autoNotifiedState[safeKey]) {
-                    // Send first message immediately
+                    // Queue first message (send_size)
                     const msg1 = `update ${g.server} send_size for ${cleanDomain} to ${nextTarget}`;
-                    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            chat_id: "-1003229248256",
-                            text: msg1
-                        })
-                    });
+                    const queueId1 = "q_" + Date.now() + "_" + Math.floor(Math.random() * 1000) + "_1";
+                    
+                    maxSendAt = Math.max(Date.now(), maxSendAt + 60000);
+                    queueState[queueId1] = {
+                        chat_id: "-1003229248256",
+                        text: msg1,
+                        sendAt: maxSendAt
+                    };
 
-                    // Queue second message for 1 minute later
+                    // Queue second message (test_after)
                     const testAfterVal = Math.round((nextTarget / 2) + 3);
                     const msg2 = `update ${g.server} test_after for ${cleanDomain} to ${testAfterVal}`;
-                    const queueId = "q_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
-                    queueState[queueId] = {
+                    const queueId2 = "q_" + Date.now() + "_" + Math.floor(Math.random() * 1000) + "_2";
+                    
+                    maxSendAt = maxSendAt + 60000;
+                    queueState[queueId2] = {
                         chat_id: "-1003229248256",
                         text: msg2,
-                        sendAt: Date.now() + 60000
+                        sendAt: maxSendAt
                     };
 
                     autoNotifiedState[safeKey] = true;
@@ -131,22 +141,40 @@ async function processAutoWarmupQueue() {
         const now = Date.now();
         let changed = false;
 
-        for (const queueId in queueState) {
-            const item = queueState[queueId];
-            if (item && item.sendAt <= now) {
-                // Send queued message
-                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        chat_id: item.chat_id,
-                        text: item.text
-                    })
-                });
+        // Sort items by scheduled time ascending
+        const items = Object.entries(queueState)
+            .map(([id, val]) => ({ id, ...val }))
+            .sort((a, b) => a.sendAt - b.sendAt);
 
-                // Remove from queue
-                delete queueState[queueId];
-                changed = true;
+        const dueItems = items.filter(item => item.sendAt <= now);
+
+        if (dueItems.length > 0) {
+            const itemToSend = dueItems[0];
+            
+            // Send the oldest due message
+            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: itemToSend.chat_id,
+                    text: itemToSend.text
+                })
+            });
+
+            delete queueState[itemToSend.id];
+            changed = true;
+
+            // Shift any other due/soon-due items forward so they are spaced by at least 1 minute
+            let nextSendAt = now + 60000;
+            for (let i = 1; i < items.length; i++) {
+                const item = items[i];
+                if (item.id === itemToSend.id) continue;
+                
+                if (queueState[item.id] && queueState[item.id].sendAt < nextSendAt) {
+                    queueState[item.id].sendAt = nextSendAt;
+                    changed = true;
+                }
+                nextSendAt += 60000;
             }
         }
 
