@@ -65,7 +65,7 @@ async function processAutoWarmup(allData, newRecords) {
         });
 
         // Find the maximum sendAt currently in the queue to schedule after it
-        let maxSendAt = Date.now() - 60000;
+        let maxSendAt = Date.now() - 5000;
         Object.values(queueState).forEach(item => {
             if (item && item.sendAt > maxSendAt) {
                 maxSendAt = item.sendAt;
@@ -112,7 +112,7 @@ async function processAutoWarmup(allData, newRecords) {
                     const msg1 = `update ${g.server} send_size for ${cleanDomain} to ${nextTarget}`;
                     const queueId1 = "q_" + Date.now() + "_" + Math.floor(Math.random() * 1000) + "_1";
                     
-                    maxSendAt = Math.max(Date.now(), maxSendAt + 60000);
+                    maxSendAt = Math.max(Date.now(), maxSendAt + 5000);
                     queueState[queueId1] = {
                         chat_id: "-5317343683",
                         text: msg1,
@@ -124,7 +124,7 @@ async function processAutoWarmup(allData, newRecords) {
                     const msg2 = `update ${g.server} test_after for ${cleanDomain} to ${testAfterVal}`;
                     const queueId2 = "q_" + Date.now() + "_" + Math.floor(Math.random() * 1000) + "_2";
                     
-                    maxSendAt = maxSendAt + 60000;
+                    maxSendAt = maxSendAt + 5000;
                     queueState[queueId2] = {
                         chat_id: "-5317343683",
                         text: msg2,
@@ -179,8 +179,8 @@ async function processAutoWarmupQueue() {
             delete queueState[itemToSend.id];
             changed = true;
 
-            // Shift any other due/soon-due items forward so they are spaced by at least 1 minute
-            let nextSendAt = now + 60000;
+            // Shift any other due/soon-due items forward so they are spaced by at least 5 seconds
+            let nextSendAt = now + 5000;
             for (let i = 1; i < items.length; i++) {
                 const item = items[i];
                 if (item.id === itemToSend.id) continue;
@@ -189,7 +189,7 @@ async function processAutoWarmupQueue() {
                     queueState[item.id].sendAt = nextSendAt;
                     changed = true;
                 }
-                nextSendAt += 60000;
+                nextSendAt += 5000;
             }
         }
 
