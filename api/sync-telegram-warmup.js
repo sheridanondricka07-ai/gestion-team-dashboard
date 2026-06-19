@@ -1,5 +1,5 @@
 const DB_URL = "https://gestion-team-e-default-rtdb.firebaseio.com";
-const BOT_TOKEN = "8827415405:AAH-sAnTE7rz_i4XSTFG6tjBX0g0BYPyn6E";
+const BOT_TOKEN = "8975320309:AAFQmIeTKMbxQMv4c8_UHSczUYYZ9mcJ8FA";
 
 async function getFirebaseData(path) {
     try {
@@ -99,7 +99,7 @@ async function processAutoWarmup(allData) {
                     
                     maxSendAt = Math.max(Date.now(), maxSendAt + 60000);
                     queueState[queueId1] = {
-                        chat_id: "-1002633168986",
+                        chat_id: "-5317343683",
                         text: msg1,
                         sendAt: maxSendAt
                     };
@@ -111,7 +111,7 @@ async function processAutoWarmup(allData) {
                     
                     maxSendAt = maxSendAt + 60000;
                     queueState[queueId2] = {
-                        chat_id: "-1002633168986",
+                        chat_id: "-5317343683",
                         text: msg2,
                         sendAt: maxSendAt
                     };
@@ -339,7 +339,7 @@ export default async function handler(req, res) {
             const msg = update.message || update.edited_message || update.channel_post;
             if (msg && msg.text) {
                 const chatId = msg.chat ? String(msg.chat.id) : "";
-                const isTargetGroup = chatId === "-1002633168986" || chatId === "-1003727758817";
+                const isTargetGroup = chatId === "-1002633168986" || chatId === "-1003727758817" || chatId === "-5317343683";
                 const isPrivate = msg.chat && msg.chat.type === "private";
                 
                 if (!isTargetGroup && !isPrivate) {
