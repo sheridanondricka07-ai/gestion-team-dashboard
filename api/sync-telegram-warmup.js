@@ -747,6 +747,9 @@ export default async function handler(req, res) {
         // Run the auto target upgrade checks (always process, passing newRecords if added)
         await processAutoWarmup(allData, addedCount > 0 ? newRecords : null);
 
+        // Process delayed auto target upgrades and dispatch to Telegram
+        await processAutoWarmupQueue();
+
         if (addedCount > 0) {
             if (!isTelegramWebhook) {
                 try {
