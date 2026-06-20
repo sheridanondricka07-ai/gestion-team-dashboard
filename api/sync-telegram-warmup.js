@@ -393,7 +393,7 @@ async function processAutoWarmup(allData, newRecords) {
 
                       // Send notification report
                       const userName = g.records && g.records[0] ? g.records[0].user : "Unknown";
-                      const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Upgrade", latestVal, nextTarget, userName, "Last 3 drops succeeded (OUT >= 95% of IN)."); maxSendAt = maxSendAt + 10000; queueState["q_" + safeKey + "_report"] = { chat_id: "-5317343683", text: reportText, parse_mode: "HTML", sendAt: maxSendAt };
+                      const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Upgrade", latestVal, nextTarget, userName, "Last 3 drops succeeded (OUT >= 95% of IN)."); maxSendAt = maxSendAt + 10000; queueState["q_" + safeKey + "_report"] = { chat_id: "-1003735130681", message_thread_id: 91, text: reportText, parse_mode: "HTML", sendAt: maxSendAt };
 
                     autoNotifiedState[safeKey] = true;
                     newNotified = true;
@@ -467,7 +467,7 @@ async function processAutoWarmup(allData, newRecords) {
 
                              // Send notification report
                              const userName = g.records && g.records[0] ? g.records[0].user : "Unknown";
-                             const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Downgrade", latestVal, prevTarget, userName, "Last 2 drops failed (OUT < 95% of IN or IN <= 0)."); maxSendAt = maxSendAt + 10000; queueState["q_" + safeKey + "_report"] = { chat_id: "-5317343683", text: reportText, parse_mode: "HTML", sendAt: maxSendAt };
+                             const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Downgrade", latestVal, prevTarget, userName, "Last 2 drops failed (OUT < 95% of IN or IN <= 0)."); maxSendAt = maxSendAt + 10000; queueState["q_" + safeKey + "_report"] = { chat_id: "-1003735130681", message_thread_id: 91, text: reportText, parse_mode: "HTML", sendAt: maxSendAt };
 
                              autoNotifiedState[safeKey] = Date.now();
                              newNotified = true;
@@ -512,7 +512,7 @@ async function processAutoWarmupQueue() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     chat_id: itemToSend.chat_id,
-                    text: itemToSend.text, parse_mode: itemToSend.parse_mode })
+                    text: itemToSend.text, parse_mode: itemToSend.parse_mode, message_thread_id: itemToSend.message_thread_id })
             });
 
             delete queueState[itemToSend.id];
@@ -825,6 +825,7 @@ export const config = {
         bodyParser: false,
     },
 };
+
 
 
 
