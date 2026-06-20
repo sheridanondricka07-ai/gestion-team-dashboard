@@ -406,8 +406,6 @@ async function processAutoWarmup(allData, newRecords) {
                         const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Upgrade", latestVal, nextTarget, userName, "Last 3 drops succeeded (OUT >= 95% of IN).");
                         
                         fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: reportText, parse_mode: "HTML" }) }).catch(e => console.error(e));
-                        
-                        newQueue = true;
                     }
                 }
             } else {
@@ -489,8 +487,6 @@ async function processAutoWarmup(allData, newRecords) {
                                  const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Downgrade", latestVal, prevTarget, userName, "Last 2 drops failed (OUT < 95% of IN or IN <= 0).");
                                  
                                  fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: reportText, parse_mode: "HTML" }) }).catch(e => console.error(e));
-                                 
-                                 newQueue = true;
                             }
                         }
                     }
