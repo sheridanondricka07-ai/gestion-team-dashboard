@@ -758,8 +758,8 @@ export default async function handler(req, res) {
                         return nonZeros[0];
                     };
                     
-                    const notifToken = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
-                    const notifChatId = "-1003735130681";
+                    const notifToken = UPGRADE_BOT_TOKEN;
+                    const notifChatId = "-5317343683";
                     
                     for (const key in grouped) {
                         const g = grouped[key];
@@ -782,7 +782,6 @@ export default async function handler(req, res) {
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
                                     chat_id: notifChatId,
-                                    message_thread_id: 91,
                                     text: text,
                                     parse_mode: 'HTML'
                                 })
