@@ -149,7 +149,10 @@ async function putFirebaseData(path, data) {
     }
 }
 
-function formatWarmupReport(server, ip, domain, action, beforeSend, afterSend, userName, reason) { const emoji = action === "Upgrade" ? "?? <b>Warmup Upgrade</b>" : "?? <b>Warmup Downgrade</b>"; return emoji + "`n`n?? Server: <b>" + (server || "N/A") + "</b>`n?? User: <b>" + (userName || "Unknown") + "</b>`n?? IP: <code>" + (ip || "N/A") + "</code>`n?? Domain: <b>" + (domain || "N/A") + "</b>`n?? Send Size: <code>" + beforeSend + "</code> ?? <b>" + afterSend + "</b>`n`n?? Reason: " + reason; }
+function formatWarmupReport(server, ip, domain, action, beforeSend, afterSend, userName, reason) {
+    const emoji = action === "Upgrade" ? "🚀 <b>Warmup Upgrade</b>" : "📉 <b>Warmup Downgrade</b>";
+    return emoji + "\n\n🖥 Server: <b>" + (server || "N/A") + "</b>\n👤 User: <b>" + (userName || "Unknown") + "</b>\n📌 IP: <code>" + (ip || "N/A") + "</code>\n🌐 Domain: <b>" + (domain || "N/A") + "</b>\n📈 Send Size: <code>" + beforeSend + "</code> ➡️ <b>" + afterSend + "</b>\n\n💬 Reason: " + reason;
+}
 
 
 async function processAutoWarmup(allData, newRecords) {
@@ -251,8 +254,8 @@ async function processAutoWarmup(allData, newRecords) {
                 }
             } else if (latestDrop.timestamp && latestDrop.timestamp <= sixHoursAgo && latestDrop.timestamp > twentyFourHoursAgo) {
                 if (!autoNotifiedState[stoppedNotifKey]) {
-                    const notifToken = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
-                    const notifChatId = "-1003735130681";
+                    const notifToken = UPGRADE_BOT_TOKEN;
+                    const notifChatId = "-5317343683";
 
                     const text = `⚠️ <b>Warmup Stopped Alert!</b>\n\n` +
                                  `🖥 Server: <b>${latestDrop.actualServer || 'Unknown'}</b>\n` +
@@ -397,8 +400,7 @@ async function processAutoWarmup(allData, newRecords) {
                       autoNotifiedState[safeKey] = true;
                       putFirebaseData('state/autoWarmupNotified', autoNotifiedState);
                       
-                      const notifToken = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
-                      fetch(`https://api.telegram.org/bot${notifToken}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-1003735130681", message_thread_id: 91, text: reportText, parse_mode: "HTML" }) }).catch(e => console.error(e));
+                      fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: reportText, parse_mode: "HTML" }) }).catch(e => console.error(e));
                       
                       newNotified = true;
                 }
@@ -472,8 +474,7 @@ async function processAutoWarmup(allData, newRecords) {
                              
                              autoNotifiedState[safeKey] = Date.now();
                              putFirebaseData('state/autoWarmupNotified', autoNotifiedState);
-                                          const notifToken = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
-                             fetch(`https://api.telegram.org/bot${notifToken}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-1003735130681", message_thread_id: 91, text: reportText, parse_mode: "HTML" }) }).catch(e => console.error(e));
+                             fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: reportText, parse_mode: "HTML" }) }).catch(e => console.error(e));
                              
                              newNotified = true;
                         }
