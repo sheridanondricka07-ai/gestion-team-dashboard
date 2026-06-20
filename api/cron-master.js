@@ -91,12 +91,15 @@ export default async function handler(req, res) {
         ptrSpfTriggered: false
     };
 
-    const runSpamhaus = task === 'all' || task === 'spamhaus' || (!task && [0, 8, 16].includes(hour));
-    const runVmta = task === 'all' || task === 'vmta' || task === 'rdns' || (!task && hour % 3 === 0);
-    const runGmail = task === 'all' || task === 'gmail' || (!task && [12, 18].includes(hour));
-    const runSpf = task === 'all' || task === 'spf' || (!task && hour === 9);
-    const runGmailStatus = task === 'all' || task === 'gmail-status' || (!task && hour === 9);
-    const runPtrSpf = task === 'all' || task === 'ptr-spf' || !task;
+    // To prevent a 1-minute cron job from executing 60 times an hour, restrict execution to the first 5 minutes of the hour.
+    const isTopOfTheHour = !task && now.getUTCMinutes() < 5;
+
+    const runSpamhaus = task === 'all' || task === 'spamhaus' || (isTopOfTheHour && [0, 8, 16].includes(hour));
+    const runVmta = task === 'all' || task === 'vmta' || task === 'rdns' || (isTopOfTheHour && hour % 3 === 0);
+    const runGmail = task === 'all' || task === 'gmail' || (isTopOfTheHour && [12, 18].includes(hour));
+    const runSpf = task === 'all' || task === 'spf' || (isTopOfTheHour && hour === 9);
+    const runGmailStatus = task === 'all' || task === 'gmail-status' || (isTopOfTheHour && hour === 9);
+    const runPtrSpf = task === 'all' || task === 'ptr-spf' || isTopOfTheHour;
 
     // 1. Trigger Spamhaus Check
     if (runSpamhaus) {
@@ -639,18 +642,7 @@ export default async function handler(req, res) {
         }
     }
 
-    // 7. Trigger Telegram Warmup Sync
-    console.log('Triggering Telegram Warmup Sync...');
-    try {
-        const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
-        const triggerResp = await fetch(`${baseUrl}/api/sync-telegram-warmup`);
-        const triggerData = await triggerResp.json().catch(() => ({}));
-        console.log('Telegram Warmup Sync Response:', triggerData);
-        results.telegramWarmupTriggered = true;
-        results.telegramWarmupTriggerData = triggerData;
-    } catch (e) {
-        console.error('Telegram Warmup Sync Error:', e);
-    }
+    // Telegram Warmup Sync cron trigger removed - no longer needed since queue was replaced with instant execution
 
     return res.status(200).json(results);
 }
