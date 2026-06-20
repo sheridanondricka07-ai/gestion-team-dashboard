@@ -149,6 +149,23 @@ async function putFirebaseData(path, data) {
     }
 }
 
+async function putFirebaseDataConditional(path, data, etag) {
+    try {
+        const resp = await fetch(`${DB_URL}/${path}.json`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'if-match': etag
+            },
+            body: JSON.stringify(data)
+        });
+        return resp.status === 200;
+    } catch (e) {
+        console.error("Firebase conditional put error:", e);
+        return false;
+    }
+}
+
 function formatWarmupReport(server, ip, domain, action, beforeSend, afterSend, userName, reason) {
     const emoji = action === "Upgrade" ? "🚀 <b>Warmup Upgrade</b>" : "📉 <b>Warmup Downgrade</b>";
     return emoji + "\n\n🖥 Server: <b>" + (server || "N/A") + "</b>\n👤 User: <b>" + (userName || "Unknown") + "</b>\n📌 IP: <code>" + (ip || "N/A") + "</code>\n🌐 Domain: <b>" + (domain || "N/A") + "</b>\n📈 Send Size: <code>" + beforeSend + "</code> ➡️ <b>" + afterSend + "</b>\n\n💬 Reason: " + reason;
@@ -170,28 +187,9 @@ async function processAutoWarmup(allData, newRecords) {
         }
 
         let newNotified = false;
-        let newQueue = false;
+        let newQueueItems = {};
 
-        // 1. Prune warmupData older than 30 days to optimize Firebase storage space
-        const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
-        let pruneCount = 0;
-        const prunedData = {};
-        let dataChanged = false;
-        
-        Object.entries(allData).forEach(([key, val]) => {
-            if (val && val.timestamp && val.timestamp < thirtyDaysAgo) {
-                dataChanged = true;
-                pruneCount++;
-            } else {
-                prunedData[key] = val;
-            }
-        });
-        
-        if (dataChanged) {
-            console.log(`Pruned ${pruneCount} old warmup records.`);
-            await putFirebaseData('warmupData', prunedData);
-            allData = prunedData;
-        }
+        // 1. Pruning logic removed to prevent data loss when fetching limited dataset
 
         // 2. Check for stopped warmups (> 6 hours since last drop, but < 24 hours to avoid ancient targets)
         const sixHoursAgo = Date.now() - (6 * 60 * 60 * 1000);
@@ -224,10 +222,12 @@ async function processAutoWarmup(allData, newRecords) {
                 }
             }
 
-            const isRdns = !actualDomain || actualDomain.toLowerCase().trim() === '[rdns]' || actualDomain.toLowerCase().trim() === 'rdns';
+            const cleanActualDomain = (actualDomain || '').toLowerCase().trim();
+            const isRdns = !actualDomain || cleanActualDomain === '[rdns]' || cleanActualDomain === 'rdns' || cleanActualDomain === 'n/a';
             const cleanDomain = isRdns ? (r.ip || 'unknown') : (actualDomain || r.ip || 'unknown');
-            const safeDomain = cleanDomain.replace(/[\.\#\$\[\]]/g, '_');
-            const safeKey = `${safeDomain}_${actualServer}`;
+            const safeDomain = cleanDomain.replace(/[\.\#\$\[\]\/]/g, '_');
+            const safeIp = (r.ip || 'unknown').replace(/[\.\:\/]/g, '_');
+            const safeKey = `${safeDomain}_${actualServer}_${safeIp}`;
 
             // Group by resolved safeKey so old/swapped keys and correct keys of the same target don't compete
             if (!absoluteLatest[safeKey] || r.timestamp > absoluteLatest[safeKey].timestamp) {
@@ -249,25 +249,26 @@ async function processAutoWarmup(allData, newRecords) {
             if (latestDrop.timestamp && latestDrop.timestamp > sixHoursAgo) {
                 if (autoNotifiedState[stoppedNotifKey]) {
                     delete autoNotifiedState[stoppedNotifKey];
-                    await saveFirebaseData('state/autoWarmupNotified', { [stoppedNotifKey]: null });
+                    await fetch(`${DB_URL}/state/autoWarmupNotified/${stoppedNotifKey}.json`, { method: 'DELETE' }).catch(e => console.error(e));
                 }
             } else if (latestDrop.timestamp && latestDrop.timestamp <= sixHoursAgo && latestDrop.timestamp > twentyFourHoursAgo) {
                 if (!autoNotifiedState[stoppedNotifKey]) {
-                    autoNotifiedState[stoppedNotifKey] = true;
-                    await saveFirebaseData('state/autoWarmupNotified', { [stoppedNotifKey]: true });
+                    // Try to write the key atomically only if it doesn't exist
+                    const acquired = await putFirebaseDataConditional(`state/autoWarmupNotified/${stoppedNotifKey}`, true, 'null_etag');
+                    if (acquired) {
+                        autoNotifiedState[stoppedNotifKey] = true;
 
-                    const notifToken = UPGRADE_BOT_TOKEN;
-                    const notifChatId = "-5317343683";
+                        const notifToken = UPGRADE_BOT_TOKEN;
+                        const notifChatId = "-5317343683";
 
-                    const text = `⚠️ <b>Warmup Stopped Alert!</b>\n\n` +
-                                 `🖥 Server: <b>${latestDrop.actualServer || 'Unknown'}</b>\n` +
-                                 `👤 User: <b>${latestDrop.user || 'Unknown'}</b>\n` +
-                                 `📌 IP: <code>${latestDrop.ip || 'Unknown'}</code>\n` +
-                                 `🌐 Domain: <b>${latestDrop.actualDomain || 'N/A'}</b>\n\n` +
-                                 `❌ <i>No drops recorded in the last 6 hours (last drop was ${new Date(latestDrop.timestamp).toLocaleString()}). Please check if stopped.</i>`;
+                        const text = `⚠️ <b>Warmup Stopped Alert!</b>\n\n` +
+                                     `🖥 Server: <b>${latestDrop.actualServer || 'Unknown'}</b>\n` +
+                                     `👤 User: <b>${latestDrop.user || 'Unknown'}</b>\n` +
+                                     `📌 IP: <code>${latestDrop.ip || 'Unknown'}</code>\n` +
+                                     `🌐 Domain: <b>${latestDrop.actualDomain || 'N/A'}</b>\n\n` +
+                                     `❌ <i>No drops recorded in the last 6 hours (last drop was ${new Date(latestDrop.timestamp).toLocaleString()}). Please check if stopped.</i>`;
 
-                    try {
-                        await fetch(`https://api.telegram.org/bot${notifToken}/sendMessage`, {
+                        fetch(`https://api.telegram.org/bot${notifToken}/sendMessage`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -275,9 +276,7 @@ async function processAutoWarmup(allData, newRecords) {
                                 text: text,
                                 parse_mode: 'HTML'
                             })
-                        });
-                    } catch (err) {
-                        console.error("Failed to send stopped notification:", err);
+                        }).catch(e => console.error("Failed to send stopped alert:", e));
                     }
                 }
             }
@@ -333,10 +332,12 @@ async function processAutoWarmup(allData, newRecords) {
 
              if (success) {
                  // Check if there was a downgrade and enforce a 3-drop cooldown before upgrading again
-                 const isRdns = !g.domain || g.domain.toLowerCase().trim() === '[rdns]' || g.domain.toLowerCase().trim() === 'rdns';
+                 const cleanGDomain = (g.domain || '').toLowerCase().trim();
+                 const isRdns = !g.domain || cleanGDomain === '[rdns]' || cleanGDomain === 'rdns' || cleanGDomain === 'n/a';
                  const cleanDomainName = isRdns ? (g.ip || 'unknown') : (g.domain || g.ip || 'unknown');
-                 const safeDomainName = cleanDomainName.replace(/[\.\#\$\[\]]/g, '_');
-                 const downPrefix = `${safeDomainName}_${g.server}_down_`;
+                 const safeDomainName = cleanDomainName.replace(/[\.\#\$\[\]\/]/g, '_');
+                 const safeIp = (g.ip || 'unknown').replace(/[\.\:\/]/g, '_');
+                 const downPrefix = `${safeDomainName}_${g.server}_${safeIp}_down_`;
                  
                  let latestDowngradeTime = 0;
                  Object.keys(autoNotifiedState).forEach(k => {
@@ -363,7 +364,7 @@ async function processAutoWarmup(allData, newRecords) {
                  
                  const cleanDomain = cleanDomainName;
                  const safeDomain = safeDomainName;
-                 const safeKey = `${safeDomain}_${g.server}_${nextTarget}`;
+                 const safeKey = `${safeDomain}_${g.server}_${safeIp}_${nextTarget}`;
 
                 // Auto-detect and register domain in RPs inventory if it's a new custom domain
                 if (!isRdns && g.domain) {
@@ -371,47 +372,43 @@ async function processAutoWarmup(allData, newRecords) {
                 }
 
                 if (!autoNotifiedState[safeKey]) {
-                    const currentServer = servers.find(s => s && s.name === g.server);
-                    const isRP = currentServer && currentServer.warmupType === "RP";
+                    const acquired = await putFirebaseDataConditional(`state/autoWarmupNotified/${safeKey}`, true, 'null_etag');
+                    if (acquired) {
+                        autoNotifiedState[safeKey] = true;
+                        const currentServer = servers.find(s => s && s.name === g.server);
+                        const isRP = currentServer && currentServer.warmupType === "RP";
 
-                    // Queue first message (send_size)
-                    const msg1 = isRP 
-                        ? `update ${g.server} send_size for ${cleanDomain} to ${nextTarget}`
-                        : `update ${g.server} pmta to ${nextTarget}`;
-                    const queueId1 = "q_" + safeKey + "_send_size";
-                    
-                    maxSendAt = Math.max(Date.now(), maxSendAt + 10000);
-                    queueState[queueId1] = {
-                        chat_id: "-5317343683",
-                        text: msg1,
-                        sendAt: maxSendAt
-                    };
+                        // Queue first message (send_size)
+                        const msg1 = `update ${g.server} send_size for ${cleanDomain} to ${nextTarget}`;
+                        const queueId1 = "q_" + safeKey + "_send_size";
+                        
+                        maxSendAt = Math.max(Date.now(), maxSendAt + 10000);
+                        newQueueItems[queueId1] = {
+                            chat_id: "-1003229248256",
+                            text: msg1,
+                            sendAt: maxSendAt
+                        };
 
-                    // Queue second message (test_after)
-                    const testAfterVal = Math.round((nextTarget / 2) + 3);
-                    const msg2 = isRP
-                        ? `update ${g.server} test_after for ${cleanDomain} to ${testAfterVal}`
-                        : `update ${g.server} send_size to ${testAfterVal}`;
-                    const queueId2 = "q_" + safeKey + "_test_after";
-                    
-                    maxSendAt = maxSendAt + 10000;
-                    queueState[queueId2] = {
-                        chat_id: "-5317343683",
-                        text: msg2,
-                        sendAt: maxSendAt
-                    };
+                        // Queue second message (test_after)
+                        const testAfterVal = Math.round((nextTarget / 2) + 3);
+                        const msg2 = `update ${g.server} test_after for ${cleanDomain} to ${testAfterVal}`;
+                        const queueId2 = "q_" + safeKey + "_test_after";
+                        
+                        maxSendAt = maxSendAt + 10000;
+                        newQueueItems[queueId2] = {
+                            chat_id: "-1003229248256",
+                            text: msg2,
+                            sendAt: maxSendAt
+                        };
 
-                      autoNotifiedState[safeKey] = true;
-                      await saveFirebaseData('state/autoWarmupNotified', { [safeKey]: true });
-
-                      // Send notification report
-                      const userName = g.records && g.records[0] ? g.records[0].user : "Unknown";
-                      const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Upgrade", latestVal, nextTarget, userName, "Last 3 drops succeeded (OUT >= 95% of IN).");
-                      
-                      fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: reportText, parse_mode: "HTML" }) }).catch(e => console.error(e));
-                      
-                      newNotified = true;
-                      newQueue = true;
+                        // Send notification report
+                        const userName = g.records && g.records[0] ? g.records[0].user : "Unknown";
+                        const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Upgrade", latestVal, nextTarget, userName, "Last 3 drops succeeded (OUT >= 95% of IN).");
+                        
+                        fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: reportText, parse_mode: "HTML" }) }).catch(e => console.error(e));
+                        
+                        newQueue = true;
+                    }
                 }
             } else {
                 // If not success, check if last 2 drops failed (OUT < 0.95 * IN or IN <= 0) and occurred within 24 hours
@@ -450,63 +447,59 @@ async function processAutoWarmup(allData, newRecords) {
                     }
 
                     if (prevTarget < latestVal) {
-                        const isRdns = !g.domain || g.domain.toLowerCase().trim() === '[rdns]' || g.domain.toLowerCase().trim() === 'rdns';
+                        const cleanGDomain = (g.domain || '').toLowerCase().trim();
+                        const isRdns = !g.domain || cleanGDomain === '[rdns]' || cleanGDomain === 'rdns' || cleanGDomain === 'n/a';
                         const cleanDomain = isRdns ? (g.ip || 'unknown') : (g.domain || g.ip || 'unknown');
-                        const safeDomain = cleanDomain.replace(/[\.\#\$\[\]]/g, '_');
-                        const safeKey = `${safeDomain}_${g.server}_down_${prevTarget}`;
+                        const safeDomain = cleanDomain.replace(/[\.\#\$\[\]\/]/g, '_');
+                        const safeIp = (g.ip || 'unknown').replace(/[\.\:\/]/g, '_');
+                        const safeKey = `${safeDomain}_${g.server}_${safeIp}_down_${prevTarget}`;
 
                         if (!autoNotifiedState[safeKey]) {
-                            const currentServer = servers.find(s => s && s.name === g.server);
-                            const isRP = currentServer && currentServer.warmupType === "RP";
+                            const acquired = await putFirebaseDataConditional(`state/autoWarmupNotified/${safeKey}`, Date.now(), 'null_etag');
+                            if (acquired) {
+                                autoNotifiedState[safeKey] = Date.now();
+                                const currentServer = servers.find(s => s && s.name === g.server);
+                                const isRP = currentServer && currentServer.warmupType === "RP";
 
-                            // Queue first message (send_size downgrade)
-                            const msg1 = isRP
-                                ? `update ${g.server} send_size for ${cleanDomain} to ${prevTarget}`
-                                : `update ${g.server} pmta to ${prevTarget}`;
-                            const queueId1 = "q_" + safeKey + "_send_size";
-                            
-                            maxSendAt = Math.max(Date.now(), maxSendAt + 10000);
-                            queueState[queueId1] = {
-                                chat_id: "-5317343683",
-                                text: msg1,
-                                sendAt: maxSendAt
-                            };
+                                // Queue first message (send_size downgrade)
+                                const msg1 = `update ${g.server} send_size for ${cleanDomain} to ${prevTarget}`;
+                                const queueId1 = "q_" + safeKey + "_send_size";
+                                
+                                maxSendAt = Math.max(Date.now(), maxSendAt + 10000);
+                                newQueueItems[queueId1] = {
+                                    chat_id: "-1003229248256",
+                                    text: msg1,
+                                    sendAt: maxSendAt
+                                };
 
-                            // Queue second message (test_after downgrade)
-                            const testAfterVal = Math.round((prevTarget / 2) + 3);
-                            const msg2 = isRP
-                                ? `update ${g.server} test_after for ${cleanDomain} to ${testAfterVal}`
-                                : `update ${g.server} send_size to ${testAfterVal}`;
-                            const queueId2 = "q_" + safeKey + "_test_after";
-                            
-                            maxSendAt = maxSendAt + 10000;
-                            queueState[queueId2] = {
-                                chat_id: "-5317343683",
-                                text: msg2,
-                                sendAt: maxSendAt
-                            };
+                                // Queue second message (test_after downgrade)
+                                const testAfterVal = Math.round((prevTarget / 2) + 3);
+                                const msg2 = `update ${g.server} test_after for ${cleanDomain} to ${testAfterVal}`;
+                                const queueId2 = "q_" + safeKey + "_test_after";
+                                
+                                maxSendAt = maxSendAt + 10000;
+                                newQueueItems[queueId2] = {
+                                    chat_id: "-1003229248256",
+                                    text: msg2,
+                                    sendAt: maxSendAt
+                                };
 
-                             autoNotifiedState[safeKey] = Date.now();
-                             await saveFirebaseData('state/autoWarmupNotified', { [safeKey]: autoNotifiedState[safeKey] });
-
-                             // Send notification report
-                             const userName = g.records && g.records[0] ? g.records[0].user : "Unknown";
-                             const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Downgrade", latestVal, prevTarget, userName, "Last 2 drops failed (OUT < 95% of IN or IN <= 0).");
-                             
-                             fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: reportText, parse_mode: "HTML" }) }).catch(e => console.error(e));
-                             
-                             newNotified = true;
-                             newQueue = true;
+                                 // Send notification report
+                                 const userName = g.records && g.records[0] ? g.records[0].user : "Unknown";
+                                 const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Downgrade", latestVal, prevTarget, userName, "Last 2 drops failed (OUT < 95% of IN or IN <= 0).");
+                                 
+                                 fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: reportText, parse_mode: "HTML" }) }).catch(e => console.error(e));
+                                 
+                                 newQueue = true;
+                            }
                         }
                     }
                 }
             }
         }
 
-        // autoNotifiedState changes are now saved immediately inside the loop via PATCH
-
-        if (newQueue) {
-            await putFirebaseData('state/autoWarmupQueue', queueState);
+        if (Object.keys(newQueueItems).length > 0) {
+            await saveFirebaseData('state/autoWarmupQueue', newQueueItems);
         }
     } catch (e) {
         console.error("Error in processAutoWarmup:", e);
@@ -539,24 +532,27 @@ async function processAutoWarmupQueue() {
             });
 
             delete queueState[itemToSend.id];
-            changed = true;
+            // changed flag handled below
 
-            // Shift any other due/soon-due items forward so they are spaced by at least 5 seconds
+            // Shift any other due/soon-due items forward so they are spaced by at least 10 seconds
             let nextSendAt = now + 10000;
+            const updatedItems = {};
             for (let i = 1; i < items.length; i++) {
                 const item = items[i];
                 if (item.id === itemToSend.id) continue;
                 
                 if (queueState[item.id] && queueState[item.id].sendAt < nextSendAt) {
-                    queueState[item.id].sendAt = nextSendAt;
+                    updatedItems[item.id] = { ...queueState[item.id], sendAt: nextSendAt };
                     changed = true;
                 }
                 nextSendAt += 10000;
             }
-        }
 
-        if (changed) {
-            await putFirebaseData('state/autoWarmupQueue', queueState);
+            // Apply updates without overwriting the entire queue
+            await fetch(`${DB_URL}/state/autoWarmupQueue/${itemToSend.id}.json`, { method: 'DELETE' });
+            if (Object.keys(updatedItems).length > 0) {
+                await saveFirebaseData('state/autoWarmupQueue', updatedItems);
+            }
         }
     } catch (e) {
         console.error("Error in processAutoWarmupQueue:", e);
@@ -736,10 +732,18 @@ export default async function handler(req, res) {
         
         if (addedCount > 0) {
             await saveFirebaseData('warmupData', newRecords);
-        }        // Fetch all warmupData from Firebase if needed (when new records are added or not in webhook mode)
+        }
+        // Fetch recent warmupData from Firebase if needed (when new records are added or not in webhook mode)
         let allData = {};
         if (addedCount > 0 || !isTelegramWebhook) {
-            allData = await getFirebaseData('warmupData') || {};
+            try {
+                // Fetch only the last 2000 records to save bandwidth (~95% reduction)
+                const resp = await fetch(`${DB_URL}/warmupData.json?orderBy="$key"&limitToLast=2000`);
+                allData = await resp.json() || {};
+            } catch (err) {
+                // Fallback to fetching all if query fails
+                allData = await getFirebaseData('warmupData') || {};
+            }
         }
         
 
