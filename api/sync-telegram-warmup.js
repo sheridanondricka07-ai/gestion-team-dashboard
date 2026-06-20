@@ -393,11 +393,21 @@ async function processAutoWarmup(allData, newRecords) {
 
                       // Send notification report
                       const userName = g.records && g.records[0] ? g.records[0].user : "Unknown";
-                      const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Upgrade", latestVal, nextTarget, userName, "Last 3 drops succeeded (OUT >= 95% of IN)."); maxSendAt = maxSendAt + 10000; queueState["q_" + safeKey + "_report"] = { chat_id: "-1003735130681", message_thread_id: 91, text: reportText, parse_mode: "HTML", sendAt: maxSendAt };
+                      const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Upgrade", latestVal, nextTarget, userName, "Last 3 drops succeeded (OUT >= 95% of IN).");
+                      
+                      autoNotifiedState[safeKey] = true;
+                      putFirebaseData('state/autoWarmupNotified', autoNotifiedState);
+                      
+                      fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-1003735130681", message_thread_id: 91, text: reportText, parse_mode: "HTML" }) }).catch(e => console.error(e));
+                      fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: msg1 }) }).catch(e => console.error(e));
+                      
+                      await new Promise(r => setTimeout(r, 9000));
+                      fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: msg2 }) }).catch(e => console.error(e));
+                      
+                      delete queueState[queueId1];
+                      delete queueState[queueId2];
 
-                    autoNotifiedState[safeKey] = true;
                     newNotified = true;
-                    newQueue = true;
                 }
             } else {
                 // If not success, check if last 2 drops failed (OUT < 0.95 * IN or IN <= 0) and occurred within 24 hours
@@ -467,11 +477,21 @@ async function processAutoWarmup(allData, newRecords) {
 
                              // Send notification report
                              const userName = g.records && g.records[0] ? g.records[0].user : "Unknown";
-                             const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Downgrade", latestVal, prevTarget, userName, "Last 2 drops failed (OUT < 95% of IN or IN <= 0)."); maxSendAt = maxSendAt + 10000; queueState["q_" + safeKey + "_report"] = { chat_id: "-1003735130681", message_thread_id: 91, text: reportText, parse_mode: "HTML", sendAt: maxSendAt };
-
+                             const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Downgrade", latestVal, prevTarget, userName, "Last 2 drops failed (OUT < 95% of IN or IN <= 0).");
+                             
                              autoNotifiedState[safeKey] = Date.now();
+                             putFirebaseData('state/autoWarmupNotified', autoNotifiedState);
+                             
+                             fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-1003735130681", message_thread_id: 91, text: reportText, parse_mode: "HTML" }) }).catch(e => console.error(e));
+                             fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: msg1 }) }).catch(e => console.error(e));
+                             
+                             await new Promise(r => setTimeout(r, 9000));
+                             fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: msg2 }) }).catch(e => console.error(e));
+                             
+                             delete queueState[queueId1];
+                             delete queueState[queueId2];
+
                              newNotified = true;
-                             newQueue = true;
                         }
                     }
                 }
@@ -825,6 +845,7 @@ export const config = {
         bodyParser: false,
     },
 };
+
 
 
 
