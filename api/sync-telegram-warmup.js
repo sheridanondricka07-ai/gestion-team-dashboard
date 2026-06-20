@@ -168,6 +168,7 @@ async function processAutoWarmup(allData, newRecords) {
 
         let newNotified = false;
         let newQueue = false;
+        let newQueueItems = {};
 
         // 1. Prune warmupData older than 30 days to optimize Firebase storage space
         const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
@@ -373,8 +374,7 @@ async function processAutoWarmup(allData, newRecords) {
                     const queueId1 = "q_" + safeKey + "_send_size";
                     
                     maxSendAt = Math.max(Date.now(), maxSendAt + 10000);
-                    queueState[queueId1] = {
-                        chat_id: "-5317343683",
+                    newQueueItems[queueId1] = {
                         text: msg1,
                         sendAt: maxSendAt
                     };
@@ -385,8 +385,7 @@ async function processAutoWarmup(allData, newRecords) {
                     const queueId2 = "q_" + safeKey + "_test_after";
                     
                     maxSendAt = maxSendAt + 10000;
-                    queueState[queueId2] = {
-                        chat_id: "-5317343683",
+                    newQueueItems[queueId2] = {
                         text: msg2,
                         sendAt: maxSendAt
                     };
@@ -400,15 +399,8 @@ async function processAutoWarmup(allData, newRecords) {
                       
                       const notifToken = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
                       fetch(`https://api.telegram.org/bot${notifToken}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-1003735130681", message_thread_id: 91, text: reportText, parse_mode: "HTML" }) }).catch(e => console.error(e));
-                      fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: msg1 }) }).catch(e => console.error(e));
                       
-                      await new Promise(r => setTimeout(r, 9000));
-                      fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: msg2 }) }).catch(e => console.error(e));
-                      
-                      delete queueState[queueId1];
-                      delete queueState[queueId2];
-
-                    newNotified = true;
+                      newNotified = true;
                 }
             } else {
                 // If not success, check if last 2 drops failed (OUT < 0.95 * IN or IN <= 0) and occurred within 24 hours
@@ -458,8 +450,7 @@ async function processAutoWarmup(allData, newRecords) {
                             const queueId1 = "q_" + safeKey + "_send_size";
                             
                             maxSendAt = Math.max(Date.now(), maxSendAt + 10000);
-                            queueState[queueId1] = {
-                                chat_id: "-5317343683",
+                            newQueueItems[queueId1] = {
                                 text: msg1,
                                 sendAt: maxSendAt
                             };
@@ -470,8 +461,7 @@ async function processAutoWarmup(allData, newRecords) {
                             const queueId2 = "q_" + safeKey + "_test_after";
                             
                             maxSendAt = maxSendAt + 10000;
-                            queueState[queueId2] = {
-                                chat_id: "-5317343683",
+                            newQueueItems[queueId2] = {
                                 text: msg2,
                                 sendAt: maxSendAt
                             };
@@ -482,17 +472,9 @@ async function processAutoWarmup(allData, newRecords) {
                              
                              autoNotifiedState[safeKey] = Date.now();
                              putFirebaseData('state/autoWarmupNotified', autoNotifiedState);
-                             
-                             const notifToken = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
+                                          const notifToken = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
                              fetch(`https://api.telegram.org/bot${notifToken}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-1003735130681", message_thread_id: 91, text: reportText, parse_mode: "HTML" }) }).catch(e => console.error(e));
-                             fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: msg1 }) }).catch(e => console.error(e));
                              
-                             await new Promise(r => setTimeout(r, 9000));
-                             fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: msg2 }) }).catch(e => console.error(e));
-                             
-                             delete queueState[queueId1];
-                             delete queueState[queueId2];
-
                              newNotified = true;
                         }
                     }
@@ -505,7 +487,7 @@ async function processAutoWarmup(allData, newRecords) {
         }
 
         if (newQueue) {
-            await putFirebaseData('state/autoWarmupQueue', queueState);
+            await saveFirebaseData('state/autoWarmupQueue', newQueueItems);
         }
     } catch (e) {
         console.error("Error in processAutoWarmup:", e);
