@@ -249,10 +249,13 @@ async function processAutoWarmup(allData, newRecords) {
             if (latestDrop.timestamp && latestDrop.timestamp > sixHoursAgo) {
                 if (autoNotifiedState[stoppedNotifKey]) {
                     delete autoNotifiedState[stoppedNotifKey];
-                    newNotified = true;
+                    await saveFirebaseData('state/autoWarmupNotified', { [stoppedNotifKey]: null });
                 }
             } else if (latestDrop.timestamp && latestDrop.timestamp <= sixHoursAgo && latestDrop.timestamp > twentyFourHoursAgo) {
                 if (!autoNotifiedState[stoppedNotifKey]) {
+                    autoNotifiedState[stoppedNotifKey] = true;
+                    await saveFirebaseData('state/autoWarmupNotified', { [stoppedNotifKey]: true });
+
                     const notifToken = UPGRADE_BOT_TOKEN;
                     const notifChatId = "-5317343683";
 
@@ -276,9 +279,6 @@ async function processAutoWarmup(allData, newRecords) {
                     } catch (err) {
                         console.error("Failed to send stopped notification:", err);
                     }
-
-                    autoNotifiedState[stoppedNotifKey] = true;
-                    newNotified = true;
                 }
             }
         }
@@ -371,8 +371,13 @@ async function processAutoWarmup(allData, newRecords) {
                 }
 
                 if (!autoNotifiedState[safeKey]) {
+                    const currentServer = servers.find(s => s && s.name === g.server);
+                    const isRP = currentServer && currentServer.warmupType === "RP";
+
                     // Queue first message (send_size)
-                    const msg1 = `update ${g.server} send_size for ${cleanDomain} to ${nextTarget}`;
+                    const msg1 = isRP 
+                        ? `update ${g.server} send_size for ${cleanDomain} to ${nextTarget}`
+                        : `update ${g.server} pmta to ${nextTarget}`;
                     const queueId1 = "q_" + safeKey + "_send_size";
                     
                     maxSendAt = Math.max(Date.now(), maxSendAt + 10000);
@@ -384,7 +389,9 @@ async function processAutoWarmup(allData, newRecords) {
 
                     // Queue second message (test_after)
                     const testAfterVal = Math.round((nextTarget / 2) + 3);
-                    const msg2 = `update ${g.server} test_after for ${cleanDomain} to ${testAfterVal}`;
+                    const msg2 = isRP
+                        ? `update ${g.server} test_after for ${cleanDomain} to ${testAfterVal}`
+                        : `update ${g.server} send_size to ${testAfterVal}`;
                     const queueId2 = "q_" + safeKey + "_test_after";
                     
                     maxSendAt = maxSendAt + 10000;
@@ -394,12 +401,12 @@ async function processAutoWarmup(allData, newRecords) {
                         sendAt: maxSendAt
                     };
 
+                      autoNotifiedState[safeKey] = true;
+                      await saveFirebaseData('state/autoWarmupNotified', { [safeKey]: true });
+
                       // Send notification report
                       const userName = g.records && g.records[0] ? g.records[0].user : "Unknown";
                       const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Upgrade", latestVal, nextTarget, userName, "Last 3 drops succeeded (OUT >= 95% of IN).");
-                      
-                      autoNotifiedState[safeKey] = true;
-                      putFirebaseData('state/autoWarmupNotified', autoNotifiedState);
                       
                       fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: reportText, parse_mode: "HTML" }) }).catch(e => console.error(e));
                       
@@ -449,8 +456,13 @@ async function processAutoWarmup(allData, newRecords) {
                         const safeKey = `${safeDomain}_${g.server}_down_${prevTarget}`;
 
                         if (!autoNotifiedState[safeKey]) {
+                            const currentServer = servers.find(s => s && s.name === g.server);
+                            const isRP = currentServer && currentServer.warmupType === "RP";
+
                             // Queue first message (send_size downgrade)
-                            const msg1 = `update ${g.server} send_size for ${cleanDomain} to ${prevTarget}`;
+                            const msg1 = isRP
+                                ? `update ${g.server} send_size for ${cleanDomain} to ${prevTarget}`
+                                : `update ${g.server} pmta to ${prevTarget}`;
                             const queueId1 = "q_" + safeKey + "_send_size";
                             
                             maxSendAt = Math.max(Date.now(), maxSendAt + 10000);
@@ -462,7 +474,9 @@ async function processAutoWarmup(allData, newRecords) {
 
                             // Queue second message (test_after downgrade)
                             const testAfterVal = Math.round((prevTarget / 2) + 3);
-                            const msg2 = `update ${g.server} test_after for ${cleanDomain} to ${testAfterVal}`;
+                            const msg2 = isRP
+                                ? `update ${g.server} test_after for ${cleanDomain} to ${testAfterVal}`
+                                : `update ${g.server} send_size to ${testAfterVal}`;
                             const queueId2 = "q_" + safeKey + "_test_after";
                             
                             maxSendAt = maxSendAt + 10000;
@@ -472,12 +486,13 @@ async function processAutoWarmup(allData, newRecords) {
                                 sendAt: maxSendAt
                             };
 
+                             autoNotifiedState[safeKey] = Date.now();
+                             await saveFirebaseData('state/autoWarmupNotified', { [safeKey]: autoNotifiedState[safeKey] });
+
                              // Send notification report
                              const userName = g.records && g.records[0] ? g.records[0].user : "Unknown";
                              const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Downgrade", latestVal, prevTarget, userName, "Last 2 drops failed (OUT < 95% of IN or IN <= 0).");
                              
-                             autoNotifiedState[safeKey] = Date.now();
-                             putFirebaseData('state/autoWarmupNotified', autoNotifiedState);
                              fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: reportText, parse_mode: "HTML" }) }).catch(e => console.error(e));
                              
                              newNotified = true;
@@ -488,9 +503,7 @@ async function processAutoWarmup(allData, newRecords) {
             }
         }
 
-        if (newNotified) {
-            await putFirebaseData('state/autoWarmupNotified', autoNotifiedState);
-        }
+        // autoNotifiedState changes are now saved immediately inside the loop via PATCH
 
         if (newQueue) {
             await putFirebaseData('state/autoWarmupQueue', queueState);
