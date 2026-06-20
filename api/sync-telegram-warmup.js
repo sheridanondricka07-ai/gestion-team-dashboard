@@ -250,8 +250,8 @@ async function processAutoWarmup(allData, newRecords) {
                 }
             } else if (latestDrop.timestamp && latestDrop.timestamp <= sixHoursAgo && latestDrop.timestamp > twentyFourHoursAgo) {
                 if (!autoNotifiedState[stoppedNotifKey]) {
-                    const notifToken = UPGRADE_BOT_TOKEN;
-                    const notifChatId = "-5317343683";
+                    const notifToken = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
+                    const notifChatId = "-1003735130681";
 
                     const text = `⚠️ <b>Warmup Stopped Alert!</b>\n\n` +
                                  `🖥 Server: <b>${latestDrop.actualServer || 'Unknown'}</b>\n` +
@@ -398,7 +398,8 @@ async function processAutoWarmup(allData, newRecords) {
                       autoNotifiedState[safeKey] = true;
                       putFirebaseData('state/autoWarmupNotified', autoNotifiedState);
                       
-                      fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-1003735130681", message_thread_id: 91, text: reportText, parse_mode: "HTML" }) }).catch(e => console.error(e));
+                      const notifToken = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
+                      fetch(`https://api.telegram.org/bot${notifToken}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-1003735130681", message_thread_id: 91, text: reportText, parse_mode: "HTML" }) }).catch(e => console.error(e));
                       fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: msg1 }) }).catch(e => console.error(e));
                       
                       await new Promise(r => setTimeout(r, 9000));
@@ -482,7 +483,8 @@ async function processAutoWarmup(allData, newRecords) {
                              autoNotifiedState[safeKey] = Date.now();
                              putFirebaseData('state/autoWarmupNotified', autoNotifiedState);
                              
-                             fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-1003735130681", message_thread_id: 91, text: reportText, parse_mode: "HTML" }) }).catch(e => console.error(e));
+                             const notifToken = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
+                             fetch(`https://api.telegram.org/bot${notifToken}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-1003735130681", message_thread_id: 91, text: reportText, parse_mode: "HTML" }) }).catch(e => console.error(e));
                              fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: msg1 }) }).catch(e => console.error(e));
                              
                              await new Promise(r => setTimeout(r, 9000));
