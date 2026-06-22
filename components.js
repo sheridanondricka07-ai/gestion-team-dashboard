@@ -7721,19 +7721,22 @@ function renderWarmupProgress(app, container) {
                         <tbody>
                             ${filteredGroups.map((g, idx) => {
                                 const latest = g.records[0];
-                                const oldest = g.records[g.records.length - 1];
+                                
+                                // Filter records to only include those matching the current IP
+                                const recordsForCurrentIp = g.records.filter(r => r.ip === latest.ip);
+                                const oldestForIp = recordsForCurrentIp[recordsForCurrentIp.length - 1];
                                 
                                 const last3 = g.records.slice(0, 3).map(r => r.outVal);
                                 const repOut = g.repOut;
-                                const totalOutAllTime = g.records.reduce((sum, r) => sum + (parseInt(r.outVal) || 0), 0);
+                                const totalOutAllTime = recordsForCurrentIp.reduce((sum, r) => sum + (parseInt(r.outVal) || 0), 0);
                                 
                                 let durationDays = 0;
-                                if (latest && oldest) {
-                                    const msDiff = latest.timestamp - oldest.timestamp;
+                                if (latest && oldestForIp) {
+                                    const msDiff = latest.timestamp - oldestForIp.timestamp;
                                     durationDays = Math.max(1, Math.ceil(msDiff / (1000 * 60 * 60 * 24)));
                                 }
-                                const startDateStr = oldest ? new Date(oldest.timestamp).toLocaleDateString() : 'Unknown';
-                                const totalDrops = g.records.length;
+                                const startDateStr = oldestForIp ? new Date(oldestForIp.timestamp).toLocaleDateString() : 'Unknown';
+                                const totalDrops = recordsForCurrentIp.length;
                                 
                                 const rec = window.getWarmupRecommendation ? window.getWarmupRecommendation(totalOutAllTime, repOut, intel) : null;
                                 let recHtml = '';
