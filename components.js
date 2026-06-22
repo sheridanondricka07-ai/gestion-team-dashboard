@@ -7478,8 +7478,10 @@ function renderWarmupProgress(app, container) {
     });
 
     filteredGroups.forEach(g => {
-        const allOuts = g.records.map(r => r.outVal);
-        g.repOut = getRepresentativeVolume(allOuts);
+        const recentOuts = g.records
+            .filter(r => r.timestamp >= twentyFourHoursAgo)
+            .map(r => r.outVal);
+        g.repOut = getRepresentativeVolume(recentOuts.length > 0 ? recentOuts : [0]);
     });
     filteredGroups.sort((a, b) => b.repOut - a.repOut);
 
