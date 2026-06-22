@@ -384,7 +384,7 @@ async function processAutoWarmup(allData, newRecords) {
                         
                         maxSendAt = Math.max(Date.now(), maxSendAt + 10000);
                         newQueueItems[queueId1] = {
-                            chat_id: "-1003229248256",
+                            chat_id: "-5317343683",
                             text: msg1,
                             sendAt: maxSendAt
                         };
@@ -396,7 +396,7 @@ async function processAutoWarmup(allData, newRecords) {
                         
                         maxSendAt = maxSendAt + 10000;
                         newQueueItems[queueId2] = {
-                            chat_id: "-1003229248256",
+                            chat_id: "-5317343683",
                             text: msg2,
                             sendAt: maxSendAt
                         };
@@ -465,7 +465,7 @@ async function processAutoWarmup(allData, newRecords) {
                                 
                                 maxSendAt = Math.max(Date.now(), maxSendAt + 10000);
                                 newQueueItems[queueId1] = {
-                                    chat_id: "-1003229248256",
+                                    chat_id: "-5317343683",
                                     text: msg1,
                                     sendAt: maxSendAt
                                 };
@@ -477,7 +477,7 @@ async function processAutoWarmup(allData, newRecords) {
                                 
                                 maxSendAt = maxSendAt + 10000;
                                 newQueueItems[queueId2] = {
-                                    chat_id: "-1003229248256",
+                                    chat_id: "-5317343683",
                                     text: msg2,
                                     sendAt: maxSendAt
                                 };
@@ -788,37 +788,32 @@ export default async function handler(req, res) {
                         const allOuts = g.records.map(r => r.outVal);
                         const repOut = getRepOut(allOuts);
                         
-                        const safeDomain = (g.domain || g.ip || g.server || 'unknown').replace(/[\.\#\$\[\]]/g, '_');
+                        const safeDomain = (g.domain || g.ip || g.server || 'unknown').replace(/[\.\#\$\[\]\/]/g, '_');
+                        const safeIp = (g.ip || 'unknown').replace(/[\.\:\/]/g, '_');
+                        const reachedKey = `${safeDomain}_${g.server}_${safeIp}_reached`;
                         
-                        if (repOut > 25900 && !notifiedState[safeDomain]) {
-                            const text = `🎯 <b>Warmup Target Reached!</b>\n\n` + 
-                                         `🌐 Domain: <b>${g.domain || 'N/A'}</b>\n` +
-                                         `📌 IP: <code>${g.ip || 'Unknown'}</code>\n` + 
-                                         `🖥 Server: ${g.server || 'Unknown'}\n` + 
-                                         `📊 Rep Out: <b>${repOut}</b>\n\n` + 
-                                         `<i>Target (>25900) achieved.</i>`;
-                                         
-                            await fetch(`https://api.telegram.org/bot${notifToken}/sendMessage`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    chat_id: notifChatId,
-                                    text: text,
-                                    parse_mode: 'HTML'
-                                })
-                            });
-                            
-                            notifiedState[safeDomain] = true;
-                            newNotified = true;
+                        if (repOut > 25900 && !autoNotifiedState[reachedKey]) {
+                            const acquired = await putFirebaseDataConditional(`state/autoWarmupNotified/${reachedKey}`, true, 'null_etag');
+                            if (acquired) {
+                                autoNotifiedState[reachedKey] = true;
+                                const text = `🎯 <b>Warmup Target Reached!</b>\n\n` + 
+                                             `🌐 Domain: <b>${g.domain || 'N/A'}</b>\n` +
+                                             `📌 IP: <code>${g.ip || 'Unknown'}</code>\n` + 
+                                             `🖥 Server: ${g.server || 'Unknown'}\n` + 
+                                             `📊 Rep Out: <b>${repOut}</b>\n\n` + 
+                                             `<i>Target (>25900) achieved.</i>`;
+                                             
+                                fetch(`https://api.telegram.org/bot${notifToken}/sendMessage`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        chat_id: notifChatId,
+                                        text: text,
+                                        parse_mode: 'HTML'
+                                    })
+                                }).catch(e => console.error(e));
+                            }
                         }
-                    }
-                    
-                    if (newNotified) {
-                        await fetch(`${DB_URL}/state/warmupNotified.json`, {
-                            method: 'PUT',
-                            body: JSON.stringify(notifiedState),
-                            headers: { 'Content-Type': 'application/json' }
-                        });
                     }
                 } catch (err) {
                     console.error("Error during notification check:", err);
