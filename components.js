@@ -5511,7 +5511,16 @@ window.renderAiAgent = (app, container) => {
                         records: []
                     };
                 }
-                warmupGrouped[key].records.push(r);
+                
+                const isDuplicate = warmupGrouped[key].records.some(ex => 
+                    ex.ip === r.ip &&
+                    ex.outVal === r.outVal && 
+                    Math.abs(ex.timestamp - r.timestamp) < 5 * 60 * 1000
+                );
+                
+                if (!isDuplicate) {
+                    warmupGrouped[key].records.push(r);
+                }
             });
 
             const warmupGroups = Object.values(warmupGrouped);
@@ -7334,7 +7343,16 @@ function renderWarmupProgress(app, container) {
                 records: []
             };
         }
-        grouped[key].records.push(r);
+        
+        const isDuplicate = grouped[key].records.some(ex => 
+            ex.ip === r.ip &&
+            ex.outVal === r.outVal && 
+            Math.abs(ex.timestamp - r.timestamp) < 5 * 60 * 1000
+        );
+        
+        if (!isDuplicate) {
+            grouped[key].records.push(r);
+        }
     });
 
     const groups = Object.values(grouped);
