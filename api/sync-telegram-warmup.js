@@ -292,7 +292,16 @@ async function processAutoWarmup(allData, newRecords) {
 
             const key = `${r.domain || ''}_${r.server || ''}_${r.ip || ''}`;
             if (!grouped[key]) grouped[key] = { ...r, records: [] };
-            grouped[key].records.push(r);
+            
+            const isDuplicate = grouped[key].records.some(ex => 
+                ex.ip === r.ip &&
+                ex.outVal === r.outVal && 
+                Math.abs(ex.timestamp - r.timestamp) < 5 * 60 * 1000
+            );
+            
+            if (!isDuplicate) {
+                grouped[key].records.push(r);
+            }
         });
 
         // Find the maximum sendAt currently in the queue to schedule after it
@@ -324,7 +333,14 @@ async function processAutoWarmup(allData, newRecords) {
                 }
                 const inVal = parseInt(r.inVal, 10) || 0;
                 const outVal = parseInt(r.outVal, 10) || 0;
+                const latestInVal = parseInt(g.records[0].inVal, 10) || 0;
+
                 if (inVal <= 0 || outVal < inVal * 0.95) {
+                    success = false;
+                    break;
+                }
+                
+                if (Math.abs(inVal - latestInVal) > 50) {
                     success = false;
                     break;
                 }
@@ -708,7 +724,16 @@ export default async function handler(req, res) {
                         if (!r.domain && !r.ip && !r.server) return;
                         const key = `${r.domain || ''}_${r.server || ''}_${r.ip || ''}`;
                         if (!grouped[key]) grouped[key] = { ...r, records: [] };
-                        grouped[key].records.push(r);
+            
+            const isDuplicate = grouped[key].records.some(ex => 
+                ex.ip === r.ip &&
+                ex.outVal === r.outVal && 
+                Math.abs(ex.timestamp - r.timestamp) < 5 * 60 * 1000
+            );
+            
+            if (!isDuplicate) {
+                grouped[key].records.push(r);
+            }
                     });
                     
                     const getRepOut = (drops) => {
