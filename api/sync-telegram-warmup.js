@@ -498,41 +498,6 @@ async function processAutoWarmup(allData, newRecords) {
     }
 }
 
-async function processAutoWarmupQueue() {
-    try {
-        const queueState = await getFirebaseData('state/autoWarmupQueue') || {};
-        const now = Date.now();
-
-        // Sort items by scheduled time ascending
-        const items = Object.entries(queueState)
-            .map(([id, val]) => ({ id, ...val }))
-            .sort((a, b) => a.sendAt - b.sendAt);
-
-        const dueItems = items.filter(item => item.sendAt <= now);
-        
-        for (let i = 0; i < dueItems.length; i++) {
-            const itemToSend = dueItems[i];
-            
-            await fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    chat_id: itemToSend.chat_id,
-                    text: itemToSend.text, parse_mode: itemToSend.parse_mode, message_thread_id: itemToSend.message_thread_id })
-            });
-
-            await fetch(`${DB_URL}/state/autoWarmupQueue/${itemToSend.id}.json`, { method: 'DELETE' });
-            
-            // Wait 9 seconds before sending the next command to give desktop bots time to process
-            if (i < dueItems.length - 1) {
-                await new Promise(r => setTimeout(r, 9000));
-            }
-        }
-    } catch (e) {
-        console.error("Error in processAutoWarmupQueue:", e);
-    }
-}
-
 function parseMessage(text, timestamp) {
     if (!text || !text.includes('Server Deployment Summary')) return null;
     
@@ -722,7 +687,6 @@ export default async function handler(req, res) {
         
         if (isTelegramWebhook) {
             await processAutoWarmup(newRecords);
-            await processAutoWarmupQueue();
             
             return res.status(200).json({ 
                 success: true, 
@@ -732,9 +696,6 @@ export default async function handler(req, res) {
 
         // Run the auto target upgrade checks (always process, passing newRecords if added)
         await processAutoWarmup(allData, addedCount > 0 ? newRecords : null);
-
-        // Process delayed auto target upgrades and dispatch to Telegram
-        await processAutoWarmupQueue();
 
         if (addedCount > 0) {
             if (!isTelegramWebhook) {
