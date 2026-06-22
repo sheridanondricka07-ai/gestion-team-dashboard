@@ -382,11 +382,10 @@ async function processAutoWarmup(allData, newRecords) {
                         const msg1 = `update ${g.server} send_size for ${cleanDomain} to ${nextTarget}`;
                         const queueId1 = "q_" + safeKey + "_send_size";
                         
-                        maxSendAt = Math.max(Date.now(), maxSendAt + 10000);
                         newQueueItems[queueId1] = {
                             chat_id: "-5317343683",
                             text: msg1,
-                            sendAt: maxSendAt
+                            sendAt: Date.now()
                         };
 
                         // Queue second message (test_after)
@@ -394,7 +393,6 @@ async function processAutoWarmup(allData, newRecords) {
                         const msg2 = `update ${g.server} test_after for ${cleanDomain} to ${testAfterVal}`;
                         const queueId2 = "q_" + safeKey + "_test_after";
                         
-                        maxSendAt = maxSendAt + 10000;
                         newQueueItems[queueId2] = {
                             chat_id: "-5317343683",
                             text: msg2,
@@ -463,11 +461,10 @@ async function processAutoWarmup(allData, newRecords) {
                                 const msg1 = `update ${g.server} send_size for ${cleanDomain} to ${prevTarget}`;
                                 const queueId1 = "q_" + safeKey + "_send_size";
                                 
-                                maxSendAt = Math.max(Date.now(), maxSendAt + 10000);
                                 newQueueItems[queueId1] = {
                                     chat_id: "-5317343683",
                                     text: msg1,
-                                    sendAt: maxSendAt
+                                    sendAt: Date.now()
                                 };
 
                                 // Queue second message (test_after downgrade)
@@ -475,7 +472,6 @@ async function processAutoWarmup(allData, newRecords) {
                                 const msg2 = `update ${g.server} test_after for ${cleanDomain} to ${testAfterVal}`;
                                 const queueId2 = "q_" + safeKey + "_test_after";
                                 
-                                maxSendAt = maxSendAt + 10000;
                                 newQueueItems[queueId2] = {
                                     chat_id: "-5317343683",
                                     text: msg2,
@@ -506,7 +502,6 @@ async function processAutoWarmupQueue() {
     try {
         const queueState = await getFirebaseData('state/autoWarmupQueue') || {};
         const now = Date.now();
-        let changed = false;
 
         // Sort items by scheduled time ascending
         const items = Object.entries(queueState)
@@ -514,11 +509,10 @@ async function processAutoWarmupQueue() {
             .sort((a, b) => a.sendAt - b.sendAt);
 
         const dueItems = items.filter(item => item.sendAt <= now);
-
-        if (dueItems.length > 0) {
-            const itemToSend = dueItems[0];
+        
+        for (let i = 0; i < dueItems.length; i++) {
+            const itemToSend = dueItems[i];
             
-            // Send the oldest due message
             await fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -527,27 +521,11 @@ async function processAutoWarmupQueue() {
                     text: itemToSend.text, parse_mode: itemToSend.parse_mode, message_thread_id: itemToSend.message_thread_id })
             });
 
-            delete queueState[itemToSend.id];
-            // changed flag handled below
-
-            // Shift any other due/soon-due items forward so they are spaced by at least 10 seconds
-            let nextSendAt = now + 10000;
-            const updatedItems = {};
-            for (let i = 1; i < items.length; i++) {
-                const item = items[i];
-                if (item.id === itemToSend.id) continue;
-                
-                if (queueState[item.id] && queueState[item.id].sendAt < nextSendAt) {
-                    updatedItems[item.id] = { ...queueState[item.id], sendAt: nextSendAt };
-                    changed = true;
-                }
-                nextSendAt += 10000;
-            }
-
-            // Apply updates without overwriting the entire queue
             await fetch(`${DB_URL}/state/autoWarmupQueue/${itemToSend.id}.json`, { method: 'DELETE' });
-            if (Object.keys(updatedItems).length > 0) {
-                await saveFirebaseData('state/autoWarmupQueue', updatedItems);
+            
+            // Wait 9 seconds before sending the next command to give desktop bots time to process
+            if (i < dueItems.length - 1) {
+                await new Promise(r => setTimeout(r, 9000));
             }
         }
     } catch (e) {
@@ -742,7 +720,15 @@ export default async function handler(req, res) {
             }
         }
         
-
+        if (isTelegramWebhook) {
+            await processAutoWarmup(newRecords);
+            await processAutoWarmupQueue();
+            
+            return res.status(200).json({ 
+                success: true, 
+                addedCount 
+            });
+        }
 
         // Run the auto target upgrade checks (always process, passing newRecords if added)
         await processAutoWarmup(allData, addedCount > 0 ? newRecords : null);
