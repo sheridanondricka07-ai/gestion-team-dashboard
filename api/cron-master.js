@@ -367,18 +367,6 @@ export default async function handler(req, res) {
 
     // 4. Trigger SPF Check
     if (runSpf) {
-        console.log('Triggering Telegram Warmup Sync...');
-        try {
-            const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
-            const triggerResp = await fetch(`${baseUrl}/api/sync-telegram-warmup`, {
-                method: 'GET',
-                headers: { 'x-vercel-cron': 'true' }
-            });
-            console.log('Warmup Sync response:', triggerResp.status);
-        } catch (e) {
-            console.error('Error triggering Warmup Sync:', e);
-        }
-
         console.log('Triggering SPF Check...');
         try {
             const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
