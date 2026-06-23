@@ -5,7 +5,7 @@
 const firebaseConfig = {
     apiKey: "AIzaSyAmlb9zRzuMKvKVv6lPnKFJo7l4utjCO_c",
     authDomain: "gestion-team-e.firebaseapp.com",
-    databaseURL: "https://gestion-team-e-default-rtdb.firebaseio.com",
+    databaseURL: "https://gestion-team-c-01-default-rtdb.firebaseio.com",
     projectId: "gestion-team-e",
     storageBucket: "gestion-team-e.firebasestorage.app",
     messagingSenderId: "581748244383",

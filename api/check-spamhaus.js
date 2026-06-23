@@ -1,7 +1,7 @@
 // Spamhaus REST API - ported from working spamhaus-checker project
 // Uses api.spamhaus.org with token auth - pure HTTPS
 
-const DB_URL = "https://gestion-team-e-default-rtdb.firebaseio.com";
+const DB_URL = "https://gestion-team-c-01-default-rtdb.firebaseio.com";
 
 // Credentials from working project
 const SPAMHAUS_USERNAME = "ypihcpsh@98907859";

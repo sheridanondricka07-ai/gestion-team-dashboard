@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 
-const DB_URL = "https://gestion-team-e-default-rtdb.firebaseio.com";
+const DB_URL = "https://gestion-team-c-01-default-rtdb.firebaseio.com";
 
 const DEFAULT_CREDS = {
   "type": "service_account",

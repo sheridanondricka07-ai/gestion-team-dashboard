@@ -1,0 +1,2056 @@
+﻿commit 49d80b26d5e982929977aeb307582e36ec154a40
+Author: Admin <admin@team.com>
+Date:   Sat Jun 20 02:38:56 2026 +0100
+
+    Send report instantly and use synchronous delay for test_after
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index e5f016e..18b0f6f 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -393,11 +393,21 @@ async function processAutoWarmup(allData, newRecords) {
+ 
+                       // Send notification report
+                       const userName = g.records && g.records[0] ? g.records[0].user : "Unknown";
+-                      const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Upgrade", latestVal, nextTarget, userName, "Last 3 drops succeeded (OUT >= 95% of IN)."); maxSendAt = maxSendAt + 10000; queueState["q_" + safeKey + "_report"] = { chat_id: "-1003735130681", message_thread_id: 91, text: reportText, parse_mode: "HTML", sendAt: maxSendAt };
++                      const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Upgrade", latestVal, nextTarget, userName, "Last 3 drops succeeded (OUT >= 95% of IN).");
++                      
++                      autoNotifiedState[safeKey] = true;
++                      putFirebaseData('state/autoWarmupNotified', autoNotifiedState);
++                      
++                      fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-1003735130681", message_thread_id: 91, text: reportText, parse_mode: "HTML" }) }).catch(e => console.error(e));
++                      fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: msg1 }) }).catch(e => console.error(e));
++                      
++                      await new Promise(r => setTimeout(r, 9000));
++                      fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: msg2 }) }).catch(e => console.error(e));
++                      
++                      delete queueState[queueId1];
++                      delete queueState[queueId2];
+ 
+-                    autoNotifiedState[safeKey] = true;
+                     newNotified = true;
+-                    newQueue = true;
+                 }
+             } else {
+                 // If not success, check if last 2 drops failed (OUT < 0.95 * IN or IN <= 0) and occurred within 24 hours
+@@ -467,11 +477,21 @@ async function processAutoWarmup(allData, newRecords) {
+ 
+                              // Send notification report
+                              const userName = g.records && g.records[0] ? g.records[0].user : "Unknown";
+-                             const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Downgrade", latestVal, prevTarget, userName, "Last 2 drops failed (OUT < 95% of IN or IN <= 0)."); maxSendAt = maxSendAt + 10000; queueState["q_" + safeKey + "_report"] = { chat_id: "-1003735130681", message_thread_id: 91, text: reportText, parse_mode: "HTML", sendAt: maxSendAt };
+-
++                             const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Downgrade", latestVal, prevTarget, userName, "Last 2 drops failed (OUT < 95% of IN or IN <= 0).");
++                             
+                              autoNotifiedState[safeKey] = Date.now();
++                             putFirebaseData('state/autoWarmupNotified', autoNotifiedState);
++                             
++                             fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-1003735130681", message_thread_id: 91, text: reportText, parse_mode: "HTML" }) }).catch(e => console.error(e));
++                             fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: msg1 }) }).catch(e => console.error(e));
++                             
++                             await new Promise(r => setTimeout(r, 9000));
++                             fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: msg2 }) }).catch(e => console.error(e));
++                             
++                             delete queueState[queueId1];
++                             delete queueState[queueId2];
++
+                              newNotified = true;
+-                             newQueue = true;
+                         }
+                     }
+                 }
+@@ -830,3 +850,4 @@ export const config = {
+ 
+ 
+ 
++
+
+commit 518a39203d02b454660171d89d8b8827e150aa7e
+Author: Admin <admin@team.com>
+Date:   Sat Jun 20 02:15:06 2026 +0100
+
+    Fix chat ID and thread ID for Upgrade/Downgrade reports
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index 63392d3..e5f016e 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -393,7 +393,7 @@ async function processAutoWarmup(allData, newRecords) {
+ 
+                       // Send notification report
+                       const userName = g.records && g.records[0] ? g.records[0].user : "Unknown";
+-                      const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Upgrade", latestVal, nextTarget, userName, "Last 3 drops succeeded (OUT >= 95% of IN)."); maxSendAt = maxSendAt + 10000; queueState["q_" + safeKey + "_report"] = { chat_id: "-5317343683", text: reportText, parse_mode: "HTML", sendAt: maxSendAt };
++                      const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Upgrade", latestVal, nextTarget, userName, "Last 3 drops succeeded (OUT >= 95% of IN)."); maxSendAt = maxSendAt + 10000; queueState["q_" + safeKey + "_report"] = { chat_id: "-1003735130681", message_thread_id: 91, text: reportText, parse_mode: "HTML", sendAt: maxSendAt };
+ 
+                     autoNotifiedState[safeKey] = true;
+                     newNotified = true;
+@@ -467,7 +467,7 @@ async function processAutoWarmup(allData, newRecords) {
+ 
+                              // Send notification report
+                              const userName = g.records && g.records[0] ? g.records[0].user : "Unknown";
+-                             const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Downgrade", latestVal, prevTarget, userName, "Last 2 drops failed (OUT < 95% of IN or IN <= 0)."); maxSendAt = maxSendAt + 10000; queueState["q_" + safeKey + "_report"] = { chat_id: "-5317343683", text: reportText, parse_mode: "HTML", sendAt: maxSendAt };
++                             const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Downgrade", latestVal, prevTarget, userName, "Last 2 drops failed (OUT < 95% of IN or IN <= 0)."); maxSendAt = maxSendAt + 10000; queueState["q_" + safeKey + "_report"] = { chat_id: "-1003735130681", message_thread_id: 91, text: reportText, parse_mode: "HTML", sendAt: maxSendAt };
+ 
+                              autoNotifiedState[safeKey] = Date.now();
+                              newNotified = true;
+@@ -512,7 +512,7 @@ async function processAutoWarmupQueue() {
+                 headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify({
+                     chat_id: itemToSend.chat_id,
+-                    text: itemToSend.text, parse_mode: itemToSend.parse_mode })
++                    text: itemToSend.text, parse_mode: itemToSend.parse_mode, message_thread_id: itemToSend.message_thread_id })
+             });
+ 
+             delete queueState[itemToSend.id];
+@@ -829,3 +829,4 @@ export const config = {
+ 
+ 
+ 
++
+
+commit 728db18a641aabec9fa86fc436f010fa1838ed06
+Author: Admin <admin@team.com>
+Date:   Fri Jun 19 22:45:10 2026 +0100
+
+    Fix duplication by queuing the report notifications
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index 7587fa6..63392d3 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -149,33 +149,7 @@ async function putFirebaseData(path, data) {
+     }
+ }
+ 
+-async function sendWarmupReport(server, ip, domain, action, beforeSend, afterSend, userName, reason) {
+-    const notifToken = UPGRADE_BOT_TOKEN;
+-    const notifChatId = "-5317343683";
+-
+-    const emoji = action === "Upgrade" ? "≡ƒÜÇ <b>Warmup Upgrade</b>" : "≡ƒôë <b>Warmup Downgrade</b>";
+-    const text = `${emoji}\n\n` +
+-                 `≡ƒûÑ Server: <b>${server || 'N/A'}</b>\n` +
+-                 `≡ƒæñ User: <b>${userName || 'Unknown'}</b>\n` +
+-                 `≡ƒôî IP: <code>${ip || 'N/A'}</code>\n` +
+-                 `≡ƒîÉ Domain: <b>${domain || 'N/A'}</b>\n` +
+-                 `≡ƒôê Send Size: <code>${beforeSend}</code> Γ₧í∩╕Å <b>${afterSend}</b>\n\n` +
+-                 `≡ƒÆ¼ Reason: ${reason}`;
+-
+-    try {
+-        await fetch(`https://api.telegram.org/bot${notifToken}/sendMessage`, {
+-            method: 'POST',
+-            headers: { 'Content-Type': 'application/json' },
+-            body: JSON.stringify({
+-                chat_id: notifChatId,
+-                text: text,
+-                parse_mode: 'HTML'
+-            })
+-        });
+-    } catch (e) {
+-        console.error("Failed to send warmup report to Telegram:", e);
+-    }
+-}
++function formatWarmupReport(server, ip, domain, action, beforeSend, afterSend, userName, reason) { const emoji = action === "Upgrade" ? "?? <b>Warmup Upgrade</b>" : "?? <b>Warmup Downgrade</b>"; return emoji + "`n`n?? Server: <b>" + (server || "N/A") + "</b>`n?? User: <b>" + (userName || "Unknown") + "</b>`n?? IP: <code>" + (ip || "N/A") + "</code>`n?? Domain: <b>" + (domain || "N/A") + "</b>`n?? Send Size: <code>" + beforeSend + "</code> ?? <b>" + afterSend + "</b>`n`n?? Reason: " + reason; }
+ 
+ 
+ async function processAutoWarmup(allData, newRecords) {
+@@ -419,7 +393,7 @@ async function processAutoWarmup(allData, newRecords) {
+ 
+                       // Send notification report
+                       const userName = g.records && g.records[0] ? g.records[0].user : "Unknown";
+-                      await sendWarmupReport(g.server, g.ip, cleanDomain, "Upgrade", latestVal, nextTarget, userName, "Last 3 drops succeeded (OUT >= 95% of IN).");
++                      const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Upgrade", latestVal, nextTarget, userName, "Last 3 drops succeeded (OUT >= 95% of IN)."); maxSendAt = maxSendAt + 10000; queueState["q_" + safeKey + "_report"] = { chat_id: "-5317343683", text: reportText, parse_mode: "HTML", sendAt: maxSendAt };
+ 
+                     autoNotifiedState[safeKey] = true;
+                     newNotified = true;
+@@ -493,7 +467,7 @@ async function processAutoWarmup(allData, newRecords) {
+ 
+                              // Send notification report
+                              const userName = g.records && g.records[0] ? g.records[0].user : "Unknown";
+-                             await sendWarmupReport(g.server, g.ip, cleanDomain, "Downgrade", latestVal, prevTarget, userName, "Last 2 drops failed (OUT < 95% of IN or IN <= 0).");
++                             const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Downgrade", latestVal, prevTarget, userName, "Last 2 drops failed (OUT < 95% of IN or IN <= 0)."); maxSendAt = maxSendAt + 10000; queueState["q_" + safeKey + "_report"] = { chat_id: "-5317343683", text: reportText, parse_mode: "HTML", sendAt: maxSendAt };
+ 
+                              autoNotifiedState[safeKey] = Date.now();
+                              newNotified = true;
+@@ -538,8 +512,7 @@ async function processAutoWarmupQueue() {
+                 headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify({
+                     chat_id: itemToSend.chat_id,
+-                    text: itemToSend.text
+-                })
++                    text: itemToSend.text, parse_mode: itemToSend.parse_mode })
+             });
+ 
+             delete queueState[itemToSend.id];
+@@ -854,3 +827,5 @@ export const config = {
+ };
+ 
+ 
++
++
+
+commit b09cd5af9a440f3b5b890029dec079cbfcf8a221
+Author: Admin <admin@team.com>
+Date:   Fri Jun 19 22:28:57 2026 +0100
+
+    Update warmup spacing to 10s and ignore 0/0 drops
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index a873e2d..7587fa6 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -398,7 +398,7 @@ async function processAutoWarmup(allData, newRecords) {
+                     const msg1 = `update ${g.server} send_size for ${cleanDomain} to ${nextTarget}`;
+                     const queueId1 = "q_" + safeKey + "_send_size";
+                     
+-                    maxSendAt = Math.max(Date.now(), maxSendAt + 5000);
++                    maxSendAt = Math.max(Date.now(), maxSendAt + 10000);
+                     queueState[queueId1] = {
+                         chat_id: "-5317343683",
+                         text: msg1,
+@@ -410,7 +410,7 @@ async function processAutoWarmup(allData, newRecords) {
+                     const msg2 = `update ${g.server} test_after for ${cleanDomain} to ${testAfterVal}`;
+                     const queueId2 = "q_" + safeKey + "_test_after";
+                     
+-                    maxSendAt = maxSendAt + 5000;
++                    maxSendAt = maxSendAt + 10000;
+                     queueState[queueId2] = {
+                         chat_id: "-5317343683",
+                         text: msg2,
+@@ -472,7 +472,7 @@ async function processAutoWarmup(allData, newRecords) {
+                             const msg1 = `update ${g.server} send_size for ${cleanDomain} to ${prevTarget}`;
+                             const queueId1 = "q_" + safeKey + "_send_size";
+                             
+-                            maxSendAt = Math.max(Date.now(), maxSendAt + 5000);
++                            maxSendAt = Math.max(Date.now(), maxSendAt + 10000);
+                             queueState[queueId1] = {
+                                 chat_id: "-5317343683",
+                                 text: msg1,
+@@ -484,7 +484,7 @@ async function processAutoWarmup(allData, newRecords) {
+                             const msg2 = `update ${g.server} test_after for ${cleanDomain} to ${testAfterVal}`;
+                             const queueId2 = "q_" + safeKey + "_test_after";
+                             
+-                            maxSendAt = maxSendAt + 5000;
++                            maxSendAt = maxSendAt + 10000;
+                             queueState[queueId2] = {
+                                 chat_id: "-5317343683",
+                                 text: msg2,
+@@ -546,7 +546,7 @@ async function processAutoWarmupQueue() {
+             changed = true;
+ 
+             // Shift any other due/soon-due items forward so they are spaced by at least 5 seconds
+-            let nextSendAt = now + 5000;
++            let nextSendAt = now + 10000;
+             for (let i = 1; i < items.length; i++) {
+                 const item = items[i];
+                 if (item.id === itemToSend.id) continue;
+@@ -555,7 +555,7 @@ async function processAutoWarmupQueue() {
+                     queueState[item.id].sendAt = nextSendAt;
+                     changed = true;
+                 }
+-                nextSendAt += 5000;
++                nextSendAt += 10000;
+             }
+         }
+ 
+@@ -624,7 +624,7 @@ function parseMessage(text, timestamp) {
+     }
+     
+     if (!server && !ip) return null;
+-    
++    if (inVal === 0 && outVal === 0) return null;
+     return {
+         user,
+         server,
+@@ -852,3 +852,5 @@ export const config = {
+         bodyParser: false,
+     },
+ };
++
++
+
+commit 6e085d18bdafdfed520708b38e076c0a8a7568ea
+Author: Admin <admin@team.com>
+Date:   Fri Jun 19 21:46:38 2026 +0100
+
+    consolidate stopped alerts grouping by safeKey to prevent misparsed key conflicts
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index dfb60b1..a873e2d 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -220,35 +220,27 @@ async function processAutoWarmup(allData, newRecords) {
+         const sixHoursAgo = Date.now() - (6 * 60 * 60 * 1000);
+         const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
+ 
++        const servers = await getFirebaseData('state/servers') || [];
+         const absoluteLatest = {};
++
+         Object.values(allData).forEach(r => {
+             if (!r.domain && !r.ip && !r.server) return;
+-            const key = `${r.domain || ''}_${r.server || ''}_${r.ip || ''}`;
+-            if (!absoluteLatest[key] || r.timestamp > absoluteLatest[key].timestamp) {
+-                absoluteLatest[key] = r;
+-            }
+-        });
+-
+-        const servers = await getFirebaseData('state/servers') || [];
+-
+-        for (const key in absoluteLatest) {
+-            const latestDrop = absoluteLatest[key];
+             
+-            // Fix swapped server and domain names if any
+-            let actualServer = latestDrop.server || 'Unknown';
+-            let actualDomain = latestDrop.domain || 'N/A';
++            // Resolve actual server and domain names to get the correct safeKey
++            let actualServer = r.server || 'Unknown';
++            let actualDomain = r.domain || 'N/A';
+             
+             if (actualServer.includes('.') || (!actualServer.startsWith('sh_') && !actualServer.startsWith('s_'))) {
+                 actualDomain = actualServer;
+                 actualServer = 'Unknown';
+             }
+             
+-            if ((actualServer === 'Unknown' || !actualServer) && latestDrop.ip) {
++            if ((actualServer === 'Unknown' || !actualServer) && r.ip) {
+                 const srv = servers.find(s => {
+                     const ips = [...(s.allIps || [])];
+                     if (s.ip) ips.push(s.ip);
+                     if (s.mainIp) ips.push(s.mainIp);
+-                    return ips.map(x => (x || '').trim()).includes(latestDrop.ip.trim());
++                    return ips.map(x => (x || '').trim()).includes(r.ip.trim());
+                 });
+                 if (srv) {
+                     actualServer = srv.name;
+@@ -256,10 +248,26 @@ async function processAutoWarmup(allData, newRecords) {
+             }
+ 
+             const isRdns = !actualDomain || actualDomain.toLowerCase().trim() === '[rdns]' || actualDomain.toLowerCase().trim() === 'rdns';
+-            const cleanDomain = isRdns ? (latestDrop.ip || 'unknown') : (actualDomain || latestDrop.ip || 'unknown');
++            const cleanDomain = isRdns ? (r.ip || 'unknown') : (actualDomain || r.ip || 'unknown');
+             const safeDomain = cleanDomain.replace(/[\.\#\$\[\]]/g, '_');
+             const safeKey = `${safeDomain}_${actualServer}`;
+-            const stoppedNotifKey = `${safeKey}_stopped`;
++
++            // Group by resolved safeKey so old/swapped keys and correct keys of the same target don't compete
++            if (!absoluteLatest[safeKey] || r.timestamp > absoluteLatest[safeKey].timestamp) {
++                absoluteLatest[safeKey] = {
++                    ...r,
++                    actualServer,
++                    actualDomain,
++                    cleanDomain,
++                    safeDomain,
++                    stoppedNotifKey: `${safeKey}_stopped`
++                };
++            }
++        });
++
++        for (const safeKey in absoluteLatest) {
++            const latestDrop = absoluteLatest[safeKey];
++            const stoppedNotifKey = latestDrop.stoppedNotifKey;
+ 
+             if (latestDrop.timestamp && latestDrop.timestamp > sixHoursAgo) {
+                 if (autoNotifiedState[stoppedNotifKey]) {
+@@ -272,10 +280,10 @@ async function processAutoWarmup(allData, newRecords) {
+                     const notifChatId = "-5317343683";
+ 
+                     const text = `ΓÜá∩╕Å <b>Warmup Stopped Alert!</b>\n\n` +
+-                                 `≡ƒûÑ Server: <b>${actualServer || 'Unknown'}</b>\n` +
++                                 `≡ƒûÑ Server: <b>${latestDrop.actualServer || 'Unknown'}</b>\n` +
+                                  `≡ƒæñ User: <b>${latestDrop.user || 'Unknown'}</b>\n` +
+                                  `≡ƒôî IP: <code>${latestDrop.ip || 'Unknown'}</code>\n` +
+-                                 `≡ƒîÉ Domain: <b>${actualDomain || 'N/A'}</b>\n\n` +
++                                 `≡ƒîÉ Domain: <b>${latestDrop.actualDomain || 'N/A'}</b>\n\n` +
+                                  `Γ¥î <i>No drops recorded in the last 6 hours (last drop was ${new Date(latestDrop.timestamp).toLocaleString()}). Please check if stopped.</i>`;
+ 
+                     try {
+
+commit d9f1da9dcb4f809d67a8aa3c6d58f94770c3a4f5
+Author: Admin <admin@team.com>
+Date:   Fri Jun 19 21:41:15 2026 +0100
+
+    change stopped alert threshold from 4h to 6h
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index 97f5b62..dfb60b1 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -216,8 +216,8 @@ async function processAutoWarmup(allData, newRecords) {
+             allData = prunedData;
+         }
+ 
+-        // 2. Check for stopped warmups (> 4 hours since last drop, but < 48 hours to avoid ancient targets)
+-        const fourHoursAgo = Date.now() - (4 * 60 * 60 * 1000);
++        // 2. Check for stopped warmups (> 6 hours since last drop, but < 24 hours to avoid ancient targets)
++        const sixHoursAgo = Date.now() - (6 * 60 * 60 * 1000);
+         const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
+ 
+         const absoluteLatest = {};
+@@ -261,12 +261,12 @@ async function processAutoWarmup(allData, newRecords) {
+             const safeKey = `${safeDomain}_${actualServer}`;
+             const stoppedNotifKey = `${safeKey}_stopped`;
+ 
+-            if (latestDrop.timestamp && latestDrop.timestamp > fourHoursAgo) {
++            if (latestDrop.timestamp && latestDrop.timestamp > sixHoursAgo) {
+                 if (autoNotifiedState[stoppedNotifKey]) {
+                     delete autoNotifiedState[stoppedNotifKey];
+                     newNotified = true;
+                 }
+-            } else if (latestDrop.timestamp && latestDrop.timestamp <= fourHoursAgo && latestDrop.timestamp > twentyFourHoursAgo) {
++            } else if (latestDrop.timestamp && latestDrop.timestamp <= sixHoursAgo && latestDrop.timestamp > twentyFourHoursAgo) {
+                 if (!autoNotifiedState[stoppedNotifKey]) {
+                     const notifToken = UPGRADE_BOT_TOKEN;
+                     const notifChatId = "-5317343683";
+@@ -276,7 +276,7 @@ async function processAutoWarmup(allData, newRecords) {
+                                  `≡ƒæñ User: <b>${latestDrop.user || 'Unknown'}</b>\n` +
+                                  `≡ƒôî IP: <code>${latestDrop.ip || 'Unknown'}</code>\n` +
+                                  `≡ƒîÉ Domain: <b>${actualDomain || 'N/A'}</b>\n\n` +
+-                                 `Γ¥î <i>No drops recorded in the last 4 hours (last drop was ${new Date(latestDrop.timestamp).toLocaleString()}). Please check if stopped.</i>`;
++                                 `Γ¥î <i>No drops recorded in the last 6 hours (last drop was ${new Date(latestDrop.timestamp).toLocaleString()}). Please check if stopped.</i>`;
+ 
+                     try {
+                         await fetch(`https://api.telegram.org/bot${notifToken}/sendMessage`, {
+
+commit 69eebff19b5ff531d5f3c2fd21caa96c0491dac9
+Author: Admin <admin@team.com>
+Date:   Fri Jun 19 21:36:57 2026 +0100
+
+    restrict stopped check to last 24h and dynamically resolve swapped domain/server name fields
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index 9368ea2..97f5b62 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -218,7 +218,7 @@ async function processAutoWarmup(allData, newRecords) {
+ 
+         // 2. Check for stopped warmups (> 4 hours since last drop, but < 48 hours to avoid ancient targets)
+         const fourHoursAgo = Date.now() - (4 * 60 * 60 * 1000);
+-        const fortyEightHoursAgo = Date.now() - (48 * 60 * 60 * 1000);
++        const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
+ 
+         const absoluteLatest = {};
+         Object.values(allData).forEach(r => {
+@@ -229,12 +229,36 @@ async function processAutoWarmup(allData, newRecords) {
+             }
+         });
+ 
++        const servers = await getFirebaseData('state/servers') || [];
++
+         for (const key in absoluteLatest) {
+             const latestDrop = absoluteLatest[key];
+-            const isRdns = !latestDrop.domain || latestDrop.domain.toLowerCase().trim() === '[rdns]' || latestDrop.domain.toLowerCase().trim() === 'rdns';
+-            const cleanDomain = isRdns ? (latestDrop.ip || 'unknown') : (latestDrop.domain || latestDrop.ip || 'unknown');
++            
++            // Fix swapped server and domain names if any
++            let actualServer = latestDrop.server || 'Unknown';
++            let actualDomain = latestDrop.domain || 'N/A';
++            
++            if (actualServer.includes('.') || (!actualServer.startsWith('sh_') && !actualServer.startsWith('s_'))) {
++                actualDomain = actualServer;
++                actualServer = 'Unknown';
++            }
++            
++            if ((actualServer === 'Unknown' || !actualServer) && latestDrop.ip) {
++                const srv = servers.find(s => {
++                    const ips = [...(s.allIps || [])];
++                    if (s.ip) ips.push(s.ip);
++                    if (s.mainIp) ips.push(s.mainIp);
++                    return ips.map(x => (x || '').trim()).includes(latestDrop.ip.trim());
++                });
++                if (srv) {
++                    actualServer = srv.name;
++                }
++            }
++
++            const isRdns = !actualDomain || actualDomain.toLowerCase().trim() === '[rdns]' || actualDomain.toLowerCase().trim() === 'rdns';
++            const cleanDomain = isRdns ? (latestDrop.ip || 'unknown') : (actualDomain || latestDrop.ip || 'unknown');
+             const safeDomain = cleanDomain.replace(/[\.\#\$\[\]]/g, '_');
+-            const safeKey = `${safeDomain}_${latestDrop.server}`;
++            const safeKey = `${safeDomain}_${actualServer}`;
+             const stoppedNotifKey = `${safeKey}_stopped`;
+ 
+             if (latestDrop.timestamp && latestDrop.timestamp > fourHoursAgo) {
+@@ -242,16 +266,16 @@ async function processAutoWarmup(allData, newRecords) {
+                     delete autoNotifiedState[stoppedNotifKey];
+                     newNotified = true;
+                 }
+-            } else if (latestDrop.timestamp && latestDrop.timestamp <= fourHoursAgo && latestDrop.timestamp > fortyEightHoursAgo) {
++            } else if (latestDrop.timestamp && latestDrop.timestamp <= fourHoursAgo && latestDrop.timestamp > twentyFourHoursAgo) {
+                 if (!autoNotifiedState[stoppedNotifKey]) {
+                     const notifToken = UPGRADE_BOT_TOKEN;
+                     const notifChatId = "-5317343683";
+ 
+                     const text = `ΓÜá∩╕Å <b>Warmup Stopped Alert!</b>\n\n` +
+-                                 `≡ƒûÑ Server: <b>${latestDrop.server || 'Unknown'}</b>\n` +
++                                 `≡ƒûÑ Server: <b>${actualServer || 'Unknown'}</b>\n` +
+                                  `≡ƒæñ User: <b>${latestDrop.user || 'Unknown'}</b>\n` +
+                                  `≡ƒôî IP: <code>${latestDrop.ip || 'Unknown'}</code>\n` +
+-                                 `≡ƒîÉ Domain: <b>${latestDrop.domain || 'N/A'}</b>\n\n` +
++                                 `≡ƒîÉ Domain: <b>${actualDomain || 'N/A'}</b>\n\n` +
+                                  `Γ¥î <i>No drops recorded in the last 4 hours (last drop was ${new Date(latestDrop.timestamp).toLocaleString()}). Please check if stopped.</i>`;
+ 
+                     try {
+
+commit ac8fb469268dd7fba50380e9548c4809e0563ba8
+Author: Admin <admin@team.com>
+Date:   Fri Jun 19 21:33:31 2026 +0100
+
+    redirect warmup stopped alerts to the notice upgrade telegram group
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index a0b0e6d..9368ea2 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -244,9 +244,8 @@ async function processAutoWarmup(allData, newRecords) {
+                 }
+             } else if (latestDrop.timestamp && latestDrop.timestamp <= fourHoursAgo && latestDrop.timestamp > fortyEightHoursAgo) {
+                 if (!autoNotifiedState[stoppedNotifKey]) {
+-                    const notifToken = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
+-                    const notifChatId = "-1003735130681";
+-                    const threadId = 91;
++                    const notifToken = UPGRADE_BOT_TOKEN;
++                    const notifChatId = "-5317343683";
+ 
+                     const text = `ΓÜá∩╕Å <b>Warmup Stopped Alert!</b>\n\n` +
+                                  `≡ƒûÑ Server: <b>${latestDrop.server || 'Unknown'}</b>\n` +
+@@ -261,7 +260,6 @@ async function processAutoWarmup(allData, newRecords) {
+                             headers: { 'Content-Type': 'application/json' },
+                             body: JSON.stringify({
+                                 chat_id: notifChatId,
+-                                message_thread_id: threadId,
+                                 text: text,
+                                 parse_mode: 'HTML'
+                             })
+
+commit e88fb5b4317be7b08b8c4888df75a63d1c816a4f
+Author: Admin <admin@team.com>
+Date:   Fri Jun 19 21:32:29 2026 +0100
+
+    fix syntax brace mismatch and convert require of dns to import statement
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index 1c24c72..a0b0e6d 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -1,7 +1,7 @@
+ const DB_URL = "https://gestion-team-e-default-rtdb.firebaseio.com";
+ const BOT_TOKEN = "8827415405:AAH-sAnTE7rz_i4XSTFG6tjBX0g0BYPyn6E";
+ const UPGRADE_BOT_TOKEN = "8975320309:AAFQmIeTKMbxQMv4c8_UHSczUYYZ9mcJ8FA";
+-const dns = require('dns').promises;
++import { promises as dns } from 'dns';
+ 
+ function ipInCidr(ip, cidr) {
+     const [range, bitsStr] = cidr.split('/');
+@@ -721,6 +721,7 @@ export default async function handler(req, res) {
+         // Run the auto target upgrade checks (always process, passing newRecords if added)
+         await processAutoWarmup(allData, addedCount > 0 ? newRecords : null);
+ 
++        if (addedCount > 0) {
+             if (!isTelegramWebhook) {
+                 try {
+                     const notifiedState = await getFirebaseData('state/warmupNotified') || {};
+
+commit 8dbdf6664f43a6dada8965c9f23df909f30d09f6
+Author: Admin <admin@team.com>
+Date:   Fri Jun 19 20:39:14 2026 +0100
+
+    include user name in warmup reports
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index f3fee02..1c24c72 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -149,13 +149,14 @@ async function putFirebaseData(path, data) {
+     }
+ }
+ 
+-async function sendWarmupReport(server, ip, domain, action, beforeSend, afterSend, reason) {
++async function sendWarmupReport(server, ip, domain, action, beforeSend, afterSend, userName, reason) {
+     const notifToken = UPGRADE_BOT_TOKEN;
+     const notifChatId = "-5317343683";
+ 
+     const emoji = action === "Upgrade" ? "≡ƒÜÇ <b>Warmup Upgrade</b>" : "≡ƒôë <b>Warmup Downgrade</b>";
+     const text = `${emoji}\n\n` +
+                  `≡ƒûÑ Server: <b>${server || 'N/A'}</b>\n` +
++                 `≡ƒæñ User: <b>${userName || 'Unknown'}</b>\n` +
+                  `≡ƒôî IP: <code>${ip || 'N/A'}</code>\n` +
+                  `≡ƒîÉ Domain: <b>${domain || 'N/A'}</b>\n` +
+                  `≡ƒôê Send Size: <code>${beforeSend}</code> Γ₧í∩╕Å <b>${afterSend}</b>\n\n` +
+@@ -386,8 +387,9 @@ async function processAutoWarmup(allData, newRecords) {
+                         sendAt: maxSendAt
+                     };
+ 
+-                     // Send notification report
+-                     await sendWarmupReport(g.server, g.ip, cleanDomain, "Upgrade", latestVal, nextTarget, "Last 3 drops succeeded (OUT >= 95% of IN).");
++                      // Send notification report
++                      const userName = g.records && g.records[0] ? g.records[0].user : "Unknown";
++                      await sendWarmupReport(g.server, g.ip, cleanDomain, "Upgrade", latestVal, nextTarget, userName, "Last 3 drops succeeded (OUT >= 95% of IN).");
+ 
+                     autoNotifiedState[safeKey] = true;
+                     newNotified = true;
+@@ -460,7 +462,8 @@ async function processAutoWarmup(allData, newRecords) {
+                             };
+ 
+                              // Send notification report
+-                             await sendWarmupReport(g.server, g.ip, cleanDomain, "Downgrade", latestVal, prevTarget, "Last 2 drops failed (OUT < 95% of IN or IN <= 0).");
++                             const userName = g.records && g.records[0] ? g.records[0].user : "Unknown";
++                             await sendWarmupReport(g.server, g.ip, cleanDomain, "Downgrade", latestVal, prevTarget, userName, "Last 2 drops failed (OUT < 95% of IN or IN <= 0).");
+ 
+                              autoNotifiedState[safeKey] = Date.now();
+                              newNotified = true;
+
+commit 69214c351341f79611183585c63b1468e3ff87d3
+Author: Admin <admin@team.com>
+Date:   Fri Jun 19 20:36:51 2026 +0100
+
+    remove raw telegram command messages, keep queue for imacros script
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index 4a40981..f3fee02 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -713,8 +713,7 @@ export default async function handler(req, res) {
+             allData = await getFirebaseData('warmupData') || {};
+         }
+         
+-        // Process delayed auto target upgrades
+-        await processAutoWarmupQueue();
++
+ 
+         // Run the auto target upgrade checks (always process, passing newRecords if added)
+         await processAutoWarmup(allData, addedCount > 0 ? newRecords : null);
+
+commit edd2dc1a7ccabb1ced40114aedeeeceed29ef0e7
+Author: Admin <admin@team.com>
+Date:   Fri Jun 19 20:33:09 2026 +0100
+
+    update warmup cooldown logic and dynamic wait times
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index 8b4511d..4a40981 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -149,6 +149,34 @@ async function putFirebaseData(path, data) {
+     }
+ }
+ 
++async function sendWarmupReport(server, ip, domain, action, beforeSend, afterSend, reason) {
++    const notifToken = UPGRADE_BOT_TOKEN;
++    const notifChatId = "-5317343683";
++
++    const emoji = action === "Upgrade" ? "≡ƒÜÇ <b>Warmup Upgrade</b>" : "≡ƒôë <b>Warmup Downgrade</b>";
++    const text = `${emoji}\n\n` +
++                 `≡ƒûÑ Server: <b>${server || 'N/A'}</b>\n` +
++                 `≡ƒôî IP: <code>${ip || 'N/A'}</code>\n` +
++                 `≡ƒîÉ Domain: <b>${domain || 'N/A'}</b>\n` +
++                 `≡ƒôê Send Size: <code>${beforeSend}</code> Γ₧í∩╕Å <b>${afterSend}</b>\n\n` +
++                 `≡ƒÆ¼ Reason: ${reason}`;
++
++    try {
++        await fetch(`https://api.telegram.org/bot${notifToken}/sendMessage`, {
++            method: 'POST',
++            headers: { 'Content-Type': 'application/json' },
++            body: JSON.stringify({
++                chat_id: notifChatId,
++                text: text,
++                parse_mode: 'HTML'
++            })
++        });
++    } catch (e) {
++        console.error("Failed to send warmup report to Telegram:", e);
++    }
++}
++
++
+ async function processAutoWarmup(allData, newRecords) {
+     try {
+         const autoNotifiedState = await getFirebaseData('state/autoWarmupNotified') || {};
+@@ -187,6 +215,66 @@ async function processAutoWarmup(allData, newRecords) {
+             allData = prunedData;
+         }
+ 
++        // 2. Check for stopped warmups (> 4 hours since last drop, but < 48 hours to avoid ancient targets)
++        const fourHoursAgo = Date.now() - (4 * 60 * 60 * 1000);
++        const fortyEightHoursAgo = Date.now() - (48 * 60 * 60 * 1000);
++
++        const absoluteLatest = {};
++        Object.values(allData).forEach(r => {
++            if (!r.domain && !r.ip && !r.server) return;
++            const key = `${r.domain || ''}_${r.server || ''}_${r.ip || ''}`;
++            if (!absoluteLatest[key] || r.timestamp > absoluteLatest[key].timestamp) {
++                absoluteLatest[key] = r;
++            }
++        });
++
++        for (const key in absoluteLatest) {
++            const latestDrop = absoluteLatest[key];
++            const isRdns = !latestDrop.domain || latestDrop.domain.toLowerCase().trim() === '[rdns]' || latestDrop.domain.toLowerCase().trim() === 'rdns';
++            const cleanDomain = isRdns ? (latestDrop.ip || 'unknown') : (latestDrop.domain || latestDrop.ip || 'unknown');
++            const safeDomain = cleanDomain.replace(/[\.\#\$\[\]]/g, '_');
++            const safeKey = `${safeDomain}_${latestDrop.server}`;
++            const stoppedNotifKey = `${safeKey}_stopped`;
++
++            if (latestDrop.timestamp && latestDrop.timestamp > fourHoursAgo) {
++                if (autoNotifiedState[stoppedNotifKey]) {
++                    delete autoNotifiedState[stoppedNotifKey];
++                    newNotified = true;
++                }
++            } else if (latestDrop.timestamp && latestDrop.timestamp <= fourHoursAgo && latestDrop.timestamp > fortyEightHoursAgo) {
++                if (!autoNotifiedState[stoppedNotifKey]) {
++                    const notifToken = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
++                    const notifChatId = "-1003735130681";
++                    const threadId = 91;
++
++                    const text = `ΓÜá∩╕Å <b>Warmup Stopped Alert!</b>\n\n` +
++                                 `≡ƒûÑ Server: <b>${latestDrop.server || 'Unknown'}</b>\n` +
++                                 `≡ƒæñ User: <b>${latestDrop.user || 'Unknown'}</b>\n` +
++                                 `≡ƒôî IP: <code>${latestDrop.ip || 'Unknown'}</code>\n` +
++                                 `≡ƒîÉ Domain: <b>${latestDrop.domain || 'N/A'}</b>\n\n` +
++                                 `Γ¥î <i>No drops recorded in the last 4 hours (last drop was ${new Date(latestDrop.timestamp).toLocaleString()}). Please check if stopped.</i>`;
++
++                    try {
++                        await fetch(`https://api.telegram.org/bot${notifToken}/sendMessage`, {
++                            method: 'POST',
++                            headers: { 'Content-Type': 'application/json' },
++                            body: JSON.stringify({
++                                chat_id: notifChatId,
++                                message_thread_id: threadId,
++                                text: text,
++                                parse_mode: 'HTML'
++                            })
++                        });
++                    } catch (err) {
++                        console.error("Failed to send stopped notification:", err);
++                    }
++
++                    autoNotifiedState[stoppedNotifKey] = true;
++                    newNotified = true;
++                }
++            }
++        }
++
+         const grouped = {};
+         const cutoff = Date.now() - (24 * 60 * 60 * 1000);
+         
+@@ -214,8 +302,10 @@ async function processAutoWarmup(allData, newRecords) {
+             const g = grouped[key];
+             
+ 
+-            g.records.sort((a, b) => b.timestamp - a.timestamp);
+-            if (g.records.length < 3) continue;
++             g.records.sort((a, b) => b.timestamp - a.timestamp);
++             if (g.records.length < 3) continue;
++
++
+ 
+             // Check if 3 last drops succeeded (OUT >= 0.95 * IN)
+             let success = true;
+@@ -234,14 +324,38 @@ async function processAutoWarmup(allData, newRecords) {
+             }
+ 
+              if (success) {
+-                const latestVal = parseInt(g.records[0].inVal, 10) || 0;
+-                const LEVELS = [50, 100, 200, 300, 500, 760, 1000, 1500, 2000, 3000, 5000, 7000, 8000, 10000, 15000, 19000, 21000, 26000, 30000];
+-                const nextTarget = LEVELS.find(l => l > latestVal) || latestVal;
+-                
+-                const isRdns = !g.domain || g.domain.toLowerCase().trim() === '[rdns]' || g.domain.toLowerCase().trim() === 'rdns';
+-                const cleanDomain = isRdns ? (g.ip || 'unknown') : (g.domain || g.ip || 'unknown');
+-                const safeDomain = cleanDomain.replace(/[\.\#\$\[\]]/g, '_');
+-                const safeKey = `${safeDomain}_${g.server}_${nextTarget}`;
++                 // Check if there was a downgrade and enforce a 3-drop cooldown before upgrading again
++                 const isRdns = !g.domain || g.domain.toLowerCase().trim() === '[rdns]' || g.domain.toLowerCase().trim() === 'rdns';
++                 const cleanDomainName = isRdns ? (g.ip || 'unknown') : (g.domain || g.ip || 'unknown');
++                 const safeDomainName = cleanDomainName.replace(/[\.\#\$\[\]]/g, '_');
++                 const downPrefix = `${safeDomainName}_${g.server}_down_`;
++                 
++                 let latestDowngradeTime = 0;
++                 Object.keys(autoNotifiedState).forEach(k => {
++                     if (k.startsWith(downPrefix)) {
++                         const val = autoNotifiedState[k];
++                         const t = typeof val === 'number' ? val : 0;
++                         if (t > latestDowngradeTime) {
++                             latestDowngradeTime = t;
++                         }
++                     }
++                 });
++
++                 if (latestDowngradeTime > 0) {
++                     const dropsAfter = g.records.filter(r => r.timestamp > latestDowngradeTime).length;
++                     if (dropsAfter < 3) {
++                         console.log(`Cooldown active for ${cleanDomainName} on server ${g.server}: only ${dropsAfter} drops since downgrade (need 3). Skipping upgrade check.`);
++                         continue; // Cooldown: must drop at least 3 drops after downgrade before upgrade is evaluated
++                     }
++                 }
++
++                 const latestVal = parseInt(g.records[0].inVal, 10) || 0;
++                 const LEVELS = [50, 100, 200, 300, 500, 760, 1000, 1500, 2000, 3000, 5000, 7000, 8000, 10000, 15000, 19000, 21000, 26000, 30000];
++                 const nextTarget = LEVELS.find(l => l > latestVal) || latestVal;
++                 
++                 const cleanDomain = cleanDomainName;
++                 const safeDomain = safeDomainName;
++                 const safeKey = `${safeDomain}_${g.server}_${nextTarget}`;
+ 
+                 // Auto-detect and register domain in RPs inventory if it's a new custom domain
+                 if (!isRdns && g.domain) {
+@@ -272,6 +386,9 @@ async function processAutoWarmup(allData, newRecords) {
+                         sendAt: maxSendAt
+                     };
+ 
++                     // Send notification report
++                     await sendWarmupReport(g.server, g.ip, cleanDomain, "Upgrade", latestVal, nextTarget, "Last 3 drops succeeded (OUT >= 95% of IN).");
++
+                     autoNotifiedState[safeKey] = true;
+                     newNotified = true;
+                     newQueue = true;
+@@ -342,9 +459,12 @@ async function processAutoWarmup(allData, newRecords) {
+                                 sendAt: maxSendAt
+                             };
+ 
+-                            autoNotifiedState[safeKey] = true;
+-                            newNotified = true;
+-                            newQueue = true;
++                             // Send notification report
++                             await sendWarmupReport(g.server, g.ip, cleanDomain, "Downgrade", latestVal, prevTarget, "Last 2 drops failed (OUT < 95% of IN or IN <= 0).");
++
++                             autoNotifiedState[safeKey] = Date.now();
++                             newNotified = true;
++                             newQueue = true;
+                         }
+                     }
+                 }
+@@ -596,9 +716,8 @@ export default async function handler(req, res) {
+         // Process delayed auto target upgrades
+         await processAutoWarmupQueue();
+ 
+-        if (addedCount > 0) {
+-            // Run the auto target upgrade checks
+-            await processAutoWarmup(allData, newRecords);
++        // Run the auto target upgrade checks (always process, passing newRecords if added)
++        await processAutoWarmup(allData, addedCount > 0 ? newRecords : null);
+ 
+             if (!isTelegramWebhook) {
+                 try {
+
+commit 12c69ca01fb8c7533b421023f5f4073208e35ccd
+Author: Admin <admin@team.com>
+Date:   Fri Jun 19 18:12:16 2026 +0100
+
+    Add automatic send size downgrade logic on consecutive drop failures
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index 8746c30..8b4511d 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -233,7 +233,7 @@ async function processAutoWarmup(allData, newRecords) {
+                 }
+             }
+ 
+-            if (success) {
++             if (success) {
+                 const latestVal = parseInt(g.records[0].inVal, 10) || 0;
+                 const LEVELS = [50, 100, 200, 300, 500, 760, 1000, 1500, 2000, 3000, 5000, 7000, 8000, 10000, 15000, 19000, 21000, 26000, 30000];
+                 const nextTarget = LEVELS.find(l => l > latestVal) || latestVal;
+@@ -276,6 +276,78 @@ async function processAutoWarmup(allData, newRecords) {
+                     newNotified = true;
+                     newQueue = true;
+                 }
++            } else {
++                // If not success, check if last 2 drops failed (OUT < 0.95 * IN or IN <= 0) and occurred within 24 hours
++                let shouldDowngrade = false;
++                if (g.records.length >= 2) {
++                    let bothFailed = true;
++                    for (let i = 0; i < 2; i++) {
++                        const r = g.records[i];
++                        if (!r.timestamp || r.timestamp < cutoff) {
++                            bothFailed = false;
++                            break;
++                        }
++                        const inVal = parseInt(r.inVal, 10) || 0;
++                        const outVal = parseInt(r.outVal, 10) || 0;
++                        if (inVal > 0 && outVal >= inVal * 0.95) {
++                            bothFailed = false;
++                            break;
++                        }
++                    }
++                    if (bothFailed) {
++                        shouldDowngrade = true;
++                    }
++                }
++
++                if (shouldDowngrade) {
++                    const latestVal = parseInt(g.records[0].inVal, 10) || 0;
++                    const LEVELS = [50, 100, 200, 300, 500, 760, 1000, 1500, 2000, 3000, 5000, 7000, 8000, 10000, 15000, 19000, 21000, 26000, 30000];
++                    
++                    const currentIdx = LEVELS.indexOf(latestVal);
++                    let prevTarget = latestVal;
++                    if (currentIdx > 0) {
++                        prevTarget = LEVELS[currentIdx - 1];
++                    } else if (currentIdx === -1) {
++                        const found = [...LEVELS].reverse().find(l => l < latestVal);
++                        prevTarget = found || LEVELS[0];
++                    }
++
++                    if (prevTarget < latestVal) {
++                        const isRdns = !g.domain || g.domain.toLowerCase().trim() === '[rdns]' || g.domain.toLowerCase().trim() === 'rdns';
++                        const cleanDomain = isRdns ? (g.ip || 'unknown') : (g.domain || g.ip || 'unknown');
++                        const safeDomain = cleanDomain.replace(/[\.\#\$\[\]]/g, '_');
++                        const safeKey = `${safeDomain}_${g.server}_down_${prevTarget}`;
++
++                        if (!autoNotifiedState[safeKey]) {
++                            // Queue first message (send_size downgrade)
++                            const msg1 = `update ${g.server} send_size for ${cleanDomain} to ${prevTarget}`;
++                            const queueId1 = "q_" + safeKey + "_send_size";
++                            
++                            maxSendAt = Math.max(Date.now(), maxSendAt + 5000);
++                            queueState[queueId1] = {
++                                chat_id: "-5317343683",
++                                text: msg1,
++                                sendAt: maxSendAt
++                            };
++
++                            // Queue second message (test_after downgrade)
++                            const testAfterVal = Math.round((prevTarget / 2) + 3);
++                            const msg2 = `update ${g.server} test_after for ${cleanDomain} to ${testAfterVal}`;
++                            const queueId2 = "q_" + safeKey + "_test_after";
++                            
++                            maxSendAt = maxSendAt + 5000;
++                            queueState[queueId2] = {
++                                chat_id: "-5317343683",
++                                text: msg2,
++                                sendAt: maxSendAt
++                            };
++
++                            autoNotifiedState[safeKey] = true;
++                            newNotified = true;
++                            newQueue = true;
++                        }
++                    }
++                }
+             }
+         }
+ 
+
+commit b68321dbb0c2b82b126e506ebb9198dca252110c
+Author: Admin <admin@team.com>
+Date:   Fri Jun 19 17:32:03 2026 +0100
+
+    Fix duplicate messages, enforce 24h filter on warmup, auto register RPs, and fix Unknown server issue
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index 28e43de..8746c30 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -1,6 +1,116 @@
+ const DB_URL = "https://gestion-team-e-default-rtdb.firebaseio.com";
+ const BOT_TOKEN = "8827415405:AAH-sAnTE7rz_i4XSTFG6tjBX0g0BYPyn6E";
+ const UPGRADE_BOT_TOKEN = "8975320309:AAFQmIeTKMbxQMv4c8_UHSczUYYZ9mcJ8FA";
++const dns = require('dns').promises;
++
++function ipInCidr(ip, cidr) {
++    const [range, bitsStr] = cidr.split('/');
++    if (!bitsStr) {
++        return ip === range;
++    }
++    const bits = parseInt(bitsStr, 10);
++    if (isNaN(bits)) return ip === range;
++
++    const ipParts = ip.split('.').map(Number);
++    const rangeParts = range.split('.').map(Number);
++
++    if (ipParts.length !== 4 || rangeParts.length !== 4) return false;
++
++    const ipNum = ((ipParts[0] * 256 + ipParts[1]) * 256 + ipParts[2]) * 256 + ipParts[3];
++    const rangeNum = ((rangeParts[0] * 256 + rangeParts[1]) * 256 + rangeParts[2]) * 256 + rangeParts[3];
++    const mask = bits === 0 ? 0 : (0xFFFFFFFF << (32 - bits));
++
++    return (ipNum & mask) === (rangeNum & mask);
++}
++
++async function getSpfRecord(domain) {
++    try {
++        const records = await dns.resolveTxt(domain);
++        const spfRecords = records
++            .map(chunks => chunks.join(''))
++            .filter(record => record.toLowerCase().startsWith('v=spf1'));
++        if (spfRecords.length === 0) return null;
++        return spfRecords[0];
++    } catch (err) {
++        return null;
++    }
++}
++
++async function detectAndAddNewRp(domain, ip, serverName) {
++    if (!domain || domain.toLowerCase() === '[rdns]' || domain.toLowerCase() === 'rdns') {
++        return;
++    }
++
++    try {
++        const rpInventory = await getFirebaseData('state/rpInventory') || [];
++        const rps = await getFirebaseData('state/rps') || [];
++        const servers = await getFirebaseData('state/servers') || [];
++
++        const cleanDom = domain.toLowerCase().trim();
++        
++        // Check if already exists in rpInventory
++        const exists = rpInventory.some(item => (item.rpDomain || '').toLowerCase().trim() === cleanDom);
++        if (exists) return;
++
++        // Determine RP Type (intern or extern) by checking SPF
++        let rpType = 'extern';
++        const spf = await getSpfRecord(cleanDom);
++        if (spf) {
++            const terms = spf.toLowerCase().split(/\s+/);
++            let hasDirectIp = false;
++            for (let term of terms) {
++                if (['+', '-', '~', '?'].includes(term[0])) term = term.slice(1);
++                if (term.startsWith('ip4:')) {
++                    const cidr = term.substring(4);
++                    if (ipInCidr(ip, cidr)) {
++                        hasDirectIp = true;
++                        break;
++                    }
++                }
++            }
++            if (hasDirectIp) {
++                rpType = 'intern';
++            }
++        }
++
++        // Add to rpInventory
++        const nextId = rpInventory.reduce((max, item) => Math.max(max, parseInt(item.id, 10) || 0), 0) + 1;
++        const newRpItem = {
++            id: nextId,
++            rpDomain: cleanDom,
++            domainIncluded: cleanDom,
++            subdomainIncluded: cleanDom,
++            spfType: 'Include',
++            srv: serverName,
++            rpType: rpType,
++            alreadySent: false,
++            spfStatus: 'OK',
++            spfCheckedAt: new Date().toISOString()
++        };
++        rpInventory.push(newRpItem);
++        await putFirebaseData('state/rpInventory', rpInventory);
++
++        // Add to rps
++        const attachedServer = servers.find(s => s.name === serverName);
++        const serverId = attachedServer ? attachedServer.id : null;
++        const mailerId = attachedServer ? (attachedServer.mailerId || null) : null;
++        const nextRpId = rps.reduce((max, r) => Math.max(max, parseInt(r.id, 10) || 0), 0) + 1;
++        
++        const newRpInRps = {
++            id: nextRpId,
++            domain: cleanDom,
++            serverId: serverId,
++            mailerId: mailerId,
++            status: 'active'
++        };
++        rps.push(newRpInRps);
++        await putFirebaseData('state/rps', rps);
++
++        console.log(`Automatically added new RP domain ${cleanDom} (${rpType}) for server ${serverName}`);
++    } catch (e) {
++        console.error("Error in detectAndAddNewRp:", e);
++    }
++}
+ 
+ async function getFirebaseData(path) {
+     try {
+@@ -56,9 +166,35 @@ async function processAutoWarmup(allData, newRecords) {
+         let newNotified = false;
+         let newQueue = false;
+ 
++        // 1. Prune warmupData older than 30 days to optimize Firebase storage space
++        const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
++        let pruneCount = 0;
++        const prunedData = {};
++        let dataChanged = false;
++        
++        Object.entries(allData).forEach(([key, val]) => {
++            if (val && val.timestamp && val.timestamp < thirtyDaysAgo) {
++                dataChanged = true;
++                pruneCount++;
++            } else {
++                prunedData[key] = val;
++            }
++        });
++        
++        if (dataChanged) {
++            console.log(`Pruned ${pruneCount} old warmup records.`);
++            await putFirebaseData('warmupData', prunedData);
++            allData = prunedData;
++        }
++
+         const grouped = {};
++        const cutoff = Date.now() - (24 * 60 * 60 * 1000);
++        
+         Object.values(allData).forEach(r => {
+             if (!r.domain && !r.ip && !r.server) return;
++            // Pre-filter: Only check drops from the last 24 hours
++            if (r.timestamp && r.timestamp < cutoff) return;
++
+             const key = `${r.domain || ''}_${r.server || ''}_${r.ip || ''}`;
+             if (!grouped[key]) grouped[key] = { ...r, records: [] };
+             grouped[key].records.push(r);
+@@ -81,12 +217,11 @@ async function processAutoWarmup(allData, newRecords) {
+             g.records.sort((a, b) => b.timestamp - a.timestamp);
+             if (g.records.length < 3) continue;
+ 
+-            // Check if 3 last drops succeeded (OUT >= 0.95 * IN) and occurred within the last 24 hours
++            // Check if 3 last drops succeeded (OUT >= 0.95 * IN)
+             let success = true;
+-            const cutoff = Date.now() - (24 * 60 * 60 * 1000);
+             for (let i = 0; i < 3; i++) {
+                 const r = g.records[i];
+-                if (r.timestamp < cutoff) {
++                if (!r.timestamp || r.timestamp < cutoff) {
+                     success = false;
+                     break;
+                 }
+@@ -103,14 +238,20 @@ async function processAutoWarmup(allData, newRecords) {
+                 const LEVELS = [50, 100, 200, 300, 500, 760, 1000, 1500, 2000, 3000, 5000, 7000, 8000, 10000, 15000, 19000, 21000, 26000, 30000];
+                 const nextTarget = LEVELS.find(l => l > latestVal) || latestVal;
+                 
+-                const cleanDomain = (g.domain || g.ip || g.server || 'unknown');
++                const isRdns = !g.domain || g.domain.toLowerCase().trim() === '[rdns]' || g.domain.toLowerCase().trim() === 'rdns';
++                const cleanDomain = isRdns ? (g.ip || 'unknown') : (g.domain || g.ip || 'unknown');
+                 const safeDomain = cleanDomain.replace(/[\.\#\$\[\]]/g, '_');
+                 const safeKey = `${safeDomain}_${g.server}_${nextTarget}`;
+ 
++                // Auto-detect and register domain in RPs inventory if it's a new custom domain
++                if (!isRdns && g.domain) {
++                    await detectAndAddNewRp(g.domain, g.ip, g.server);
++                }
++
+                 if (!autoNotifiedState[safeKey]) {
+                     // Queue first message (send_size)
+                     const msg1 = `update ${g.server} send_size for ${cleanDomain} to ${nextTarget}`;
+-                    const queueId1 = "q_" + Date.now() + "_" + Math.floor(Math.random() * 1000) + "_1";
++                    const queueId1 = "q_" + safeKey + "_send_size";
+                     
+                     maxSendAt = Math.max(Date.now(), maxSendAt + 5000);
+                     queueState[queueId1] = {
+@@ -122,7 +263,7 @@ async function processAutoWarmup(allData, newRecords) {
+                     // Queue second message (test_after)
+                     const testAfterVal = Math.round((nextTarget / 2) + 3);
+                     const msg2 = `update ${g.server} test_after for ${cleanDomain} to ${testAfterVal}`;
+-                    const queueId2 = "q_" + Date.now() + "_" + Math.floor(Math.random() * 1000) + "_2";
++                    const queueId2 = "q_" + safeKey + "_test_after";
+                     
+                     maxSendAt = maxSendAt + 5000;
+                     queueState[queueId2] = {
+
+commit 31a5f39128f1335a09a25d1d3575724d26322320
+Author: Admin <admin@team.com>
+Date:   Fri Jun 19 16:14:41 2026 +0100
+
+    Change auto warmup message spacing delay to 5 seconds
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index def6258..28e43de 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -65,7 +65,7 @@ async function processAutoWarmup(allData, newRecords) {
+         });
+ 
+         // Find the maximum sendAt currently in the queue to schedule after it
+-        let maxSendAt = Date.now() - 60000;
++        let maxSendAt = Date.now() - 5000;
+         Object.values(queueState).forEach(item => {
+             if (item && item.sendAt > maxSendAt) {
+                 maxSendAt = item.sendAt;
+@@ -112,7 +112,7 @@ async function processAutoWarmup(allData, newRecords) {
+                     const msg1 = `update ${g.server} send_size for ${cleanDomain} to ${nextTarget}`;
+                     const queueId1 = "q_" + Date.now() + "_" + Math.floor(Math.random() * 1000) + "_1";
+                     
+-                    maxSendAt = Math.max(Date.now(), maxSendAt + 60000);
++                    maxSendAt = Math.max(Date.now(), maxSendAt + 5000);
+                     queueState[queueId1] = {
+                         chat_id: "-5317343683",
+                         text: msg1,
+@@ -124,7 +124,7 @@ async function processAutoWarmup(allData, newRecords) {
+                     const msg2 = `update ${g.server} test_after for ${cleanDomain} to ${testAfterVal}`;
+                     const queueId2 = "q_" + Date.now() + "_" + Math.floor(Math.random() * 1000) + "_2";
+                     
+-                    maxSendAt = maxSendAt + 60000;
++                    maxSendAt = maxSendAt + 5000;
+                     queueState[queueId2] = {
+                         chat_id: "-5317343683",
+                         text: msg2,
+@@ -179,8 +179,8 @@ async function processAutoWarmupQueue() {
+             delete queueState[itemToSend.id];
+             changed = true;
+ 
+-            // Shift any other due/soon-due items forward so they are spaced by at least 1 minute
+-            let nextSendAt = now + 60000;
++            // Shift any other due/soon-due items forward so they are spaced by at least 5 seconds
++            let nextSendAt = now + 5000;
+             for (let i = 1; i < items.length; i++) {
+                 const item = items[i];
+                 if (item.id === itemToSend.id) continue;
+@@ -189,7 +189,7 @@ async function processAutoWarmupQueue() {
+                     queueState[item.id].sendAt = nextSendAt;
+                     changed = true;
+                 }
+-                nextSendAt += 60000;
++                nextSendAt += 5000;
+             }
+         }
+ 
+
+commit ed2ca3e4690054d7651d8bc473cbb0ae091e135b
+Author: Admin <admin@team.com>
+Date:   Fri Jun 19 16:13:24 2026 +0100
+
+    Limit auto warmup target upgrades to drops within the last 24 hours
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index 4cd510a..def6258 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -81,10 +81,15 @@ async function processAutoWarmup(allData, newRecords) {
+             g.records.sort((a, b) => b.timestamp - a.timestamp);
+             if (g.records.length < 3) continue;
+ 
+-            // Check if 3 last drops succeeded (OUT >= 0.95 * IN)
++            // Check if 3 last drops succeeded (OUT >= 0.95 * IN) and occurred within the last 24 hours
+             let success = true;
++            const cutoff = Date.now() - (24 * 60 * 60 * 1000);
+             for (let i = 0; i < 3; i++) {
+                 const r = g.records[i];
++                if (r.timestamp < cutoff) {
++                    success = false;
++                    break;
++                }
+                 const inVal = parseInt(r.inVal, 10) || 0;
+                 const outVal = parseInt(r.outVal, 10) || 0;
+                 if (inVal <= 0 || outVal < inVal * 0.95) {
+
+commit 34e447d03f962eee6b488cf495726e21d2df2cf3
+Author: Admin <admin@team.com>
+Date:   Fri Jun 19 16:12:43 2026 +0100
+
+    Restrict auto warmup checks to only newly added logs
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index c3caf4c..4cd510a 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -39,11 +39,20 @@ async function putFirebaseData(path, data) {
+     }
+ }
+ 
+-async function processAutoWarmup(allData) {
++async function processAutoWarmup(allData, newRecords) {
+     try {
+         const autoNotifiedState = await getFirebaseData('state/autoWarmupNotified') || {};
+         const queueState = await getFirebaseData('state/autoWarmupQueue') || {};
+         
++        const updatedKeys = new Set();
++        if (newRecords) {
++            Object.values(newRecords).forEach(r => {
++                if (!r.domain && !r.ip && !r.server) return;
++                const key = `${r.domain || ''}_${r.server || ''}_${r.ip || ''}`;
++                updatedKeys.add(key);
++            });
++        }
++
+         let newNotified = false;
+         let newQueue = false;
+ 
+@@ -64,6 +73,8 @@ async function processAutoWarmup(allData) {
+         });
+ 
+         for (const key in grouped) {
++            if (newRecords && !updatedKeys.has(key)) continue;
++            
+             const g = grouped[key];
+             
+ 
+@@ -369,7 +380,7 @@ export default async function handler(req, res) {
+ 
+         if (addedCount > 0) {
+             // Run the auto target upgrade checks
+-            await processAutoWarmup(allData);
++            await processAutoWarmup(allData, newRecords);
+ 
+             if (!isTelegramWebhook) {
+                 try {
+
+commit 287e3c9563d6d312cef3c89177671c086873e7b6
+Author: Admin <admin@team.com>
+Date:   Fri Jun 19 16:07:33 2026 +0100
+
+    Enable auto warmup target upgrades for all servers
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index c68c513..c3caf4c 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -66,8 +66,6 @@ async function processAutoWarmup(allData) {
+         for (const key in grouped) {
+             const g = grouped[key];
+             
+-            // Only server s_wmn3_2245 for now
+-            if (g.server !== 's_wmn3_2245') continue;
+ 
+             g.records.sort((a, b) => b.timestamp - a.timestamp);
+             if (g.records.length < 3) continue;
+
+commit 8fcddb2e281c062b48967da4b06b1591ff0d24a1
+Author: Admin <admin@team.com>
+Date:   Fri Jun 19 16:05:34 2026 +0100
+
+    Split BOT_TOKEN for reading logs and UPGRADE_BOT_TOKEN for posting upgrades
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index d980c04..c68c513 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -1,5 +1,6 @@
+ const DB_URL = "https://gestion-team-e-default-rtdb.firebaseio.com";
+-const BOT_TOKEN = "8975320309:AAFQmIeTKMbxQMv4c8_UHSczUYYZ9mcJ8FA";
++const BOT_TOKEN = "8827415405:AAH-sAnTE7rz_i4XSTFG6tjBX0g0BYPyn6E";
++const UPGRADE_BOT_TOKEN = "8975320309:AAFQmIeTKMbxQMv4c8_UHSczUYYZ9mcJ8FA";
+ 
+ async function getFirebaseData(path) {
+     try {
+@@ -152,7 +153,7 @@ async function processAutoWarmupQueue() {
+             const itemToSend = dueItems[0];
+             
+             // Send the oldest due message
+-            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
++            await fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, {
+                 method: 'POST',
+                 headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify({
+
+commit 26a7291f3c81e13ca14eab031b0486200b60a2aa
+Author: Admin <admin@team.com>
+Date:   Fri Jun 19 16:04:03 2026 +0100
+
+    Update Telegram BOT_TOKEN and target group ID to new bot/group
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index ae3abfe..d980c04 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -1,5 +1,5 @@
+ const DB_URL = "https://gestion-team-e-default-rtdb.firebaseio.com";
+-const BOT_TOKEN = "8827415405:AAH-sAnTE7rz_i4XSTFG6tjBX0g0BYPyn6E";
++const BOT_TOKEN = "8975320309:AAFQmIeTKMbxQMv4c8_UHSczUYYZ9mcJ8FA";
+ 
+ async function getFirebaseData(path) {
+     try {
+@@ -99,7 +99,7 @@ async function processAutoWarmup(allData) {
+                     
+                     maxSendAt = Math.max(Date.now(), maxSendAt + 60000);
+                     queueState[queueId1] = {
+-                        chat_id: "-1002633168986",
++                        chat_id: "-5317343683",
+                         text: msg1,
+                         sendAt: maxSendAt
+                     };
+@@ -111,7 +111,7 @@ async function processAutoWarmup(allData) {
+                     
+                     maxSendAt = maxSendAt + 60000;
+                     queueState[queueId2] = {
+-                        chat_id: "-1002633168986",
++                        chat_id: "-5317343683",
+                         text: msg2,
+                         sendAt: maxSendAt
+                     };
+@@ -339,7 +339,7 @@ export default async function handler(req, res) {
+             const msg = update.message || update.edited_message || update.channel_post;
+             if (msg && msg.text) {
+                 const chatId = msg.chat ? String(msg.chat.id) : "";
+-                const isTargetGroup = chatId === "-1002633168986" || chatId === "-1003727758817";
++                const isTargetGroup = chatId === "-1002633168986" || chatId === "-1003727758817" || chatId === "-5317343683";
+                 const isPrivate = msg.chat && msg.chat.type === "private";
+                 
+                 if (!isTargetGroup && !isPrivate) {
+
+commit 994a8a8aa1719380a457730257dff43f3c4c6bb5
+Author: Admin <admin@team.com>
+Date:   Fri Jun 19 15:54:56 2026 +0100
+
+    Update target group chat ID to -1002633168986
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index d4a062d..ae3abfe 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -99,7 +99,7 @@ async function processAutoWarmup(allData) {
+                     
+                     maxSendAt = Math.max(Date.now(), maxSendAt + 60000);
+                     queueState[queueId1] = {
+-                        chat_id: "-1003229248256",
++                        chat_id: "-1002633168986",
+                         text: msg1,
+                         sendAt: maxSendAt
+                     };
+@@ -111,7 +111,7 @@ async function processAutoWarmup(allData) {
+                     
+                     maxSendAt = maxSendAt + 60000;
+                     queueState[queueId2] = {
+-                        chat_id: "-1003229248256",
++                        chat_id: "-1002633168986",
+                         text: msg2,
+                         sendAt: maxSendAt
+                     };
+
+commit 5c5444b3e388481d3c54743b2e93311be55c35b2
+Author: Admin <admin@team.com>
+Date:   Fri Jun 19 15:49:18 2026 +0100
+
+    Ensure 1 minute delay between all Telegram messages using persistent queue
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index 6a13d73..d4a062d 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -54,6 +54,14 @@ async function processAutoWarmup(allData) {
+             grouped[key].records.push(r);
+         });
+ 
++        // Find the maximum sendAt currently in the queue to schedule after it
++        let maxSendAt = Date.now() - 60000;
++        Object.values(queueState).forEach(item => {
++            if (item && item.sendAt > maxSendAt) {
++                maxSendAt = item.sendAt;
++            }
++        });
++
+         for (const key in grouped) {
+             const g = grouped[key];
+             
+@@ -85,25 +93,27 @@ async function processAutoWarmup(allData) {
+                 const safeKey = `${safeDomain}_${g.server}_${nextTarget}`;
+ 
+                 if (!autoNotifiedState[safeKey]) {
+-                    // Send first message immediately
++                    // Queue first message (send_size)
+                     const msg1 = `update ${g.server} send_size for ${cleanDomain} to ${nextTarget}`;
+-                    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+-                        method: 'POST',
+-                        headers: { 'Content-Type': 'application/json' },
+-                        body: JSON.stringify({
+-                            chat_id: "-1003229248256",
+-                            text: msg1
+-                        })
+-                    });
++                    const queueId1 = "q_" + Date.now() + "_" + Math.floor(Math.random() * 1000) + "_1";
++                    
++                    maxSendAt = Math.max(Date.now(), maxSendAt + 60000);
++                    queueState[queueId1] = {
++                        chat_id: "-1003229248256",
++                        text: msg1,
++                        sendAt: maxSendAt
++                    };
+ 
+-                    // Queue second message for 1 minute later
++                    // Queue second message (test_after)
+                     const testAfterVal = Math.round((nextTarget / 2) + 3);
+                     const msg2 = `update ${g.server} test_after for ${cleanDomain} to ${testAfterVal}`;
+-                    const queueId = "q_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+-                    queueState[queueId] = {
++                    const queueId2 = "q_" + Date.now() + "_" + Math.floor(Math.random() * 1000) + "_2";
++                    
++                    maxSendAt = maxSendAt + 60000;
++                    queueState[queueId2] = {
+                         chat_id: "-1003229248256",
+                         text: msg2,
+-                        sendAt: Date.now() + 60000
++                        sendAt: maxSendAt
+                     };
+ 
+                     autoNotifiedState[safeKey] = true;
+@@ -131,22 +141,40 @@ async function processAutoWarmupQueue() {
+         const now = Date.now();
+         let changed = false;
+ 
+-        for (const queueId in queueState) {
+-            const item = queueState[queueId];
+-            if (item && item.sendAt <= now) {
+-                // Send queued message
+-                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+-                    method: 'POST',
+-                    headers: { 'Content-Type': 'application/json' },
+-                    body: JSON.stringify({
+-                        chat_id: item.chat_id,
+-                        text: item.text
+-                    })
+-                });
++        // Sort items by scheduled time ascending
++        const items = Object.entries(queueState)
++            .map(([id, val]) => ({ id, ...val }))
++            .sort((a, b) => a.sendAt - b.sendAt);
+ 
+-                // Remove from queue
+-                delete queueState[queueId];
+-                changed = true;
++        const dueItems = items.filter(item => item.sendAt <= now);
++
++        if (dueItems.length > 0) {
++            const itemToSend = dueItems[0];
++            
++            // Send the oldest due message
++            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
++                method: 'POST',
++                headers: { 'Content-Type': 'application/json' },
++                body: JSON.stringify({
++                    chat_id: itemToSend.chat_id,
++                    text: itemToSend.text
++                })
++            });
++
++            delete queueState[itemToSend.id];
++            changed = true;
++
++            // Shift any other due/soon-due items forward so they are spaced by at least 1 minute
++            let nextSendAt = now + 60000;
++            for (let i = 1; i < items.length; i++) {
++                const item = items[i];
++                if (item.id === itemToSend.id) continue;
++                
++                if (queueState[item.id] && queueState[item.id].sendAt < nextSendAt) {
++                    queueState[item.id].sendAt = nextSendAt;
++                    changed = true;
++                }
++                nextSendAt += 60000;
+             }
+         }
+ 
+
+commit 9d92931f245644ba9926820e73b72fde038b1b99
+Author: Admin <admin@team.com>
+Date:   Fri Jun 19 15:43:55 2026 +0100
+
+    Implement automated target upgrade triggers and delayed message queue for server s_wmn3_2245
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index ab51942..6a13d73 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -24,6 +24,140 @@ async function saveFirebaseData(path, data) {
+     }
+ }
+ 
++async function putFirebaseData(path, data) {
++    try {
++        await fetch(`${DB_URL}/${path}.json`, {
++            method: 'PUT',
++            headers: { 'Content-Type': 'application/json' },
++            body: JSON.stringify(data)
++        });
++        return true;
++    } catch (e) {
++        console.error("Firebase put error:", e);
++        return false;
++    }
++}
++
++async function processAutoWarmup(allData) {
++    try {
++        const autoNotifiedState = await getFirebaseData('state/autoWarmupNotified') || {};
++        const queueState = await getFirebaseData('state/autoWarmupQueue') || {};
++        
++        let newNotified = false;
++        let newQueue = false;
++
++        const grouped = {};
++        Object.values(allData).forEach(r => {
++            if (!r.domain && !r.ip && !r.server) return;
++            const key = `${r.domain || ''}_${r.server || ''}_${r.ip || ''}`;
++            if (!grouped[key]) grouped[key] = { ...r, records: [] };
++            grouped[key].records.push(r);
++        });
++
++        for (const key in grouped) {
++            const g = grouped[key];
++            
++            // Only server s_wmn3_2245 for now
++            if (g.server !== 's_wmn3_2245') continue;
++
++            g.records.sort((a, b) => b.timestamp - a.timestamp);
++            if (g.records.length < 3) continue;
++
++            // Check if 3 last drops succeeded (OUT >= 0.95 * IN)
++            let success = true;
++            for (let i = 0; i < 3; i++) {
++                const r = g.records[i];
++                const inVal = parseInt(r.inVal, 10) || 0;
++                const outVal = parseInt(r.outVal, 10) || 0;
++                if (inVal <= 0 || outVal < inVal * 0.95) {
++                    success = false;
++                    break;
++                }
++            }
++
++            if (success) {
++                const latestVal = parseInt(g.records[0].inVal, 10) || 0;
++                const LEVELS = [50, 100, 200, 300, 500, 760, 1000, 1500, 2000, 3000, 5000, 7000, 8000, 10000, 15000, 19000, 21000, 26000, 30000];
++                const nextTarget = LEVELS.find(l => l > latestVal) || latestVal;
++                
++                const cleanDomain = (g.domain || g.ip || g.server || 'unknown');
++                const safeDomain = cleanDomain.replace(/[\.\#\$\[\]]/g, '_');
++                const safeKey = `${safeDomain}_${g.server}_${nextTarget}`;
++
++                if (!autoNotifiedState[safeKey]) {
++                    // Send first message immediately
++                    const msg1 = `update ${g.server} send_size for ${cleanDomain} to ${nextTarget}`;
++                    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
++                        method: 'POST',
++                        headers: { 'Content-Type': 'application/json' },
++                        body: JSON.stringify({
++                            chat_id: "-1003229248256",
++                            text: msg1
++                        })
++                    });
++
++                    // Queue second message for 1 minute later
++                    const testAfterVal = Math.round((nextTarget / 2) + 3);
++                    const msg2 = `update ${g.server} test_after for ${cleanDomain} to ${testAfterVal}`;
++                    const queueId = "q_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
++                    queueState[queueId] = {
++                        chat_id: "-1003229248256",
++                        text: msg2,
++                        sendAt: Date.now() + 60000
++                    };
++
++                    autoNotifiedState[safeKey] = true;
++                    newNotified = true;
++                    newQueue = true;
++                }
++            }
++        }
++
++        if (newNotified) {
++            await putFirebaseData('state/autoWarmupNotified', autoNotifiedState);
++        }
++
++        if (newQueue) {
++            await putFirebaseData('state/autoWarmupQueue', queueState);
++        }
++    } catch (e) {
++        console.error("Error in processAutoWarmup:", e);
++    }
++}
++
++async function processAutoWarmupQueue() {
++    try {
++        const queueState = await getFirebaseData('state/autoWarmupQueue') || {};
++        const now = Date.now();
++        let changed = false;
++
++        for (const queueId in queueState) {
++            const item = queueState[queueId];
++            if (item && item.sendAt <= now) {
++                // Send queued message
++                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
++                    method: 'POST',
++                    headers: { 'Content-Type': 'application/json' },
++                    body: JSON.stringify({
++                        chat_id: item.chat_id,
++                        text: item.text
++                    })
++                });
++
++                // Remove from queue
++                delete queueState[queueId];
++                changed = true;
++            }
++        }
++
++        if (changed) {
++            await putFirebaseData('state/autoWarmupQueue', queueState);
++        }
++    } catch (e) {
++        console.error("Error in processAutoWarmupQueue:", e);
++    }
++}
++
+ function parseMessage(text, timestamp) {
+     if (!text || !text.includes('Server Deployment Summary')) return null;
+     
+@@ -197,86 +331,92 @@ export default async function handler(req, res) {
+         
+         if (addedCount > 0) {
+             await saveFirebaseData('warmupData', newRecords);
+-        }
+-        
+-        // Fetch all warmupData from Firebase to return to client (Only when not in Telegram webhook mode to save bandwidth)
++        }        // Fetch all warmupData from Firebase if needed (when new records are added or not in webhook mode)
+         let allData = {};
+-        if (!isTelegramWebhook) {
++        if (addedCount > 0 || !isTelegramWebhook) {
+             allData = await getFirebaseData('warmupData') || {};
+         }
+         
+-        if (addedCount > 0 && !isTelegramWebhook) {
+-            try {
+-                const notifiedState = await getFirebaseData('state/warmupNotified') || {};
+-                let newNotified = false;
+-                
+-                const grouped = {};
+-                Object.values(allData).forEach(r => {
+-                    if (!r.domain && !r.ip && !r.server) return;
+-                    const key = `${r.domain || ''}_${r.server || ''}_${r.ip || ''}`;
+-                    if (!grouped[key]) grouped[key] = { ...r, records: [] };
+-                    grouped[key].records.push(r);
+-                });
+-                
+-                const getRepOut = (drops) => {
+-                    const nonZeros = drops.filter(v => v > 0);
+-                    if (nonZeros.length === 0) return 0;
+-                    if (nonZeros.length === 1) return nonZeros[0];
+-                    nonZeros.sort((a, b) => b - a);
+-                    for (let i = 0; i < nonZeros.length; i++) {
+-                        for (let j = i + 1; j < nonZeros.length; j++) {
+-                            const maxVal = Math.max(nonZeros[i], nonZeros[j]);
+-                            const minVal = Math.min(nonZeros[i], nonZeros[j]);
+-                            if (maxVal > 0 && (maxVal - minVal) / maxVal <= 0.3) return maxVal;
++        // Process delayed auto target upgrades
++        await processAutoWarmupQueue();
++
++        if (addedCount > 0) {
++            // Run the auto target upgrade checks
++            await processAutoWarmup(allData);
++
++            if (!isTelegramWebhook) {
++                try {
++                    const notifiedState = await getFirebaseData('state/warmupNotified') || {};
++                    let newNotified = false;
++                    
++                    const grouped = {};
++                    Object.values(allData).forEach(r => {
++                        if (!r.domain && !r.ip && !r.server) return;
++                        const key = `${r.domain || ''}_${r.server || ''}_${r.ip || ''}`;
++                        if (!grouped[key]) grouped[key] = { ...r, records: [] };
++                        grouped[key].records.push(r);
++                    });
++                    
++                    const getRepOut = (drops) => {
++                        const nonZeros = drops.filter(v => v > 0);
++                        if (nonZeros.length === 0) return 0;
++                        if (nonZeros.length === 1) return nonZeros[0];
++                        nonZeros.sort((a, b) => b - a);
++                        for (let i = 0; i < nonZeros.length; i++) {
++                            for (let j = i + 1; j < nonZeros.length; j++) {
++                                const maxVal = Math.max(nonZeros[i], nonZeros[j]);
++                                const minVal = Math.min(nonZeros[i], nonZeros[j]);
++                                if (maxVal > 0 && (maxVal - minVal) / maxVal <= 0.3) return maxVal;
++                            }
+                         }
+-                    }
+-                    return nonZeros[0];
+-                };
+-                
+-                const notifToken = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
+-                const notifChatId = "-1003735130681";
+-                
+-                for (const key in grouped) {
+-                    const g = grouped[key];
+-                    g.records.sort((a, b) => b.timestamp - a.timestamp);
+-                    const allOuts = g.records.map(r => r.outVal);
+-                    const repOut = getRepOut(allOuts);
++                        return nonZeros[0];
++                    };
+                     
+-                    const safeDomain = (g.domain || g.ip || g.server || 'unknown').replace(/[\.\#\$\[\]]/g, '_');
++                    const notifToken = "8888454016:AAH04qHHycwZTnXoRFlvRBwQ2yEwPaYVdwQ";
++                    const notifChatId = "-1003735130681";
+                     
+-                    if (repOut > 25900 && !notifiedState[safeDomain]) {
+-                        const text = `≡ƒÄ» <b>Warmup Target Reached!</b>\n\n` + 
+-                                     `≡ƒîÉ Domain: <b>${g.domain || 'N/A'}</b>\n` +
+-                                     `≡ƒôî IP: <code>${g.ip || 'Unknown'}</code>\n` + 
+-                                     `≡ƒûÑ Server: ${g.server || 'Unknown'}\n` + 
+-                                     `≡ƒôè Rep Out: <b>${repOut}</b>\n\n` + 
+-                                     `<i>Target (>25900) achieved.</i>`;
+-                                     
+-                        await fetch(`https://api.telegram.org/bot${notifToken}/sendMessage`, {
+-                            method: 'POST',
+-                            headers: { 'Content-Type': 'application/json' },
+-                            body: JSON.stringify({
+-                                chat_id: notifChatId,
+-                                message_thread_id: 91,
+-                                text: text,
+-                                parse_mode: 'HTML'
+-                            })
+-                        });
++                    for (const key in grouped) {
++                        const g = grouped[key];
++                        g.records.sort((a, b) => b.timestamp - a.timestamp);
++                        const allOuts = g.records.map(r => r.outVal);
++                        const repOut = getRepOut(allOuts);
++                        
++                        const safeDomain = (g.domain || g.ip || g.server || 'unknown').replace(/[\.\#\$\[\]]/g, '_');
+                         
+-                        notifiedState[safeDomain] = true;
+-                        newNotified = true;
++                        if (repOut > 25900 && !notifiedState[safeDomain]) {
++                            const text = `≡ƒÄ» <b>Warmup Target Reached!</b>\n\n` + 
++                                         `≡ƒîÉ Domain: <b>${g.domain || 'N/A'}</b>\n` +
++                                         `≡ƒôî IP: <code>${g.ip || 'Unknown'}</code>\n` + 
++                                         `≡ƒûÑ Server: ${g.server || 'Unknown'}\n` + 
++                                         `≡ƒôè Rep Out: <b>${repOut}</b>\n\n` + 
++                                         `<i>Target (>25900) achieved.</i>`;
++                                         
++                            await fetch(`https://api.telegram.org/bot${notifToken}/sendMessage`, {
++                                method: 'POST',
++                                headers: { 'Content-Type': 'application/json' },
++                                body: JSON.stringify({
++                                    chat_id: notifChatId,
++                                    message_thread_id: 91,
++                                    text: text,
++                                    parse_mode: 'HTML'
++                                })
++                            });
++                            
++                            notifiedState[safeDomain] = true;
++                            newNotified = true;
++                        }
+                     }
++                    
++                    if (newNotified) {
++                        await fetch(`${DB_URL}/state/warmupNotified.json`, {
++                            method: 'PUT',
++                            body: JSON.stringify(notifiedState),
++                            headers: { 'Content-Type': 'application/json' }
++                        });
++                    }
++                } catch (err) {
++                    console.error("Error during notification check:", err);
+                 }
+-                
+-                if (newNotified) {
+-                    await fetch(`${DB_URL}/state/warmupNotified.json`, {
+-                        method: 'PUT',
+-                        body: JSON.stringify(notifiedState),
+-                        headers: { 'Content-Type': 'application/json' }
+-                    });
+-                }
+-            } catch (err) {
+-                console.error("Error during notification check:", err);
+             }
+         }
+         
+
+commit 0dfcb503f49c27e5447178d0aecdb247c7edbc18
+Author: Admin <admin@team.com>
+Date:   Tue Jun 16 11:47:37 2026 +0100
+
+    Optimize Telegram webhook bandwidth by skipping warmupData history fetch, and double client background sync interval
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index 3f2ba12..ab51942 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -199,10 +199,13 @@ export default async function handler(req, res) {
+             await saveFirebaseData('warmupData', newRecords);
+         }
+         
+-        // Fetch all warmupData from Firebase to return to client
+-        const allData = await getFirebaseData('warmupData') || {};
++        // Fetch all warmupData from Firebase to return to client (Only when not in Telegram webhook mode to save bandwidth)
++        let allData = {};
++        if (!isTelegramWebhook) {
++            allData = await getFirebaseData('warmupData') || {};
++        }
+         
+-        if (addedCount > 0) {
++        if (addedCount > 0 && !isTelegramWebhook) {
+             try {
+                 const notifiedState = await getFirebaseData('state/warmupNotified') || {};
+                 let newNotified = false;
+
+commit c638a2ba0a593aa6a3b5c6a8b796215b12051c1f
+Author: Admin <admin@team.com>
+Date:   Mon Jun 15 14:07:11 2026 +0100
+
+    Optimize Firebase storage and bandwidth: comment out raw webhook debug logging, move spamhausHistory to root, and load it on-demand
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index a461cd6..3f2ba12 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -120,7 +120,8 @@ export default async function handler(req, res) {
+                 results = [update];
+                 isTelegramWebhook = true;
+                 
+-                // Write debug log of raw payload
++                // Write debug log of raw payload (Disabled to prevent massive Firebase storage/bandwidth usage)
++                /*
+                 try {
+                     const msg = update.message || update.edited_message || update.channel_post;
+                     const logEntry = {
+@@ -140,6 +141,7 @@ export default async function handler(req, res) {
+                 } catch (e) {
+                     console.error("Failed to write raw debug log:", e);
+                 }
++                */
+             } else if (update && update.text) {
+                 // Direct POST of message text from external script
+                 const fakeMessageId = "ext_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+
+commit 6d859a42c26f1526853a53560387de8cdc464239
+Author: Admin <admin@team.com>
+Date:   Sat Jun 13 14:19:02 2026 +0100
+
+    Respond with simple JSON to Telegram webhooks to prevent payload size errors
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index f873c95..a461cd6 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -111,12 +111,14 @@ async function parseRequestBody(req) {
+ export default async function handler(req, res) {
+     try {
+         let results = [];
++        let isTelegramWebhook = false;
+         
+         if (req.method === 'POST') {
+             // Webhook mode: a single update object is sent in the body
+             const update = await parseRequestBody(req);
+             if (update && update.update_id) {
+                 results = [update];
++                isTelegramWebhook = true;
+                 
+                 // Write debug log of raw payload
+                 try {
+@@ -273,6 +275,13 @@ export default async function handler(req, res) {
+             }
+         }
+         
++        if (isTelegramWebhook) {
++            return res.status(200).json({ 
++                success: true, 
++                addedCount 
++            });
++        }
++        
+         return res.status(200).json({ 
+             success: true, 
+             addedCount, 
+
+commit 2ddeacea2fdc55b7b6bc42b1eb3a7cb0105b80bf
+Author: Admin <admin@team.com>
+Date:   Sat Jun 13 14:18:13 2026 +0100
+
+    Fix Telegram webhook 'Request Entity Too Large' by parsing body manually
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index dd94ac2..f873c95 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -93,13 +93,28 @@ function parseMessage(text, timestamp) {
+     };
+ }
+ 
++async function parseRequestBody(req) {
++    if (req.body) return req.body;
++    const buffers = [];
++    for await (const chunk of req) {
++        buffers.push(chunk);
++    }
++    const rawBody = Buffer.concat(buffers).toString('utf8');
++    if (!rawBody) return null;
++    try {
++        return JSON.parse(rawBody);
++    } catch (e) {
++        return null;
++    }
++}
++
+ export default async function handler(req, res) {
+     try {
+         let results = [];
+         
+         if (req.method === 'POST') {
+             // Webhook mode: a single update object is sent in the body
+-            const update = req.body;
++            const update = await parseRequestBody(req);
+             if (update && update.update_id) {
+                 results = [update];
+                 
+@@ -269,3 +284,9 @@ export default async function handler(req, res) {
+         return res.status(500).json({ error: e.message });
+     }
+ }
++
++export const config = {
++    api: {
++        bodyParser: false,
++    },
++};
+
+commit 0a729e5feba413f3c5d44945fb8d18b810293bff
+Author: Admin <admin@team.com>
+Date:   Sat Jun 13 12:27:11 2026 +0100
+
+    Optimize Firebase Realtime Database bandwidth usage and migrate configuration to new project-e
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index 4b647e2..dd94ac2 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -1,4 +1,4 @@
+-const DB_URL = "https://gestion-team-d-default-rtdb.firebaseio.com";
++const DB_URL = "https://gestion-team-e-default-rtdb.firebaseio.com";
+ const BOT_TOKEN = "8827415405:AAH-sAnTE7rz_i4XSTFG6tjBX0g0BYPyn6E";
+ 
+ async function getFirebaseData(path) {
+
+commit 6980e0354cce6af6d6af8c071f9597bcb6b8d3f8
+Author: Admin <admin@team.com>
+Date:   Tue Jun 9 16:34:27 2026 +0100
+
+    perf: optimize firebase database structure to stay within monthly free bandwidth limit
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index ff3bc01..4b647e2 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -115,7 +115,7 @@ export default async function handler(req, res) {
+                         text: msg ? msg.text : null,
+                         raw: JSON.stringify(update)
+                     };
+-                    await fetch(`${DB_URL}/state/warmupRawLogs/${update.update_id}.json`, {
++                    await fetch(`${DB_URL}/warmupRawLogs/${update.update_id}.json`, {
+                         method: 'PUT',
+                         body: JSON.stringify(logEntry),
+                         headers: { 'Content-Type': 'application/json' }
+@@ -177,11 +177,11 @@ export default async function handler(req, res) {
+         });
+         
+         if (addedCount > 0) {
+-            await saveFirebaseData('state/warmupData', newRecords);
++            await saveFirebaseData('warmupData', newRecords);
+         }
+         
+         // Fetch all warmupData from Firebase to return to client
+-        const allData = await getFirebaseData('state/warmupData') || {};
++        const allData = await getFirebaseData('warmupData') || {};
+         
+         if (addedCount > 0) {
+             try {
+
+commit 3b407e2c2c5daffdc2faa6dd5d0bb10fa049c486
+Author: Admin <admin@team.com>
+Date:   Mon Jun 8 15:22:37 2026 +0100
+
+    fix: route warmup target notifications to Warmup Done topic (thread 91)
+
+diff --git a/api/sync-telegram-warmup.js b/api/sync-telegram-warmup.js
+index dded779..ff3bc01 100644
+--- a/api/sync-telegram-warmup.js
++++ b/api/sync-telegram-warmup.js
+@@ -235,7 +235,7 @@ export default async function handler(req, res) {
+                             headers: { 'Content-Type': 'application/json' },
+                             body: JSON.stringify({
+                                 chat_id: notifChatId,
+-                                message_thread_id: 6,
++                                message_thread_id: 91,
+                                 text: text,
+                                 parse_mode: 'HTML'
+                             })

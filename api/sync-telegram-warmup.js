@@ -1,4 +1,4 @@
-const DB_URL = "https://gestion-team-e-default-rtdb.firebaseio.com";
+const DB_URL = "https://gestion-team-c-01-default-rtdb.firebaseio.com";
 const BOT_TOKEN = "8827415405:AAH-sAnTE7rz_i4XSTFG6tjBX0g0BYPyn6E";
 const UPGRADE_BOT_TOKEN = "8975320309:AAFQmIeTKMbxQMv4c8_UHSczUYYZ9mcJ8FA";
 import { promises as dns } from 'dns';

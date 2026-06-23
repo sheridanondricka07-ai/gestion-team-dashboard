@@ -1,4 +1,4 @@
-const DB_URL = "https://gestion-team-e-default-rtdb.firebaseio.com";
+const DB_URL = "https://gestion-team-c-01-default-rtdb.firebaseio.com";
 
 function extractOfferId(offerStr) {
     if (!offerStr) return '';

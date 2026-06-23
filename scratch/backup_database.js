@@ -1,6 +1,6 @@
 const fs = require('fs');
 
-const DB_URL = "https://gestion-team-e-default-rtdb.firebaseio.com";
+const DB_URL = "https://gestion-team-c-01-default-rtdb.firebaseio.com";
 
 async function backup() {
     console.log("Starting full Firebase Database Backup...");
