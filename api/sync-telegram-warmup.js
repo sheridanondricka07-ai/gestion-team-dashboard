@@ -191,7 +191,13 @@ const STRATEGY = {
 
 function getLevelBand(val) {
     if (val >= 15000 && val <= 19000) return '15000-19000';
-    return val.toString();
+    // Find the closest STRATEGY level that is <= val
+    const levels = [100, 200, 300, 500, 1000, 2000, 4000, 7000, 10000, 21000, 26000, 50000];
+    let best = null;
+    for (const lvl of levels) {
+        if (val >= lvl) best = lvl;
+    }
+    return best ? best.toString() : val.toString();
 }
 
     try {
