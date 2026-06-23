@@ -321,16 +321,10 @@ function getLevelBand(val) {
             const safeIp = (r.ip || 'unknown').replace(/[\.\:\/]/g, '_');
             const statKey = `${cleanDomainName}_${r.server}_${safeIp}`;
             
-            
-                          // PREVENT DOUBLE PROCESSING: Only evaluate if we haven't processed this exact drop before
-                          if (warmupStats[statKey].lastProcessedDropId === latestDrop.messageId) {
-                              return; // Skip evaluation, already processed
-                          }
-                          warmupStats[statKey].lastProcessedDropId = latestDrop.messageId; statsUpdated = true;
-
-                          if (!warmupStats[statKey]) {
-                warmupStats[statKey] = { firstDropTimestamp: r.timestamp, totalDrops: 0 };
-            }
+              if (!warmupStats[statKey]) {
+                  warmupStats[statKey] = { firstDropTimestamp: r.timestamp, totalDrops: 0 };
+                  statsUpdated = true;
+              }
             if (addedCount > 0 && newRecords[r.messageId]) {
                   warmupStats[statKey].totalDrops++;
                   statsUpdated = true;
