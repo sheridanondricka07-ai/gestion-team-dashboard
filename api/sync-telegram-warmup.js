@@ -114,7 +114,7 @@ async function detectAndAddNewRp(domain, ip, serverName) {
 
 async function getFirebaseData(path) {
     try {
-        const resp = await fetch(`${DB_URL}/${path}.json`);
+        const resp = await fetch(`${DB_URL}/${path}.json`, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate', 'Pragma': 'no-cache' }, cache: 'no-store' });
         return await resp.json();
     } catch (e) {
         return null;
@@ -754,7 +754,7 @@ export default async function handler(req, res) {
         if (addedCount > 0 || !isTelegramWebhook) {
             try {
                 // Fetch only the last 2000 records to save bandwidth (~95% reduction)
-                const resp = await fetch(`${DB_URL}/warmupData.json?orderBy="$key"&limitToLast=2000`);
+                const resp = await fetch(`${DB_URL}/warmupData.json?orderBy="$key"&limitToLast=2000`, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate', 'Pragma': 'no-cache' }, cache: 'no-store' });
                 allData = await resp.json() || {};
             } catch (err) {
                 // Fallback to fetching all if query fails
