@@ -7736,6 +7736,8 @@ function renderWarmupProgress(app, container) {
                                 <option value="send_size">send_size</option>
                                 <option value="test_after">test_after</option>
                                 <option value="random">random</option>
+                                <option value="pmta">pmta</option>
+                                <option value="id_news">id_news</option>
                             </select>
                         </div>
                         <div style="display: flex; flex-direction: column; gap: 8px; flex: 1;">
