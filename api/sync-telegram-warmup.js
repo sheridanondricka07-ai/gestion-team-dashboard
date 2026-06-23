@@ -325,7 +325,7 @@ function getLevelBand(val) {
                   warmupStats[statKey] = { firstDropTimestamp: r.timestamp, totalDrops: 0 };
                   statsUpdated = true;
               }
-            if (addedCount > 0 && newRecords[r.messageId]) {
+            if (newRecords && newRecords[r.messageId]) {
                   warmupStats[statKey].totalDrops++;
                   statsUpdated = true;
                   
@@ -379,26 +379,23 @@ function getLevelBand(val) {
 
 
 
-            // Check if 3 last drops succeeded (OUT >= 0.95 * IN)
-            let success = true;
-            for (let i = 0; i < 3; i++) {
-                const r = g.records[i];
-                if (!r.timestamp || r.timestamp < cutoff) {
-                    success = false;
-                    break;
-                }
-                const inVal = parseInt(r.inVal, 10) || 0;
-                const outVal = parseInt(r.outVal, 10) || 0;
-                const latestInVal = parseInt(g.records[0].inVal, 10) || 0;
-
-                if (inVal <= 0 || outVal < inVal * 0.95) {
-                    success = false;
-                    break;
-                }
+            // STRATEGY LOGIC UPGRADE
+            let success = false;
+            let nextTarget = 0;
+            const latestVal = parseInt(g.records[0].inVal, 10) || 0;
+            
+            const cleanDomainStr = (g.domain || g.ip || 'unknown').replace(/[\.\#\$\[\]\/]/g, '_');
+            const safeIpStr = (g.ip || 'unknown').replace(/[\.\:\/]/g, '_');
+            const statKey = `${cleanDomainStr}_${g.server}_${safeIpStr}`;
+            
+            if (warmupStats[statKey]) {
+                const band = warmupStats[statKey].currentBand;
+                const streak = warmupStats[statKey].streak || 0;
+                const strat = STRATEGY[band];
                 
-                if (Math.abs(inVal - latestInVal) > 50) {
-                    success = false;
-                    break;
+                if (strat && streak >= strat.drops) {
+                    success = true;
+                    nextTarget = strat.next;
                 }
             }
 
@@ -473,7 +470,7 @@ function getLevelBand(val) {
 
                         // Send notification report
                         const userName = g.records && g.records[0] ? g.records[0].user : "Unknown";
-                        const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Upgrade", latestVal, nextTarget, userName, "Last 3 drops succeeded (OUT >= 95% of IN).");
+                        const reportText = formatWarmupReport(g.server, g.ip, cleanDomain, "Upgrade", latestVal, nextTarget, userName, "Strategy Target Reached! (Streak: " + warmupStats[statKey].streak + " drops)");
                         
                         fetch(`https://api.telegram.org/bot${UPGRADE_BOT_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: "-5317343683", text: reportText, parse_mode: "HTML" }) }).catch(e => console.error(e));
                     }
@@ -795,7 +792,7 @@ export default async function handler(req, res) {
             if (!warmupStats[statKey]) {
                 warmupStats[statKey] = { firstDropTimestamp: r.timestamp, totalDrops: 0 };
             }
-            if (addedCount > 0 && newRecords[r.messageId]) {
+            if (newRecords && newRecords[r.messageId]) {
                   warmupStats[statKey].totalDrops++;
                   statsUpdated = true;
                   
