@@ -173,6 +173,27 @@ function formatWarmupReport(server, ip, domain, action, beforeSend, afterSend, u
 
 
 async function processAutoWarmup(allData, newRecords) {
+const STRATEGY = {
+    '100': { drops: 7, next: 200 },
+    '200': { drops: 7, next: 300 },
+    '300': { drops: 2, next: 500 },
+    '500': { drops: 13, next: 1000 },
+    '1000': { drops: 7, next: 2000 },
+    '2000': { drops: 9, next: 4000 },
+    '4000': { drops: 7, next: 7000 },
+    '7000': { drops: 7, next: 10000 },
+    '10000': { drops: 5, next: 15000 },
+    '15000-19000': { drops: 25, next: 21000 },
+    '21000': { drops: 2, next: 26000 },
+    '26000': { drops: 3, next: 50000 },
+    '50000': { drops: 1, next: 50000 }
+};
+
+function getLevelBand(val) {
+    if (val >= 15000 && val <= 19000) return '15000-19000';
+    return val.toString();
+}
+
     try {
         const autoNotifiedState = await getFirebaseData('state/autoWarmupNotified') || {};
         const warmupStats = await getFirebaseData('state/warmupStats') || {};
@@ -304,9 +325,28 @@ async function processAutoWarmup(allData, newRecords) {
                 warmupStats[statKey] = { firstDropTimestamp: r.timestamp, totalDrops: 0 };
             }
             if (addedCount > 0 && newRecords[r.messageId]) {
-                warmupStats[statKey].totalDrops++;
-                statsUpdated = true;
-            }
+                  warmupStats[statKey].totalDrops++;
+                  statsUpdated = true;
+                  
+                  // Streak Logic for Upgrades
+                  const inVal = parseInt(r.inVal, 10) || 0;
+                  const outVal = parseInt(r.outVal, 10) || 0;
+                  const isSuccess = inVal > 0 && outVal >= Math.floor(inVal * 0.95);
+                  
+                  const band = getLevelBand(inVal);
+                  
+                  if (!warmupStats[statKey].currentBand || warmupStats[statKey].currentBand !== band) {
+                      warmupStats[statKey].currentBand = band;
+                      warmupStats[statKey].streak = 0; // Reset streak on band change
+                  }
+                  
+                  if (isSuccess) {
+                      warmupStats[statKey].streak++;
+                  } else {
+                      // If fail, we don't reset streak immediately here because the 2-drop downgrade logic 
+                      // handles changing the target. If target changes, streak resets automatically above.
+                  }
+              }
             
             const isDuplicate = grouped[key].records.some(ex => 
                 ex.ip === r.ip &&
@@ -389,9 +429,7 @@ async function processAutoWarmup(allData, newRecords) {
                      }
                  }
 
-                 const latestVal = parseInt(g.records[0].inVal, 10) || 0;
-                 const LEVELS = [50, 100, 200, 300, 500, 760, 1000, 1500, 2000, 3000, 5000, 7000, 8000, 10000, 15000, 19000, 21000, 26000, 30000];
-                 const nextTarget = LEVELS.find(l => l > latestVal) || latestVal;
+                 
                  
                  const cleanDomain = cleanDomainName;
                  const safeDomain = safeDomainName;
@@ -403,7 +441,9 @@ async function processAutoWarmup(allData, newRecords) {
                 }
 
                 if (!autoNotifiedState[safeKey]) {
-                    const acquired = await putFirebaseDataConditional(`state/autoWarmupNotified/${safeKey}`, true, 'null_etag');
+                    warmupStats[statKey].streak = 0; // Reset streak so it doesn't fire multiple times
+                          statsUpdated = true;
+                          const acquired = await putFirebaseDataConditional(`state/autoWarmupNotified/${safeKey}`, true, 'null_etag');
                     if (acquired) {
                         autoNotifiedState[safeKey] = true;
                         const currentServer = servers.find(s => s && s.name === g.server);
@@ -462,16 +502,15 @@ async function processAutoWarmup(allData, newRecords) {
 
                 if (shouldDowngrade) {
                     const latestVal = parseInt(g.records[0].inVal, 10) || 0;
-                    const LEVELS = [50, 100, 200, 300, 500, 760, 1000, 1500, 2000, 3000, 5000, 7000, 8000, 10000, 15000, 19000, 21000, 26000, 30000];
-                    
-                    const currentIdx = LEVELS.indexOf(latestVal);
-                    let prevTarget = latestVal;
-                    if (currentIdx > 0) {
-                        prevTarget = LEVELS[currentIdx - 1];
-                    } else if (currentIdx === -1) {
-                        const found = [...LEVELS].reverse().find(l => l < latestVal);
-                        prevTarget = found || LEVELS[0];
-                    }
+                    const ORDERED_TARGETS = [50, 100, 200, 300, 500, 1000, 2000, 4000, 7000, 10000, 15000, 19000, 21000, 26000, 50000];
+                      const currentIdx = ORDERED_TARGETS.indexOf(latestVal);
+                      let prevTarget = latestVal;
+                      if (currentIdx > 0) {
+                          prevTarget = ORDERED_TARGETS[currentIdx - 1];
+                      } else if (currentIdx === -1) {
+                          const found = [...ORDERED_TARGETS].reverse().find(l => l < latestVal);
+                          prevTarget = found || ORDERED_TARGETS[0];
+                      }
 
                     if (prevTarget < latestVal) {
                         const cleanGDomain = (g.domain || '').toLowerCase().trim();
@@ -482,7 +521,9 @@ async function processAutoWarmup(allData, newRecords) {
                         const safeKey = `${safeDomain}_${g.server}_${safeIp}_down_${prevTarget}`;
 
                         if (!autoNotifiedState[safeKey]) {
-                            const acquired = await putFirebaseDataConditional(`state/autoWarmupNotified/${safeKey}`, Date.now(), 'null_etag');
+                            warmupStats[statKey].streak = 0; // Reset streak so it doesn't fire multiple times
+                          statsUpdated = true;
+                          const acquired = await putFirebaseDataConditional(`state/autoWarmupNotified/${safeKey}`, Date.now(), 'null_etag');
                             if (acquired) {
                                 autoNotifiedState[safeKey] = Date.now();
                                 const currentServer = servers.find(s => s && s.name === g.server);
@@ -521,7 +562,14 @@ async function processAutoWarmup(allData, newRecords) {
             }
         }
 
-        if (Object.keys(newQueueItems).length > 0) {
+        if (statsUpdated) {
+              await fetch(`${DB_URL}/state/warmupStats.json`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(warmupStats)
+              });
+          }
+          if (Object.keys(newQueueItems).length > 0) {
             await saveFirebaseData('state/autoWarmupQueue', newQueueItems);
         }
     } catch (e) {
@@ -749,9 +797,28 @@ export default async function handler(req, res) {
                 warmupStats[statKey] = { firstDropTimestamp: r.timestamp, totalDrops: 0 };
             }
             if (addedCount > 0 && newRecords[r.messageId]) {
-                warmupStats[statKey].totalDrops++;
-                statsUpdated = true;
-            }
+                  warmupStats[statKey].totalDrops++;
+                  statsUpdated = true;
+                  
+                  // Streak Logic for Upgrades
+                  const inVal = parseInt(r.inVal, 10) || 0;
+                  const outVal = parseInt(r.outVal, 10) || 0;
+                  const isSuccess = inVal > 0 && outVal >= Math.floor(inVal * 0.95);
+                  
+                  const band = getLevelBand(inVal);
+                  
+                  if (!warmupStats[statKey].currentBand || warmupStats[statKey].currentBand !== band) {
+                      warmupStats[statKey].currentBand = band;
+                      warmupStats[statKey].streak = 0; // Reset streak on band change
+                  }
+                  
+                  if (isSuccess) {
+                      warmupStats[statKey].streak++;
+                  } else {
+                      // If fail, we don't reset streak immediately here because the 2-drop downgrade logic 
+                      // handles changing the target. If target changes, streak resets automatically above.
+                  }
+              }
             
             const isDuplicate = grouped[key].records.some(ex => 
                 ex.ip === r.ip &&
