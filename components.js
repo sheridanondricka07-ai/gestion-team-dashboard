@@ -7306,7 +7306,7 @@ function renderWarmupProgress(app, container) {
         (async () => {
             try {
                 // Fetch the initial state from Firebase first
-                const snapshot = await window.db.ref('warmupData').once('value');
+                const snapshot = await window.db.ref('warmupData').orderByKey().limitToLast(2000).once('value');
                   app.state.warmupData = snapshot.val() || {};
                   const statsSnapshot = await window.db.ref('state/warmupStats').once('value');
                   app.state.warmupStats = statsSnapshot.val() || {};
@@ -7315,7 +7315,7 @@ function renderWarmupProgress(app, container) {
                 const resp = await fetch('/api/sync-telegram-warmup');
                 const data = await resp.json();
                 if (data.success && data.addedCount > 0) {
-                    const snapshotUpdate = await window.db.ref('warmupData').once('value');
+                    const snapshotUpdate = await window.db.ref('warmupData').orderByKey().limitToLast(2000).once('value');
                       app.state.warmupData = snapshotUpdate.val() || {};
                       const statsSnapshotUpdate = await window.db.ref('state/warmupStats').once('value');
                       app.state.warmupStats = statsSnapshotUpdate.val() || {};
@@ -8069,7 +8069,7 @@ window.fetchTelegramWarmup = async (btn) => {
         const data = await resp.json();
         if (data.success) {
             alert(`Successfully fetched updates! Added ${data.addedCount} new logs. Total: ${data.totalCount}`);
-            const snapshot = await window.db.ref('warmupData').once('value');
+            const snapshot = await window.db.ref('warmupData').orderByKey().limitToLast(2000).once('value');
               window.app.state.warmupData = snapshot.val() || {};
               const statsSnapshotBtn = await window.db.ref('state/warmupStats').once('value');
               window.app.state.warmupStats = statsSnapshotBtn.val() || {};
