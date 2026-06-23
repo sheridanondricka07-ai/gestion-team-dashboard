@@ -175,6 +175,8 @@ function formatWarmupReport(server, ip, domain, action, beforeSend, afterSend, u
 async function processAutoWarmup(allData, newRecords) {
     try {
         const autoNotifiedState = await getFirebaseData('state/autoWarmupNotified') || {};
+        const warmupStats = await getFirebaseData('state/warmupStats') || {};
+        let statsUpdated = false;
         const queueState = await getFirebaseData('state/autoWarmupQueue') || {};
         
         const updatedKeys = new Set();
@@ -292,6 +294,19 @@ async function processAutoWarmup(allData, newRecords) {
 
             const key = `${r.domain || ''}_${r.server || ''}_${r.ip || ''}`;
             if (!grouped[key]) grouped[key] = { ...r, records: [] };
+            
+            // Update stats
+            const cleanDomainName = (r.domain || r.ip || 'unknown').replace(/[\.\#\$\[\]\/]/g, '_');
+            const safeIp = (r.ip || 'unknown').replace(/[\.\:\/]/g, '_');
+            const statKey = `${cleanDomainName}_${r.server}_${safeIp}`;
+            
+            if (!warmupStats[statKey]) {
+                warmupStats[statKey] = { firstDropTimestamp: r.timestamp, totalDrops: 0 };
+            }
+            if (addedCount > 0 && newRecords[r.messageId]) {
+                warmupStats[statKey].totalDrops++;
+                statsUpdated = true;
+            }
             
             const isDuplicate = grouped[key].records.some(ex => 
                 ex.ip === r.ip &&
@@ -724,6 +739,19 @@ export default async function handler(req, res) {
                         if (!r.domain && !r.ip && !r.server) return;
                         const key = `${r.domain || ''}_${r.server || ''}_${r.ip || ''}`;
                         if (!grouped[key]) grouped[key] = { ...r, records: [] };
+            
+            // Update stats
+            const cleanDomainName = (r.domain || r.ip || 'unknown').replace(/[\.\#\$\[\]\/]/g, '_');
+            const safeIp = (r.ip || 'unknown').replace(/[\.\:\/]/g, '_');
+            const statKey = `${cleanDomainName}_${r.server}_${safeIp}`;
+            
+            if (!warmupStats[statKey]) {
+                warmupStats[statKey] = { firstDropTimestamp: r.timestamp, totalDrops: 0 };
+            }
+            if (addedCount > 0 && newRecords[r.messageId]) {
+                warmupStats[statKey].totalDrops++;
+                statsUpdated = true;
+            }
             
             const isDuplicate = grouped[key].records.some(ex => 
                 ex.ip === r.ip &&

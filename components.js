@@ -7307,14 +7307,18 @@ function renderWarmupProgress(app, container) {
             try {
                 // Fetch the initial state from Firebase first
                 const snapshot = await window.db.ref('warmupData').once('value');
-                app.state.warmupData = snapshot.val() || {};
+                  app.state.warmupData = snapshot.val() || {};
+                  const statsSnapshot = await window.db.ref('state/warmupStats').once('value');
+                  app.state.warmupStats = statsSnapshot.val() || {};
                 app.updateDashboard();
 
                 const resp = await fetch('/api/sync-telegram-warmup');
                 const data = await resp.json();
                 if (data.success && data.addedCount > 0) {
                     const snapshotUpdate = await window.db.ref('warmupData').once('value');
-                    app.state.warmupData = snapshotUpdate.val() || {};
+                      app.state.warmupData = snapshotUpdate.val() || {};
+                      const statsSnapshotUpdate = await window.db.ref('state/warmupStats').once('value');
+                      app.state.warmupStats = statsSnapshotUpdate.val() || {};
                     app.updateDashboard();
                 }
             } catch(e) {
@@ -7788,19 +7792,23 @@ function renderWarmupProgress(app, container) {
                                 
                                 // Filter records to only include those matching the current IP
                                 const recordsForCurrentIp = g.records.filter(r => r.ip === latest.ip);
-                                const oldestForIp = recordsForCurrentIp[recordsForCurrentIp.length - 1];
-                                
-                                const last3 = g.records.slice(0, 3).map(r => r.outVal);
-                                const repOut = g.repOut;
-                                const totalOutAllTime = recordsForCurrentIp.reduce((sum, r) => sum + (parseInt(r.outVal) || 0), 0);
-                                
-                                let durationDays = 0;
-                                if (latest && oldestForIp) {
-                                    const msDiff = latest.timestamp - oldestForIp.timestamp;
-                                    durationDays = Math.max(1, Math.ceil(msDiff / (1000 * 60 * 60 * 24)));
-                                }
-                                const startDateStr = oldestForIp ? new Date(oldestForIp.timestamp).toLocaleDateString() : 'Unknown';
-                                const totalDrops = recordsForCurrentIp.length;
+                                let durationDays = 1;
+                                  let startDateStr = 'Unknown';
+                                  let totalDrops = recordsForCurrentIp.length;
+                                  
+                                  const safeDomainName = (g.domain || g.ip || 'unknown').replace(/[\.\#\$\[\]\/]/g, '_');
+                                  const safeIpKey = (g.ip || 'unknown').replace(/[\.\:\/]/g, '_');
+                                  const statKey = `${safeDomainName}_${g.server}_${safeIpKey}`;
+                                  
+                                  if (app.state.warmupStats && app.state.warmupStats[statKey]) {
+                                      const stats = app.state.warmupStats[statKey];
+                                      totalDrops = stats.totalDrops || totalDrops;
+                                      if (stats.firstDropTimestamp) {
+                                          const msDiff = Date.now() - stats.firstDropTimestamp;
+                                          durationDays = Math.max(1, Math.ceil(msDiff / (1000 * 60 * 60 * 24)));
+                                          startDateStr = new Date(stats.firstDropTimestamp).toLocaleDateString();
+                                      }
+                                  }
                                 
                                 const rec = window.getWarmupRecommendation ? window.getWarmupRecommendation(totalOutAllTime, repOut, intel) : null;
                                 let recHtml = '';
@@ -8058,7 +8066,9 @@ window.fetchTelegramWarmup = async (btn) => {
         if (data.success) {
             alert(`Successfully fetched updates! Added ${data.addedCount} new logs. Total: ${data.totalCount}`);
             const snapshot = await window.db.ref('warmupData').once('value');
-            window.app.state.warmupData = snapshot.val() || {};
+              window.app.state.warmupData = snapshot.val() || {};
+              const statsSnapshotBtn = await window.db.ref('state/warmupStats').once('value');
+              window.app.state.warmupStats = statsSnapshotBtn.val() || {};
             window.app.updateDashboard();
         } else {
             alert(`Error: ${data.error || 'Failed to fetch updates.'}`);
