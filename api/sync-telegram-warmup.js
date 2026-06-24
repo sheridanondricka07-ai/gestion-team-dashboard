@@ -331,9 +331,22 @@ function getLevelBand(val) {
                   warmupStats[statKey] = { firstDropTimestamp: r.timestamp, totalDrops: 0 };
                   statsUpdated = true;
               }
-            if (newRecords && newRecords[r.messageId]) {
-                  warmupStats[statKey].totalDrops++;
+              if (!warmupStats[statKey].processedMessages) {
+                  warmupStats[statKey].processedMessages = {};
                   statsUpdated = true;
+              }
+              if (!warmupStats[statKey].processedMessages[r.messageId]) {
+                  warmupStats[statKey].processedMessages[r.messageId] = r.timestamp || Date.now();
+                  warmupStats[statKey].totalDrops = (warmupStats[statKey].totalDrops || 0) + 1;
+                  statsUpdated = true;
+                  
+                  // Prune old processed messages (older than 48 hours) to keep Firebase size small
+                  const fortyEightHoursAgo = Date.now() - (48 * 60 * 60 * 1000);
+                  for (const [mId, ts] of Object.entries(warmupStats[statKey].processedMessages)) {
+                      if (ts < fortyEightHoursAgo) {
+                          delete warmupStats[statKey].processedMessages[mId];
+                      }
+                  }
                   
                   // Streak Logic for Upgrades
                   const inVal = parseInt(r.inVal, 10) || 0;
@@ -348,10 +361,7 @@ function getLevelBand(val) {
                   }
                   
                   if (isSuccess) {
-                      warmupStats[statKey].streak++;
-                  } else {
-                      // If fail, we don't reset streak immediately here because the 2-drop downgrade logic 
-                      // handles changing the target. If target changes, streak resets automatically above.
+                      warmupStats[statKey].streak = (warmupStats[statKey].streak || 0) + 1;
                   }
               }
             
