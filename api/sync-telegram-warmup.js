@@ -184,15 +184,15 @@ const STRATEGY = {
     '7000': { drops: 7, next: 10000 },
     '10000': { drops: 5, next: 15000 },
     '15000-19000': { drops: 25, next: 21000 },
-    '21000': { drops: 2, next: 26000 },
-    '26000': { drops: 3, next: 50000 },
+    '21000': { drops: 2, next: 27000 },
+    '27000': { drops: 3, next: 50000 },
     '50000': { drops: 1, next: 50000 }
 };
 
 function getLevelBand(val) {
     if (val >= 15000 && val <= 19000) return '15000-19000';
     // Find the closest STRATEGY level that is <= val
-    const levels = [100, 200, 300, 500, 1000, 2000, 4000, 7000, 10000, 21000, 26000, 50000];
+    const levels = [100, 200, 300, 500, 1000, 2000, 4000, 7000, 10000, 21000, 27000, 50000];
     let best = null;
     for (const lvl of levels) {
         if (val >= lvl) best = lvl;
@@ -516,7 +516,7 @@ function getLevelBand(val) {
 
                 if (shouldDowngrade) {
                     const latestVal = parseInt(g.records[0].inVal, 10) || 0;
-                    const ORDERED_TARGETS = [50, 100, 200, 300, 500, 1000, 2000, 4000, 7000, 10000, 15000, 19000, 21000, 26000, 50000];
+                    const ORDERED_TARGETS = [50, 100, 200, 300, 500, 1000, 2000, 4000, 7000, 10000, 15000, 19000, 21000, 27000, 50000];
                       const currentIdx = ORDERED_TARGETS.indexOf(latestVal);
                       let prevTarget = latestVal;
                       if (currentIdx > 0) {
@@ -763,18 +763,6 @@ export default async function handler(req, res) {
         if (addedCount > 0) {
             await saveFirebaseData('warmupData', newRecords);
         }
-        // Fetch recent warmupData from Firebase if needed (when new records are added or not in webhook mode)
-        let allData = {};
-        if (addedCount > 0 || !isTelegramWebhook) {
-            try {
-                // Fetch only the last 2000 records to save bandwidth (~95% reduction)
-                const resp = await fetch(`${DB_URL}/warmupData.json?orderBy="$key"&limitToLast=2000`, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate', 'Pragma': 'no-cache' }, cache: 'no-store' });
-                allData = await resp.json() || {};
-            } catch (err) {
-                // Fallback to fetching all if query fails
-                allData = await getFirebaseData('warmupData') || {};
-            }
-        }
         
         if (isTelegramWebhook) {
             // Webhook ONLY saves data to prevent bandwidth exhaustion. 
@@ -783,6 +771,17 @@ export default async function handler(req, res) {
                 success: true, 
                 addedCount 
             });
+        }
+
+        // Fetch recent warmupData from Firebase if needed (when not in webhook mode)
+        let allData = {};
+        try {
+            // Fetch only the last 1000 records to save bandwidth (~97% reduction)
+            const resp = await fetch(`${DB_URL}/warmupData.json?orderBy="$key"&limitToLast=1000`, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate', 'Pragma': 'no-cache' }, cache: 'no-store' });
+            allData = await resp.json() || {};
+        } catch (err) {
+            // Fallback to fetching all if query fails
+            allData = await getFirebaseData('warmupData') || {};
         }
 
         // Run the auto target upgrade checks (always process, passing newRecords if added)

@@ -91,15 +91,28 @@ export default async function handler(req, res) {
         ptrSpfTriggered: false
     };
 
-    // To prevent a 1-minute cron job from executing 60 times an hour, restrict execution to the first 5 minutes of the hour.
-    const isTopOfTheHour = !task && now.getUTCMinutes() < 5;
+    // Prevent duplicate executions by storing and checking task timestamps in Firebase
+    const lastRun = await getFirebaseData('state/cronLastRun') || {};
+    const nowMs = now.getTime();
+    
+    const shouldRunTask = (taskName, intervalMs, scheduleCheck) => {
+        if (task === 'all' || task === taskName) return true;
+        if (task) return false;
+        
+        if (scheduleCheck) {
+            const lastTime = lastRun[taskName] || 0;
+            return (nowMs - lastTime) >= intervalMs;
+        }
+        return false;
+    };
 
-    const runSpamhaus = task === 'all' || task === 'spamhaus' || (isTopOfTheHour && [0, 8, 16].includes(hour));
-    const runVmta = task === 'all' || task === 'vmta' || task === 'rdns' || (isTopOfTheHour && hour % 3 === 0);
-    const runGmail = task === 'all' || task === 'gmail' || (isTopOfTheHour && [12, 18].includes(hour));
-    const runSpf = task === 'all' || task === 'spf' || (isTopOfTheHour && hour === 9);
-    const runGmailStatus = task === 'all' || task === 'gmail-status' || (isTopOfTheHour && hour === 9);
-    const runPtrSpf = task === 'all' || task === 'ptr-spf' || isTopOfTheHour;
+    const runSpamhaus = shouldRunTask('spamhaus', 7 * 60 * 60 * 1000, [0, 8, 16].includes(hour) && now.getUTCMinutes() < 10);
+    const runVmta = shouldRunTask('vmta', 2.5 * 60 * 60 * 1000, (hour % 3 === 0) && now.getUTCMinutes() < 10);
+    const runGmail = shouldRunTask('gmail', 5 * 60 * 60 * 1000, [12, 18].includes(hour) && now.getUTCMinutes() < 10);
+    const runSpf = shouldRunTask('spf', 22 * 60 * 60 * 1000, hour === 9 && now.getUTCMinutes() < 10);
+    const runGmailStatus = shouldRunTask('gmail-status', 22 * 60 * 60 * 1000, hour === 9 && now.getUTCMinutes() < 10);
+    const runPtrSpf = shouldRunTask('ptr-spf', 50 * 60 * 1000, now.getUTCMinutes() < 10);
+    const runWarmup = shouldRunTask('warmup', 4.5 * 60 * 1000, true);
 
     // 1. Trigger Spamhaus Check
     if (runSpamhaus) {
@@ -642,7 +655,37 @@ export default async function handler(req, res) {
         }
     }
 
-    // Telegram Warmup Sync cron trigger removed - no longer needed since queue was replaced with instant execution
+    // 7. Trigger Telegram Warmup Sync / Evaluation (Runs every 5 minutes / when cron runs)
+    if (runWarmup) {
+        console.log('Triggering Telegram Warmup Sync...');
+        try {
+            const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
+            const triggerResp = await fetch(`${baseUrl}/api/sync-telegram-warmup`, {
+                method: 'GET',
+                headers: { 'x-vercel-cron': 'true' }
+            });
+            const triggerData = await triggerResp.json().catch(() => ({}));
+            console.log('Warmup Trigger Response:', triggerData);
+            results.warmupTriggered = true;
+            results.warmupTriggerData = triggerData;
+        } catch (e) {
+            console.error('Warmup Trigger Error:', e);
+        }
+    }
+
+    // Save updated execution timestamps back to Firebase (only for scheduled runs)
+    const updates = {};
+    if (runSpamhaus && !task) updates.spamhaus = nowMs;
+    if (runVmta && !task) updates.vmta = nowMs;
+    if (runGmail && !task) updates.gmail = nowMs;
+    if (runSpf && !task) updates.spf = nowMs;
+    if (runGmailStatus && !task) updates.gmailStatus = nowMs;
+    if (runPtrSpf && !task) updates.ptrSpf = nowMs;
+    if (runWarmup && !task) updates.warmup = nowMs;
+
+    if (Object.keys(updates).length > 0) {
+        await updateFirebaseData('state/cronLastRun', updates);
+    }
 
     return res.status(200).json(results);
 }
