@@ -56,7 +56,8 @@ class TeamApp {
             dropSearch: '',
             spamhausTab: 'grid',
             vmtaResults: {},
-            warmupData: {}
+            warmupData: {},
+            autoUpgradeEnabled: true
         };
         this.expandedServers = new Set();
         this.statusRange = 7;
@@ -797,6 +798,15 @@ class TeamApp {
                     if (progress) {
                         this.state.rpAutoDetectProgress = progress;
                         this.updateDashboard();
+                    }
+                });
+
+                window.db.ref('state/autoUpgradeEnabled').on('value', (snapshot) => {
+                    const enabled = snapshot.val();
+                    if (enabled !== null) {
+                        this.state.autoUpgradeEnabled = enabled;
+                        const el = document.getElementById('auto-upgrade-toggle');
+                        if (el) el.checked = enabled;
                     }
                 });
 
@@ -1608,3 +1618,15 @@ window.resetApp = () => window.app.resetApp();
 window.saveRPIps = (rpId, btn) => window.app.updateRPIps(rpId, Array.from(btn.closest('.modal').querySelectorAll('.ip-pill.selected')).map(el => el.dataset.ip)).then(() => btn.closest('.modal-overlay').remove());
 window.deleteRPInventoryItem = (id) => window.app.deleteRPInventoryItem(id);
 window.updateRPInventoryItem = (id, updates) => window.app.updateRPInventoryItem(id, updates);
+
+window.toggleAutoUpgrade = async (checked) => {
+    window.app.state.autoUpgradeEnabled = checked;
+    if (window.db) {
+        try {
+            await window.db.ref('state/autoUpgradeEnabled').set(checked);
+        } catch (e) {
+            console.error("Failed to save autoUpgradeEnabled to Firebase:", e);
+        }
+    }
+    window.app.updateDashboard();
+};

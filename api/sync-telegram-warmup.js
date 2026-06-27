@@ -201,6 +201,12 @@ function getLevelBand(val) {
 }
 
     try {
+        const autoUpgradeEnabled = await getFirebaseData('state/autoUpgradeEnabled') !== false;
+        if (!autoUpgradeEnabled) {
+            console.log("Auto warmup upgrades are disabled globally.");
+            return;
+        }
+
         const autoNotifiedState = await getFirebaseData('state/autoWarmupNotified') || {};
         const warmupStats = await getFirebaseData('state/warmupStats') || {};
         let statsUpdated = false;

@@ -7764,11 +7764,21 @@ function renderWarmupProgress(app, container) {
                         ${serversList.map(s => `<option value="${s}" ${filterServer === s ? 'selected' : ''}>${s}</option>`).join('')}
                     </select>
                 </div>
-                ${app.state.warmupActiveTab === 'inactive' ? `
-                <button onclick="window.copyInactiveIps()" class="btn-secondary" style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; font-size: 0.8rem; font-weight: 600; border-radius: 8px; border: 1px solid #8b5cf6; color: #8b5cf6; background: rgba(139, 92, 246, 0.05); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#8b5cf6'; this.style.color='#fff';" onmouseout="this.style.background='rgba(139, 92, 246, 0.05)'; this.style.color='#8b5cf6';">
-                    <i data-lucide="copy" style="width: 14px;"></i> Copy Inactive IPs
-                </button>
-                ` : ''}
+                
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Auto Upgrade:</span>
+                        <label class="switch">
+                            <input type="checkbox" id="auto-upgrade-toggle" ${app.state.autoUpgradeEnabled !== false ? 'checked' : ''} onchange="window.toggleAutoUpgrade(this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    ${app.state.warmupActiveTab === 'inactive' ? `
+                    <button onclick="window.copyInactiveIps()" class="btn-secondary" style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; font-size: 0.8rem; font-weight: 600; border-radius: 8px; border: 1px solid #8b5cf6; color: #8b5cf6; background: rgba(139, 92, 246, 0.05); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#8b5cf6'; this.style.color='#fff';" onmouseout="this.style.background='rgba(139, 92, 246, 0.05)'; this.style.color='#8b5cf6';">
+                        <i data-lucide="copy" style="width: 14px;"></i> Copy Inactive IPs
+                    </button>
+                    ` : ''}
+                </div>
             </div>
 
             <!-- Table -->
