@@ -7773,6 +7773,9 @@ function renderWarmupProgress(app, container) {
                             <span class="slider"></span>
                         </label>
                     </div>
+                    <button onclick="window.downloadWarmup24hReport()" class="btn-secondary" style="display: flex; align-items: center; gap: 6px; padding: 8px 12px; font-size: 0.75rem; font-weight: 600; border-radius: 8px; border: 1px solid var(--accent-primary); color: var(--accent-primary); background: transparent; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='var(--accent-primary)'; this.style.color='#fff';" onmouseout="this.style.background='transparent'; this.style.color='var(--accent-primary)';">
+                        <i data-lucide="download" style="width: 14px; height: 14px;"></i> Export 24h CSV
+                    </button>
                     ${app.state.warmupActiveTab === 'inactive' ? `
                     <button onclick="window.copyInactiveIps()" class="btn-secondary" style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; font-size: 0.8rem; font-weight: 600; border-radius: 8px; border: 1px solid #8b5cf6; color: #8b5cf6; background: rgba(139, 92, 246, 0.05); cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='#8b5cf6'; this.style.color='#fff';" onmouseout="this.style.background='rgba(139, 92, 246, 0.05)'; this.style.color='#8b5cf6';">
                         <i data-lucide="copy" style="width: 14px;"></i> Copy Inactive IPs
@@ -7964,11 +7967,14 @@ function renderWarmupProgress(app, container) {
                                             ${recHtml}
                                         </td>
                                         <td style="padding: 14px 12px; color: var(--text-secondary); font-size: 0.7rem;">${timeStr}</td>
-                                        <td style="padding: 14px 12px; text-align: center;">
-                                            <button onclick="deleteWarmupGroup(this)" data-domain="${(g.domain || '').replace(/"/g, '&quot;')}" data-server="${(g.server || '').replace(/"/g, '&quot;')}" title="Delete Group Logs" style="padding: 4px; background:transparent; border:none; color: #ef4444; cursor:pointer;">
-                                                <i data-lucide="trash-2" style="width: 14px; height:14px;"></i>
-                                            </button>
-                                        </td>
+                                        <td style="padding: 14px 12px; text-align: center; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                             <button onclick="window.showEditWarmupModal('${(g.domain || '').replace(/'/g, "\\'")}', '${(g.server || '').replace(/'/g, "\\'")}', '${g.ip || ''}', ${latest ? latest.inVal : 'null'})" title="Edit Warmup Parameters" style="padding: 4px; background:transparent; border:none; color: var(--accent-primary); cursor:pointer;">
+                                                 <i data-lucide="edit-3" style="width: 14px; height:14px;"></i>
+                                             </button>
+                                             <button onclick="deleteWarmupGroup(this)" data-domain="${(g.domain || '').replace(/"/g, '&quot;')}" data-server="${(g.server || '').replace(/"/g, '&quot;')}" title="Delete Group Logs" style="padding: 4px; background:transparent; border:none; color: #ef4444; cursor:pointer;">
+                                                 <i data-lucide="trash-2" style="width: 14px; height:14px;"></i>
+                                             </button>
+                                         </td>
                                     </tr>
                                 `;
                             }).join('')}
@@ -8415,4 +8421,206 @@ window.queueManualCommands = async () => {
     btn.disabled = false;
     btn.innerHTML = '<i data-lucide="zap" style="width: 16px;"></i> Queue Commands to Firebase';
     if (window.lucide) window.lucide.createIcons();
+};
+
+window.showEditWarmupModal = (domain, server, ip, currentSendSize) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.zIndex = '10000';
+    overlay.innerHTML = `
+        <div class="modal" style="max-width: 450px; padding: 28px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: var(--text-primary); font-size: 1.2rem; font-weight: 700;">Edit Warmup Parameters</h3>
+                <button onclick="this.closest('.modal-overlay').remove()" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; padding:4px;">
+                    <i data-lucide="x" style="width: 20px; height: 20px;"></i>
+                </button>
+            </div>
+            
+            <div style="background: var(--bg-tertiary); padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 0.8rem; color: var(--text-secondary);">
+                <div style="margin-bottom: 4px;">🌐 Domain: <b style="color: var(--text-primary);">${domain}</b></div>
+                <div style="margin-bottom: 4px;">🖥 Server: <b style="color: var(--accent-primary);">${server}</b></div>
+                <div>📌 IP: <b style="color: var(--text-primary);">${ip || 'N/A'}</b></div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px;">
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-weight: 600; font-size: 0.8rem; color: var(--text-secondary);">Send Size (send_size)</label>
+                    <input type="number" id="edit-send-size" value="${currentSendSize || ''}" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-tertiary); color: var(--text-primary); outline: none;" placeholder="e.g. 2000" />
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-weight: 600; font-size: 0.8rem; color: var(--text-secondary);">Test After (test_after)</label>
+                    <input type="number" id="edit-test-after" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-tertiary); color: var(--text-primary); outline: none;" placeholder="e.g. 1003" />
+                </div>
+            </div>
+
+            <div id="edit-modal-status" style="margin-bottom: 16px; font-size: 0.8rem; font-weight: 500; text-align: center;"></div>
+
+            <div style="display: flex; gap: 12px;">
+                <button onclick="window.saveWarmupParams('${domain}', '${server}', this)" class="btn-primary" style="flex: 1; padding: 12px; font-weight: 600; display: flex; justify-content: center; align-items: center; gap: 8px;">
+                    <i data-lucide="save" style="width: 16px;"></i> Queue Updates
+                </button>
+                <button onclick="this.closest('.modal-overlay').remove()" class="btn-secondary" style="flex: 1; padding: 12px; background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color);">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    if (window.lucide) window.lucide.createIcons();
+};
+
+window.saveWarmupParams = async (domain, server, btn) => {
+    const modal = btn.closest('.modal');
+    const statusDiv = modal.querySelector('#edit-modal-status');
+    const sendSize = modal.querySelector('#edit-send-size').value.trim();
+    const testAfter = modal.querySelector('#edit-test-after').value.trim();
+
+    if (!sendSize && !testAfter) {
+        statusDiv.innerText = "Please specify at least one value to update.";
+        statusDiv.style.color = "#ef4444";
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="lucide-loader"></i> Sending...';
+
+    const newQueueItems = {};
+    const now = Date.now();
+
+    if (sendSize) {
+        const queueId1 = `q_manual_${now}_send_size`;
+        newQueueItems[queueId1] = {
+            chat_id: "-5317343683",
+            text: `update ${server} send_size for ${domain} to ${sendSize}`,
+            sendAt: now
+        };
+    }
+
+    if (testAfter) {
+        const queueId2 = `q_manual_${now + 1000}_test_after`;
+        newQueueItems[queueId2] = {
+            chat_id: "-5317343683",
+            text: `update ${server} test_after for ${domain} to ${testAfter}`,
+            sendAt: now + 5000 // stagger slightly
+        };
+    }
+
+    try {
+        await window.db.ref('state/autoWarmupQueue').update(newQueueItems);
+        statusDiv.innerText = "Successfully queued updates!";
+        statusDiv.style.color = "#10b981";
+        setTimeout(() => {
+            modal.closest('.modal-overlay').remove();
+        }, 1200);
+    } catch (e) {
+        console.error(e);
+        statusDiv.innerText = "Error pushing to Firebase!";
+        statusDiv.style.color = "#ef4444";
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="save" style="width: 16px;"></i> Queue Updates';
+        if (window.lucide) window.lucide.createIcons();
+    }
+};
+
+window.downloadWarmup24hReport = () => {
+    const rawRecords = Object.values(window.app.state.warmupData || {});
+    
+    // Group records by key
+    const groups = {};
+    rawRecords.forEach(r => {
+        if (!r.domain && !r.ip && !r.server) return;
+        const key = `${r.domain || ''}_${r.server || ''}_${r.ip || ''}`;
+        if (!groups[key]) {
+            groups[key] = {
+                domain: r.domain || r.ip || 'Unknown',
+                ip: r.ip || '',
+                server: r.server || '',
+                records: []
+            };
+        }
+        groups[key].records.push(r);
+    });
+
+    const active24Groups = [];
+    const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
+    
+    Object.values(groups).forEach(g => {
+        g.records.sort((a, b) => b.timestamp - a.timestamp);
+        const latestTimestamp = g.records[0] ? g.records[0].timestamp : 0;
+        if (latestTimestamp >= twentyFourHoursAgo) {
+            active24Groups.push(g);
+        }
+    });
+
+    const STRATEGY = {
+        '100': { drops: 7, next: 200 },
+        '200': { drops: 7, next: 300 },
+        '300': { drops: 2, next: 500 },
+        '500': { drops: 13, next: 1000 },
+        '1000': { drops: 7, next: 2000 },
+        '2000': { drops: 9, next: 4000 },
+        '4000': { drops: 7, next: 7000 },
+        '7000': { drops: 7, next: 10000 },
+        '10000': { drops: 5, next: 15000 },
+        '15000-19000': { drops: 25, next: 21000 },
+        '21000': { drops: 2, next: 27000 },
+        '27000': { drops: 3, next: 50000 },
+        '50000': { drops: 1, next: 50000 }
+    };
+
+    function getLevelBand(val) {
+        if (val >= 15000 && val <= 19000) return '15000-19000';
+        const levels = [100, 200, 300, 500, 1000, 2000, 4000, 7000, 10000, 21000, 27000, 50000];
+        let best = null;
+        for (const lvl of levels) {
+            if (val >= lvl) best = lvl;
+        }
+        return best ? best.toString() : val.toString();
+    }
+
+    let csvContent = "\ufeffIP Address,Domain,Send Size,Succeed (Last 3 Drops >=95% of IN),Next Tier Command\n";
+
+    active24Groups.forEach(g => {
+        const latest = g.records[0];
+        if (!latest) return;
+
+        const ip = g.ip || '---';
+        const domain = g.domain || '---';
+        const sendSize = latest.inVal || 0;
+
+        // Check if last 3 drops succeeded (outVal >= inVal * 0.95)
+        let succeed = "NO";
+        if (g.records.length >= 3) {
+            let allSucceeded = true;
+            for (let i = 0; i < 3; i++) {
+                const r = g.records[i];
+                const rIn = parseInt(r.inVal, 10) || 0;
+                const rOut = parseInt(r.outVal, 10) || 0;
+                if (rIn <= 0 || rOut < rIn * 0.95) {
+                    allSucceeded = false;
+                    break;
+                }
+            }
+            if (allSucceeded) succeed = "YES";
+        }
+
+        let nextCommand = "";
+        if (succeed === "YES") {
+            const band = getLevelBand(sendSize);
+            const nextTierVal = STRATEGY[band] ? STRATEGY[band].next : sendSize;
+            nextCommand = `update ${g.server} send_size for ${domain} to ${nextTierVal}`;
+        }
+
+        csvContent += `"${ip}","${domain}",${sendSize},"${succeed}","${nextCommand}"\n`;
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `warmup_report_24h_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 };
