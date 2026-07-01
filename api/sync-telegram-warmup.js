@@ -705,6 +705,18 @@ export default async function handler(req, res) {
             // Fetch only the last 1000 records to save bandwidth (~97% reduction)
             const resp = await fetch(`${DB_URL}/warmupData.json?orderBy="$key"&limitToLast=1000`, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate', 'Pragma': 'no-cache' }, cache: 'no-store' });
             allData = await resp.json() || {};
+            
+            // Prune old records older than 5 days to save storage space
+            const fiveDaysAgo = Date.now() - (5 * 24 * 60 * 60 * 1000);
+            const oldRecordsResp = await fetch(`${DB_URL}/warmupData.json?orderBy="timestamp"&endAt=${fiveDaysAgo}`, { headers: { 'Cache-Control': 'no-store' } });
+            const oldRecords = await oldRecordsResp.json();
+            if (oldRecords && typeof oldRecords === 'object' && Object.keys(oldRecords).length > 0) {
+                const deletePromises = Object.keys(oldRecords).map(key => 
+                    fetch(`${DB_URL}/warmupData/${key}.json`, { method: 'DELETE' })
+                );
+                await Promise.all(deletePromises);
+                console.log(`Pruned ${deletePromises.length} old records from Firebase to save storage.`);
+            }
         } catch (err) {
             // Fallback to fetching all if query fails
             allData = await getFirebaseData('warmupData') || {};
