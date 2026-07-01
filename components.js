@@ -8610,10 +8610,12 @@ window.downloadWarmup24hReport = () => {
         if (succeed === "YES") {
             const band = getLevelBand(sendSize);
             const nextTierVal = STRATEGY[band] ? STRATEGY[band].next : sendSize;
-            nextCommand = `update ${g.server} send_size for ${domain} to ${nextTierVal}`;
+            
+            const targetIdentifier = (domain.toLowerCase() === '[rdns]' || domain.toLowerCase() === 'rdns' || !domain || domain === '---') ? ip : domain;
+            nextCommand = `update ${g.server} send_size for ${targetIdentifier} to ${nextTierVal}`;
             
             const testAfterVal = Math.round((nextTierVal / 2) + 3);
-            nextTestCommand = `update ${g.server} test_after for ${domain} to ${testAfterVal}`;
+            nextTestCommand = `update ${g.server} test_after for ${targetIdentifier} to ${testAfterVal}`;
         }
 
         csvContent += `"${ip}","${domain}","${user}",${sendSize},"${succeed}","${nextCommand}","${nextTestCommand}"\n`;
