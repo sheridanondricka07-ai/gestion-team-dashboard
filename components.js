@@ -8578,7 +8578,7 @@ window.downloadWarmup24hReport = () => {
         return best ? best.toString() : val.toString();
     }
 
-    let csvContent = "\ufeffIP Address,Domain,User,Send Size,Succeed (Last 3 Drops >=95% of IN),Next Tier Command\n";
+    let csvContent = "\ufeffIP Address,Domain,User,Send Size,Succeed (Last 3 Drops >=95% of IN),Next Tier Command,Test After Command\n";
 
     active24Groups.forEach(g => {
         const latest = g.records[0];
@@ -8606,13 +8606,17 @@ window.downloadWarmup24hReport = () => {
         }
 
         let nextCommand = "";
+        let nextTestCommand = "";
         if (succeed === "YES") {
             const band = getLevelBand(sendSize);
             const nextTierVal = STRATEGY[band] ? STRATEGY[band].next : sendSize;
             nextCommand = `update ${g.server} send_size for ${domain} to ${nextTierVal}`;
+            
+            const testAfterVal = Math.round((nextTierVal / 2) + 3);
+            nextTestCommand = `update ${g.server} test_after for ${domain} to ${testAfterVal}`;
         }
 
-        csvContent += `"${ip}","${domain}","${user}",${sendSize},"${succeed}","${nextCommand}"\n`;
+        csvContent += `"${ip}","${domain}","${user}",${sendSize},"${succeed}","${nextCommand}","${nextTestCommand}"\n`;
     });
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
