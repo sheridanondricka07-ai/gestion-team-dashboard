@@ -7839,6 +7839,28 @@ function renderWarmupProgress(app, container) {
                     <div id="mc-status" style="margin-top: 8px; font-size: 0.85rem; font-weight: 500; text-align: center;"></div>
                 </div>
             </div>
+            ` : app.state.warmupActiveTab === 'inactiveServers' ? `
+            <div class="card" style="padding: 24px; max-width: 800px; margin: 0 auto; margin-bottom: 24px; text-align: left;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                    <h3 style="margin: 0; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                        <i data-lucide="server-off" style="width: 18px; color: #ef4444;"></i> Inactive Servers Last 12 Hours
+                    </h3>
+                    ${inactive12ServersList.length > 0 ? `
+                    <button onclick="window.copyInactiveServers(this)" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-secondary); font-size: 0.75rem; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='var(--bg-tertiary)'" onmouseout="this.style.background='var(--bg-secondary)'">
+                        <i data-lucide="copy" style="width: 14px; height: 14px;"></i> Copy Servers List
+                    </button>` : ''}
+                </div>
+                <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 24px;">
+                    These servers are registered in your database but have had <strong>no warmup activity (drops)</strong> logged in the last 12 hours.
+                </p>
+                ${inactive12ServersList.length > 0 ? `
+                <div style="max-height: 250px; overflow-y: auto; padding: 16px; background: rgba(239, 68, 68, 0.03); border: 1px solid rgba(239, 68, 68, 0.1); border-radius: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start;">
+                    ${inactive12ServersList.map(s => `<span style="font-size: 0.72rem; font-family: monospace; background: var(--bg-tertiary); color: var(--text-primary); padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border-color);">${s}</span>`).join('')}
+                </div>` : `
+                <div style="font-size: 0.85rem; color: #10b981; font-weight: 500; display: flex; align-items: center; gap: 8px; padding: 16px; background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.15); border-radius: 8px;">
+                    <i data-lucide="check-circle" style="width:16px; height:16px;"></i> All registered servers are currently active!
+                </div>`}
+            </div>
             ` : `
 <!-- Filters -->
             <div class="card" style="padding: 16px; margin-bottom: 24px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between;">
