@@ -8094,7 +8094,11 @@ window.updateWarmupMinSize = (val) => {
     window.app.updateDashboard();
     setTimeout(() => {
         const input = document.getElementById('warmup-min-size-input');
-        if (input) input.focus();
+        if (input) {
+            input.focus();
+            const len = input.value.length;
+            input.setSelectionRange(len, len);
+        }
     }, 0);
 };
 
@@ -8103,7 +8107,11 @@ window.updateWarmupMaxSize = (val) => {
     window.app.updateDashboard();
     setTimeout(() => {
         const input = document.getElementById('warmup-max-size-input');
-        if (input) input.focus();
+        if (input) {
+            input.focus();
+            const len = input.value.length;
+            input.setSelectionRange(len, len);
+        }
     }, 0);
 };
 
