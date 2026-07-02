@@ -7775,9 +7775,9 @@ function renderWarmupProgress(app, container) {
                 <div style="display: flex; align-items: center; gap: 16px;">
                     <div style="display: flex; align-items: center; gap: 6px;">
                         <i data-lucide="bar-chart-2" style="width: 14px; height: 14px; color: var(--text-secondary);"></i>
-                        <input type="number" id="warmup-min-size-input" value="${app.state.warmupMinSize || ''}" placeholder="Min" min="0" step="100" style="width: 76px; padding: 7px 8px; font-size: 0.78rem; border-radius: 8px 0 0 8px; border: 1px solid var(--border-color); border-right: none; background: var(--bg-tertiary); color: var(--text-primary); outline: none; caret-color: var(--accent-primary);" oninput="window.updateWarmupMinSize(this.value)" title="Min send size">
+                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="warmup-min-size-input" value="${app.state.warmupMinSize || ''}" placeholder="Min" style="width: 76px; padding: 7px 8px; font-size: 0.78rem; border-radius: 8px 0 0 8px; border: 1px solid var(--border-color); border-right: none; background: var(--bg-tertiary); color: var(--text-primary); outline: none; caret-color: var(--accent-primary);" oninput="window.updateWarmupMinSize(this.value)" title="Min send size">
                         <span style="padding: 0 4px; font-size: 0.75rem; color: var(--text-secondary); background: var(--bg-tertiary); border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); height: 32px; display: flex; align-items: center;">→</span>
-                        <input type="number" id="warmup-max-size-input" value="${app.state.warmupMaxSize || ''}" placeholder="Max" min="0" step="100" style="width: 76px; padding: 7px 8px; font-size: 0.78rem; border-radius: 0 8px 8px 0; border: 1px solid var(--border-color); border-left: none; background: var(--bg-tertiary); color: var(--text-primary); outline: none; caret-color: var(--accent-primary);" oninput="window.updateWarmupMaxSize(this.value)" title="Max send size">
+                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="warmup-max-size-input" value="${app.state.warmupMaxSize || ''}" placeholder="Max" style="width: 76px; padding: 7px 8px; font-size: 0.78rem; border-radius: 0 8px 8px 0; border: 1px solid var(--border-color); border-left: none; background: var(--bg-tertiary); color: var(--text-primary); outline: none; caret-color: var(--accent-primary);" oninput="window.updateWarmupMaxSize(this.value)" title="Max send size">
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Auto Upgrade:</span>
@@ -8090,7 +8090,8 @@ window.updateWarmupServerFilter = (val) => {
 };
 
 window.updateWarmupMinSize = (val) => {
-    window.app.state.warmupMinSize = val;
+    const clean = val.replace(/[^0-9]/g, '');
+    window.app.state.warmupMinSize = clean;
     window.app.updateDashboard();
     setTimeout(() => {
         const input = document.getElementById('warmup-min-size-input');
@@ -8103,7 +8104,8 @@ window.updateWarmupMinSize = (val) => {
 };
 
 window.updateWarmupMaxSize = (val) => {
-    window.app.state.warmupMaxSize = val;
+    const clean = val.replace(/[^0-9]/g, '');
+    window.app.state.warmupMaxSize = clean;
     window.app.updateDashboard();
     setTimeout(() => {
         const input = document.getElementById('warmup-max-size-input');
