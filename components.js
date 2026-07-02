@@ -7697,7 +7697,7 @@ function renderWarmupProgress(app, container) {
 
             <!-- Summary Cards -->
             <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 24px;">
-                <div class="card" style="padding: 16px 20px; display: flex; align-items: center; justify-content: space-around; gap: 20px; flex-wrap: wrap;">
+                <div class="card" style="padding: 16px 20px; display: flex; align-items: center; justify-content: flex-start; gap: 48px; flex-wrap: wrap;">
                     <div style="display: flex; align-items: center; gap: 12px;">
                         <div style="background: rgba(59, 130, 246, 0.1); width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #3b82f6;">
                             <i data-lucide="globe" style="width: 18px; height: 18px;"></i>
