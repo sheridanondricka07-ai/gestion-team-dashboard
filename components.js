@@ -7770,28 +7770,6 @@ function renderWarmupProgress(app, container) {
                 </div>
             </div>
 
-            <!-- Inactive Servers (Last 12h) Card -->
-            <div class="card" style="padding: 16px 20px; margin-bottom: 24px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
-                    <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; display: flex; align-items: center; gap: 6px;">
-                        <i data-lucide="server-off" style="width: 13px; height: 13px; color: #ef4444;"></i>
-                        Inactive Servers Last 12 Hours &mdash; <span style="color: #ef4444; font-weight: 700;">${inactive12ServersList.length}</span> servers
-                    </div>
-                    ${inactive12ServersList.length > 0 ? `
-                    <button onclick="window.copyInactiveServers(this)" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-secondary); font-size: 0.7rem; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='var(--bg-tertiary)'" onmouseout="this.style.background='var(--bg-secondary)'">
-                        <i data-lucide="copy" style="width: 12px; height: 12px;"></i> Copy Servers List
-                    </button>` : ''}
-                </div>
-                ${inactive12ServersList.length > 0 ? `
-                <div style="max-height: 80px; overflow-y: auto; padding: 10px; background: rgba(239, 68, 68, 0.03); border: 1px solid rgba(239, 68, 68, 0.1); border-radius: 8px; display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start;">
-                    ${inactive12ServersList.map(s => `<span style="font-size: 0.68rem; font-family: monospace; background: var(--bg-tertiary); color: var(--text-primary); padding: 3px 6px; border-radius: 4px; border: 1px solid var(--border-color);">${s}</span>`).join('')}
-                </div>` : `
-                <div style="font-size: 0.72rem; color: #10b981; font-weight: 500; display: flex; align-items: center; gap: 6px;">
-                    <i data-lucide="check-circle" style="width:13px; height:13px;"></i> All registered servers are currently active!
-                </div>`}
-            </div>
-
-
             <!-- Tabs -->
             <div style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 0;">
                 <div onclick="window.app.state.warmupActiveTab = 'active12'; window.app.updateDashboard();" style="padding: 10px 16px; cursor: pointer; font-weight: 600; font-size: 0.85rem; border-bottom: 2px solid ${app.state.warmupActiveTab === 'active12' ? 'var(--accent-primary)' : 'transparent'}; color: ${app.state.warmupActiveTab === 'active12' ? 'var(--accent-primary)' : 'var(--text-secondary)'}; transition: all 0.2s;">
@@ -7809,12 +7787,15 @@ function renderWarmupProgress(app, container) {
                 <div onclick="window.app.state.warmupActiveTab = 'archived'; window.app.updateDashboard();" style="padding: 10px 16px; cursor: pointer; font-weight: 600; font-size: 0.85rem; border-bottom: 2px solid ${app.state.warmupActiveTab === 'archived' ? 'var(--accent-primary)' : 'transparent'}; color: ${app.state.warmupActiveTab === 'archived' ? 'var(--accent-primary)' : 'var(--text-secondary)'}; transition: all 0.2s;">
                     Archived (Sent) <span style="background: ${app.state.warmupActiveTab === 'archived' ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-tertiary)'}; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; margin-left: 6px;">${totalArchived}</span>
                 </div>
+                <div onclick="window.app.state.warmupActiveTab = 'inactiveServers'; window.app.updateDashboard();" style="padding: 10px 16px; cursor: pointer; font-weight: 600; font-size: 0.85rem; border-bottom: 2px solid ${app.state.warmupActiveTab === 'inactiveServers' ? 'var(--accent-primary)' : 'transparent'}; color: ${app.state.warmupActiveTab === 'inactiveServers' ? 'var(--accent-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 6px;">
+                    <i data-lucide="server-off" style="width: 14px; height: 14px; color: ${app.state.warmupActiveTab === 'inactiveServers' ? '#ef4444' : 'var(--text-secondary)'};"></i> Inactive Servers (12h) <span style="background: ${app.state.warmupActiveTab === 'inactiveServers' ? 'rgba(239, 68, 68, 0.1)' : 'var(--bg-tertiary)'}; color: ${app.state.warmupActiveTab === 'inactiveServers' ? '#ef4444' : 'var(--text-secondary)'}; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; margin-left: 6px;">${inactive12ServersList.length}</span>
+                </div>
                 <div onclick="window.app.state.warmupActiveTab = 'remote'; window.app.updateDashboard();" style="padding: 10px 16px; cursor: pointer; font-weight: 600; font-size: 0.85rem; border-bottom: 2px solid ${app.state.warmupActiveTab === 'remote' ? 'var(--accent-primary)' : 'transparent'}; color: ${app.state.warmupActiveTab === 'remote' ? 'var(--accent-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 6px;">
                     <i data-lucide="terminal" style="width: 14px; height: 14px;"></i> Remote Controller
                 </div>
             </div>
 
-                        ${app.state.warmupActiveTab === 'remote' ? `
+            ${app.state.warmupActiveTab === 'remote' ? `
             <div class="card" style="padding: 24px; max-width: 800px; margin: 0 auto; margin-bottom: 24px; text-align: left;">
                 <h3 style="margin-bottom: 16px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
                     <i data-lucide="terminal" style="width: 18px;"></i> Dispatch Remote Commands
@@ -8096,7 +8077,7 @@ function renderWarmupProgress(app, container) {
                     </table>
                 </div>
             </div>
-              `}
+            `}
         </div>
     `;
 }
