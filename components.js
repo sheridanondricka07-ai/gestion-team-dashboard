@@ -7672,6 +7672,36 @@ function renderWarmupProgress(app, container) {
         });
     };
 
+    // Inactive IPs (Last 12 hours) calculation
+    const allIpsSet = new Set();
+    (app.state.servers || []).forEach(s => {
+        if (s.ip) allIpsSet.add(s.ip.trim());
+        if (s.mainIp) allIpsSet.add(s.mainIp.trim());
+        (s.allIps || []).forEach(ip => {
+            if (ip) allIpsSet.add(ip.trim());
+        });
+    });
+    const allRegisteredIps = Array.from(allIpsSet).filter(ip => ip && ip !== '---');
+    const active12Ips = new Set(active12Groups.map(g => g.ip).filter(ip => ip && ip !== '---'));
+    const inactive12IpsList = allRegisteredIps.filter(ip => !active12Ips.has(ip)).sort();
+    window._inactive12IpsList = inactive12IpsList;
+
+    window.copyInactive12Ips = (btn) => {
+        const text = window._inactive12IpsList.join('\n');
+        navigator.clipboard.writeText(text).then(() => {
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i data-lucide="check" style="width:12px; height:12px;"></i> Copied!';
+            btn.style.borderColor = '#10b981';
+            btn.style.color = '#10b981';
+            setTimeout(() => {
+                btn.innerHTML = orig;
+                btn.style.borderColor = 'var(--border-color)';
+                btn.style.color = 'var(--text-secondary)';
+                if (window.lucide) window.lucide.createIcons();
+            }, 2000);
+        });
+    };
+
     container.innerHTML = `
         <div style="padding: 24px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
@@ -7790,6 +7820,9 @@ function renderWarmupProgress(app, container) {
                 <div onclick="window.app.state.warmupActiveTab = 'inactiveServers'; window.app.updateDashboard();" style="padding: 10px 16px; cursor: pointer; font-weight: 600; font-size: 0.85rem; border-bottom: 2px solid ${app.state.warmupActiveTab === 'inactiveServers' ? 'var(--accent-primary)' : 'transparent'}; color: ${app.state.warmupActiveTab === 'inactiveServers' ? 'var(--accent-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 6px;">
                     <i data-lucide="server-off" style="width: 14px; height: 14px; color: ${app.state.warmupActiveTab === 'inactiveServers' ? '#ef4444' : 'var(--text-secondary)'};"></i> Inactive Servers (12h) <span style="background: ${app.state.warmupActiveTab === 'inactiveServers' ? 'rgba(239, 68, 68, 0.1)' : 'var(--bg-tertiary)'}; color: ${app.state.warmupActiveTab === 'inactiveServers' ? '#ef4444' : 'var(--text-secondary)'}; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; margin-left: 6px;">${inactive12ServersList.length}</span>
                 </div>
+                <div onclick="window.app.state.warmupActiveTab = 'inactiveIps12h'; window.app.updateDashboard();" style="padding: 10px 16px; cursor: pointer; font-weight: 600; font-size: 0.85rem; border-bottom: 2px solid ${app.state.warmupActiveTab === 'inactiveIps12h' ? 'var(--accent-primary)' : 'transparent'}; color: ${app.state.warmupActiveTab === 'inactiveIps12h' ? 'var(--accent-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 6px;">
+                    <i data-lucide="shield-alert" style="width: 14px; height: 14px; color: ${app.state.warmupActiveTab === 'inactiveIps12h' ? '#ef4444' : 'var(--text-secondary)'};"></i> Inactive IPs (12h) <span style="background: ${app.state.warmupActiveTab === 'inactiveIps12h' ? 'rgba(239, 68, 68, 0.1)' : 'var(--bg-tertiary)'}; color: ${app.state.warmupActiveTab === 'inactiveIps12h' ? '#ef4444' : 'var(--text-secondary)'}; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; margin-left: 6px;">${inactive12IpsList.length}</span>
+                </div>
                 <div onclick="window.app.state.warmupActiveTab = 'remote'; window.app.updateDashboard();" style="padding: 10px 16px; cursor: pointer; font-weight: 600; font-size: 0.85rem; border-bottom: 2px solid ${app.state.warmupActiveTab === 'remote' ? 'var(--accent-primary)' : 'transparent'}; color: ${app.state.warmupActiveTab === 'remote' ? 'var(--accent-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 6px;">
                     <i data-lucide="terminal" style="width: 14px; height: 14px;"></i> Remote Controller
                 </div>
@@ -7859,6 +7892,28 @@ function renderWarmupProgress(app, container) {
                 </div>` : `
                 <div style="font-size: 0.85rem; color: #10b981; font-weight: 500; display: flex; align-items: center; gap: 8px; padding: 16px; background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.15); border-radius: 8px;">
                     <i data-lucide="check-circle" style="width:16px; height:16px;"></i> All registered servers are currently active!
+                </div>`}
+            </div>
+            ` : app.state.warmupActiveTab === 'inactiveIps12h' ? `
+            <div class="card" style="padding: 24px; max-width: 800px; margin: 0 auto; margin-bottom: 24px; text-align: left;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                    <h3 style="margin: 0; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                        <i data-lucide="shield-alert" style="width: 18px; color: #ef4444;"></i> Inactive IPs Last 12 Hours
+                    </h3>
+                    ${inactive12IpsList.length > 0 ? `
+                    <button onclick="window.copyInactive12Ips(this)" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-secondary); font-size: 0.75rem; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='var(--bg-tertiary)'" onmouseout="this.style.background='var(--bg-secondary)'">
+                        <i data-lucide="copy" style="width: 14px; height: 14px;"></i> Copy IPs List
+                    </button>` : ''}
+                </div>
+                <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 24px;">
+                    These IP addresses are registered in your database but have had <strong>no warmup activity (drops)</strong> logged in the last 12 hours.
+                </p>
+                ${inactive12IpsList.length > 0 ? `
+                <div style="max-height: 250px; overflow-y: auto; padding: 16px; background: rgba(239, 68, 68, 0.03); border: 1px solid rgba(239, 68, 68, 0.1); border-radius: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start;">
+                    ${inactive12IpsList.map(ip => `<span style="font-size: 0.72rem; font-family: monospace; background: var(--bg-tertiary); color: var(--text-primary); padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border-color);">${ip}</span>`).join('')}
+                </div>` : `
+                <div style="font-size: 0.85rem; color: #10b981; font-weight: 500; display: flex; align-items: center; gap: 8px; padding: 16px; background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.15); border-radius: 8px;">
+                    <i data-lucide="check-circle" style="width:16px; height:16px;"></i> All registered IPs are currently active!
                 </div>`}
             </div>
             ` : `
