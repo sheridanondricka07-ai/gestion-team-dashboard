@@ -7615,6 +7615,24 @@ function renderWarmupProgress(app, container) {
     });
     const ipClassesCount = classSet.size;
 
+    // Send Size Tier distribution (based on latest inVal per active24 group)
+    const sizeTiers = [
+        { label: '0 – 2K',     min: 0,     max: 2000,  color: '#64748b', bg: 'rgba(100,116,139,0.08)', border: 'rgba(100,116,139,0.25)' },
+        { label: '2K – 5K',   min: 2001,  max: 5000,  color: '#3b82f6', bg: 'rgba(59,130,246,0.08)',  border: 'rgba(59,130,246,0.25)' },
+        { label: '5K – 7.5K', min: 5001,  max: 7500,  color: '#06b6d4', bg: 'rgba(6,182,212,0.08)',   border: 'rgba(6,182,212,0.25)' },
+        { label: '7.5K – 10K',min: 7501,  max: 10000, color: '#10b981', bg: 'rgba(16,185,129,0.08)',  border: 'rgba(16,185,129,0.25)' },
+        { label: '10K – 15K', min: 10001, max: 15000, color: '#84cc16', bg: 'rgba(132,204,22,0.08)',  border: 'rgba(132,204,22,0.25)' },
+        { label: '15K – 20.5K',min:15001, max: 20500, color: '#f59e0b', bg: 'rgba(245,158,11,0.08)',  border: 'rgba(245,158,11,0.25)' },
+        { label: '20.5K – 25.5K',min:20501,max:25500, color: '#f97316', bg: 'rgba(249,115,22,0.08)', border: 'rgba(249,115,22,0.25)' },
+        { label: '25.5K+',    min: 25501, max: null,  color: '#ef4444', bg: 'rgba(239,68,68,0.08)',   border: 'rgba(239,68,68,0.25)' },
+    ];
+    sizeTiers.forEach(t => {
+        t.count = active24Groups.filter(g => {
+            const v = parseInt(g.records[0] && g.records[0].inVal, 10) || 0;
+            return v >= t.min && (t.max === null || v <= t.max);
+        }).length;
+    });
+
     const serversList = Array.from(new Set(rawRecords.map(r => r.server).filter(s => s)));
 
     const intel = window.computeWarmupIntelligence ? window.computeWarmupIntelligence() : null;
@@ -7688,6 +7706,24 @@ function renderWarmupProgress(app, container) {
                             <span style="font-weight: 700; color: #06b6d4; font-size: 1rem;">${ipClassesCount}</span>
                             <span style="font-size: 0.65rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">IP Classes</span>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Send Size Tier Distribution -->
+            <div class="card" style="padding: 16px 20px; margin-bottom: 24px;">
+                <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; display: flex; align-items: center; gap: 6px; margin-bottom: 10px;">
+                    <i data-lucide="layers" style="width: 13px; height: 13px; color: var(--accent-primary);"></i>
+                    Send Size Distribution (active 24h IPs) &mdash; click a tier to filter
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    ${sizeTiers.map(t => `
+                    <div onclick="window.app.state.warmupMinSize=String(${t.min}); window.app.state.warmupMaxSize=${t.max !== null ? "'" + t.max + "'" : "''"}; window.app.updateDashboard();" title="${t.label}: ${t.count} IPs — click to filter" style="display:flex; align-items:center; gap:6px; background:${t.bg}; border:1px solid ${t.border}; padding:6px 12px; border-radius:8px; cursor:pointer; transition:opacity 0.15s;" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">
+                        <span style="font-weight:700; color:${t.color}; font-size:1rem;">${t.count}</span>
+                        <span style="font-size:0.62rem; font-weight:600; color:var(--text-secondary); text-transform:uppercase; white-space:nowrap;">${t.label}</span>
+                    </div>`).join('')}
+                    <div onclick="window.app.state.warmupMinSize=''; window.app.state.warmupMaxSize=''; window.app.updateDashboard();" title="Clear size filter" style="display:flex; align-items:center; gap:4px; padding:6px 10px; border-radius:8px; border:1px dashed var(--border-color); background:transparent; cursor:pointer; font-size:0.7rem; color:var(--text-secondary); transition:opacity 0.15s;" onmouseover="this.style.opacity='0.6'" onmouseout="this.style.opacity='1'">
+                        <i data-lucide="x" style="width:11px; height:11px;"></i> Clear
                     </div>
                 </div>
             </div>
