@@ -7492,6 +7492,100 @@ function renderWarmupProgress(app, container) {
     if (app.state.warmupActiveTab === 'inactive') currentGroups = inactiveGroups;
     if (app.state.warmupActiveTab === 'highvol') currentGroups = highVolGroups;
 
+    // === Classify active24 groups (must run BEFORE filteredGroups so g.groupType is set) ===
+    let countRdns = 0;
+    let countSwitch = 0;
+    let countRpIntern = 0;
+    let countRpExtern = 0;
+
+    active24Groups.forEach(g => {
+        const latest = g.records[0];
+        const latestClean = latest && latest.domain ? latest.domain.trim().toLowerCase() : '';
+        const isRdns = latest ? (!latest.domain || latestClean === '[rdns]' || latestClean === 'rdns') : false;
+        
+        if (isRdns) {
+            countRdns++;
+            g.groupType = 'rdns';
+            return;
+        }
+
+        let isSwitch = false;
+        const srv = app.state.servers.find(s => s.name && s.name.toLowerCase() === (g.server || '').toLowerCase());
+        if (srv && g.domain && g.ip) {
+            const ipRdns = getRdns(g.ip, app.state);
+            const domainMatches = (d1, d2) => {
+                if (!d1 || !d2) return false;
+                const clean = d => d.trim().toLowerCase().replace(/\.$/, '');
+                const c1 = clean(d1);
+                const c2 = clean(d2);
+                return c1 === c2 || c1.endsWith('.' + c2) || c2.endsWith('.' + c1);
+            };
+            const domainIsIpRdns = domainMatches(g.domain, ipRdns);
+            if (!domainIsIpRdns) {
+                const otherIps = srv.allIps || [];
+                for (const otherIp of otherIps) {
+                    if (otherIp !== g.ip) {
+                        const otherRdns = getRdns(otherIp, app.state);
+                        if (domainMatches(g.domain, otherRdns)) {
+                            isSwitch = true;
+                            break;
+                         }
+                    }
+                }
+            }
+        }
+
+        if (isSwitch) {
+            countSwitch++;
+            g.groupType = 'switch';
+            return;
+        }
+
+        const invEntry = rpInventory.find(item => item.rpDomain && item.rpDomain.trim().toLowerCase() === g.domain.trim().toLowerCase());
+        let rpType = '';
+        if (invEntry) {
+            rpType = (invEntry.rpType || '').toLowerCase().trim();
+            if (!rpType) {
+                const domInc = (invEntry.domainIncluded || '').toLowerCase().trim();
+                const rpDom = (invEntry.rpDomain || '').toLowerCase().trim();
+                if (domInc && rpDom) {
+                    rpType = (domInc === rpDom) ? 'intern' : 'extern';
+                }
+            }
+        }
+        
+        if (!rpType && g.domain && g.domain !== '---' && g.domain.toLowerCase() !== 'unknown') {
+            const domainLower = g.domain.trim().toLowerCase();
+            const cached = window._spfCache && window._spfCache[domainLower];
+            if (cached && cached.found) {
+                rpType = cached.rpType;
+            }
+        }
+
+        if (rpType === 'intern') {
+            countRpIntern++;
+            g.groupType = 'rp_intern';
+        } else if (rpType === 'extern') {
+            countRpExtern++;
+            g.groupType = 'rp_extern';
+        } else {
+            g.groupType = 'other';
+        }
+    });
+
+    const classSet = new Set();
+    active24Groups.forEach(g => {
+        const ip = (g.ip || '').trim();
+        if (ip && ip !== '---') {
+            const parts = ip.split('.');
+            if (parts.length === 4) {
+                classSet.add(`${parts[0]}.${parts[1]}.${parts[2]}`);
+            }
+        }
+    });
+    const ipClassesCount = classSet.size;
+    // ============================================================
+
     const minSizeFilter = parseInt(app.state.warmupMinSize, 10);
     const maxSizeFilter = parseInt(app.state.warmupMaxSize, 10);
     const typeFilter = app.state.warmupTypeFilter || 'all';
@@ -7612,17 +7706,17 @@ function renderWarmupProgress(app, container) {
         }
     });
 
-    const classSet = new Set();
+    const classSet_old = new Set();
     active24Groups.forEach(g => {
         const ip = (g.ip || '').trim();
         if (ip && ip !== '---') {
             const parts = ip.split('.');
             if (parts.length === 4) {
-                classSet.add(`${parts[0]}.${parts[1]}.${parts[2]}`);
+                classSet_old.add(`${parts[0]}.${parts[1]}.${parts[2]}`);
             }
         }
     });
-    const ipClassesCount = classSet.size;
+    // ipClassesCount already computed above before filteredGroups
 
     // Send Size Tier distribution (based on latest inVal per active24 group)
     const sizeTiers = [
@@ -7715,6 +7809,10 @@ function renderWarmupProgress(app, container) {
                             <span style="font-weight: 700; color: #06b6d4; font-size: 1rem;">${ipClassesCount}</span>
                             <span style="font-size: 0.65rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">IP Classes</span>
                         </div>
+                        ${app.state.warmupTypeFilter !== 'all' ? `
+                        <div onclick="window.app.state.warmupTypeFilter='all'; window.app.updateDashboard();" style="display:flex; align-items:center; gap:4px; padding:6px 10px; border-radius:8px; border:1px dashed #ef4444; background:rgba(239,68,68,0.05); cursor:pointer; font-size:0.7rem; color:#ef4444; transition:opacity 0.15s;" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'" title="Clear type filter">
+                            <i data-lucide="x" style="width:11px; height:11px;"></i> Clear Filter
+                        </div>` : ''}
                     </div>
                 </div>
             </div>
