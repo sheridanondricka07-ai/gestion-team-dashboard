@@ -7300,6 +7300,7 @@ function renderWarmupProgress(app, container) {
     if (app.state.warmupSearch === undefined) app.state.warmupSearch = '';
     if (app.state.warmupFilterServer === undefined) app.state.warmupFilterServer = 'all';
     if (app.state.warmupMinSize === undefined) app.state.warmupMinSize = '';
+    if (app.state.warmupMaxSize === undefined) app.state.warmupMaxSize = '';
 
     // Trigger background fetch once per view switch to keep it fresh automatically
     if (!window._hasFetchedWarmupThisSession) {
@@ -7490,7 +7491,8 @@ function renderWarmupProgress(app, container) {
     if (app.state.warmupActiveTab === 'inactive') currentGroups = inactiveGroups;
     if (app.state.warmupActiveTab === 'highvol') currentGroups = highVolGroups;
 
-    const minSizeFilter = parseInt(app.state.warmupMinSize, 10) || 0;
+    const minSizeFilter = parseInt(app.state.warmupMinSize, 10);
+    const maxSizeFilter = parseInt(app.state.warmupMaxSize, 10);
     const filteredGroups = currentGroups.filter(g => {
         const latestUser = (g.records[0] && g.records[0].user) || '';
         const matchSearch = g.domain.toLowerCase().includes(search) || 
@@ -7499,8 +7501,9 @@ function renderWarmupProgress(app, container) {
                             latestUser.toLowerCase().includes(search);
         const matchServer = filterServer === 'all' || g.server === filterServer;
         const latestSendSize = parseInt(g.records[0] && g.records[0].inVal, 10) || 0;
-        const matchMinSize = minSizeFilter === 0 || latestSendSize >= minSizeFilter;
-        return matchSearch && matchServer && matchMinSize;
+        const matchMinSize = isNaN(minSizeFilter) || minSizeFilter === 0 ? true : latestSendSize >= minSizeFilter;
+        const matchMaxSize = isNaN(maxSizeFilter) || maxSizeFilter === 0 ? true : latestSendSize <= maxSizeFilter;
+        return matchSearch && matchServer && matchMinSize && matchMaxSize;
     });
 
     filteredGroups.forEach(g => {
@@ -7772,7 +7775,9 @@ function renderWarmupProgress(app, container) {
                 <div style="display: flex; align-items: center; gap: 16px;">
                     <div style="display: flex; align-items: center; gap: 6px;">
                         <i data-lucide="bar-chart-2" style="width: 14px; height: 14px; color: var(--text-secondary);"></i>
-                        <input type="number" id="warmup-min-size-input" value="${app.state.warmupMinSize || ''}" placeholder="Min Size" min="0" step="100" style="width: 100px; padding: 7px 10px; font-size: 0.78rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-tertiary); color: var(--text-primary); outline: none; caret-color: var(--accent-primary);" oninput="window.updateWarmupMinSize(this.value)" title="Filter by minimum send size">
+                        <input type="number" id="warmup-min-size-input" value="${app.state.warmupMinSize || ''}" placeholder="Min" min="0" step="100" style="width: 76px; padding: 7px 8px; font-size: 0.78rem; border-radius: 8px 0 0 8px; border: 1px solid var(--border-color); border-right: none; background: var(--bg-tertiary); color: var(--text-primary); outline: none; caret-color: var(--accent-primary);" oninput="window.updateWarmupMinSize(this.value)" title="Min send size">
+                        <span style="padding: 0 4px; font-size: 0.75rem; color: var(--text-secondary); background: var(--bg-tertiary); border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); height: 32px; display: flex; align-items: center;">→</span>
+                        <input type="number" id="warmup-max-size-input" value="${app.state.warmupMaxSize || ''}" placeholder="Max" min="0" step="100" style="width: 76px; padding: 7px 8px; font-size: 0.78rem; border-radius: 0 8px 8px 0; border: 1px solid var(--border-color); border-left: none; background: var(--bg-tertiary); color: var(--text-primary); outline: none; caret-color: var(--accent-primary);" oninput="window.updateWarmupMaxSize(this.value)" title="Max send size">
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Auto Upgrade:</span>
@@ -8087,9 +8092,17 @@ window.updateWarmupServerFilter = (val) => {
 window.updateWarmupMinSize = (val) => {
     window.app.state.warmupMinSize = val;
     window.app.updateDashboard();
-    // Retain focus after re-render
     setTimeout(() => {
         const input = document.getElementById('warmup-min-size-input');
+        if (input) input.focus();
+    }, 0);
+};
+
+window.updateWarmupMaxSize = (val) => {
+    window.app.state.warmupMaxSize = val;
+    window.app.updateDashboard();
+    setTimeout(() => {
+        const input = document.getElementById('warmup-max-size-input');
         if (input) input.focus();
     }, 0);
 };
