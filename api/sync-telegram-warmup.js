@@ -612,27 +612,6 @@ export default async function handler(req, res) {
             if (update && update.update_id) {
                 results = [update];
                 isTelegramWebhook = true;
-                
-                // Write debug log of raw payload
-                  try {
-                    const msg = update.message || update.edited_message || update.channel_post;
-                    const logEntry = {
-                        timestamp: Date.now(),
-                        update_id: update.update_id,
-                        chat_id: msg && msg.chat ? msg.chat.id : null,
-                        chat_title: msg && msg.chat ? msg.chat.title : null,
-                        from: msg && msg.from ? (msg.from.username || msg.from.first_name) : null,
-                        text: msg ? msg.text : null,
-                        raw: JSON.stringify(update)
-                    };
-                    await fetch(`${DB_URL}/warmupRawLogs/${update.update_id}.json`, {
-                        method: 'PUT',
-                        body: JSON.stringify(logEntry),
-                        headers: { 'Content-Type': 'application/json' }
-                    });
-                } catch (e) {
-                    console.error("Failed to write raw debug log:", e);
-                }
             } else if (update && update.text) {
                 // Direct POST of message text from external script
                 const fakeMessageId = "ext_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
