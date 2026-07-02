@@ -8089,32 +8089,30 @@ window.updateWarmupServerFilter = (val) => {
     window.app.updateDashboard();
 };
 
+let _warmupMinSizeTimer = null;
 window.updateWarmupMinSize = (val) => {
     const clean = val.replace(/[^0-9]/g, '');
+    // Update the visible input value directly without re-render
+    const input = document.getElementById('warmup-min-size-input');
+    if (input && input.value !== clean) input.value = clean;
     window.app.state.warmupMinSize = clean;
-    window.app.updateDashboard();
-    setTimeout(() => {
-        const input = document.getElementById('warmup-min-size-input');
-        if (input) {
-            input.focus();
-            const len = input.value.length;
-            input.setSelectionRange(len, len);
-        }
-    }, 0);
+    // Debounce: only re-render 400ms after user stops typing
+    clearTimeout(_warmupMinSizeTimer);
+    _warmupMinSizeTimer = setTimeout(() => {
+        window.app.updateDashboard();
+    }, 400);
 };
 
+let _warmupMaxSizeTimer = null;
 window.updateWarmupMaxSize = (val) => {
     const clean = val.replace(/[^0-9]/g, '');
+    const input = document.getElementById('warmup-max-size-input');
+    if (input && input.value !== clean) input.value = clean;
     window.app.state.warmupMaxSize = clean;
-    window.app.updateDashboard();
-    setTimeout(() => {
-        const input = document.getElementById('warmup-max-size-input');
-        if (input) {
-            input.focus();
-            const len = input.value.length;
-            input.setSelectionRange(len, len);
-        }
-    }, 0);
+    clearTimeout(_warmupMaxSizeTimer);
+    _warmupMaxSizeTimer = setTimeout(() => {
+        window.app.updateDashboard();
+    }, 400);
 };
 
 window.fetchTelegramWarmup = async (btn) => {
