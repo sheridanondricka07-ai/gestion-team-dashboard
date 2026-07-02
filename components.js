@@ -7650,6 +7650,28 @@ function renderWarmupProgress(app, container) {
 
     const intel = window.computeWarmupIntelligence ? window.computeWarmupIntelligence() : null;
 
+    // Inactive Servers (Last 12 hours) calculation
+    const active12Servers = new Set(active12Groups.map(g => g.server).filter(s => s));
+    const allServerNames = Array.from(new Set((app.state.servers || []).map(s => s.name).filter(s => s)));
+    const inactive12ServersList = allServerNames.filter(s => !active12Servers.has(s)).sort();
+    window._inactive12ServersList = inactive12ServersList;
+
+    window.copyInactiveServers = (btn) => {
+        const text = window._inactive12ServersList.join('\n');
+        navigator.clipboard.writeText(text).then(() => {
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i data-lucide="check" style="width:12px; height:12px;"></i> Copied!';
+            btn.style.borderColor = '#10b981';
+            btn.style.color = '#10b981';
+            setTimeout(() => {
+                btn.innerHTML = orig;
+                btn.style.borderColor = 'var(--border-color)';
+                btn.style.color = 'var(--text-secondary)';
+                if (window.lucide) window.lucide.createIcons();
+            }, 2000);
+        });
+    };
+
     container.innerHTML = `
         <div style="padding: 24px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
@@ -7747,6 +7769,28 @@ function renderWarmupProgress(app, container) {
                     </div>
                 </div>
             </div>
+
+            <!-- Inactive Servers (Last 12h) Card -->
+            <div class="card" style="padding: 16px 20px; margin-bottom: 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+                    <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                        <i data-lucide="server-off" style="width: 13px; height: 13px; color: #ef4444;"></i>
+                        Inactive Servers Last 12 Hours &mdash; <span style="color: #ef4444; font-weight: 700;">${inactive12ServersList.length}</span> servers
+                    </div>
+                    ${inactive12ServersList.length > 0 ? `
+                    <button onclick="window.copyInactiveServers(this)" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-secondary); font-size: 0.7rem; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='var(--bg-tertiary)'" onmouseout="this.style.background='var(--bg-secondary)'">
+                        <i data-lucide="copy" style="width: 12px; height: 12px;"></i> Copy Servers List
+                    </button>` : ''}
+                </div>
+                ${inactive12ServersList.length > 0 ? `
+                <div style="max-height: 80px; overflow-y: auto; padding: 10px; background: rgba(239, 68, 68, 0.03); border: 1px solid rgba(239, 68, 68, 0.1); border-radius: 8px; display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start;">
+                    ${inactive12ServersList.map(s => `<span style="font-size: 0.68rem; font-family: monospace; background: var(--bg-tertiary); color: var(--text-primary); padding: 3px 6px; border-radius: 4px; border: 1px solid var(--border-color);">${s}</span>`).join('')}
+                </div>` : `
+                <div style="font-size: 0.72rem; color: #10b981; font-weight: 500; display: flex; align-items: center; gap: 6px;">
+                    <i data-lucide="check-circle" style="width:13px; height:13px;"></i> All registered servers are currently active!
+                </div>`}
+            </div>
+
 
             <!-- Tabs -->
             <div style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 0;">
