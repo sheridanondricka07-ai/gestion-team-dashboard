@@ -8092,11 +8092,15 @@ window.updateWarmupServerFilter = (val) => {
 let _warmupMinSizeTimer = null;
 window.updateWarmupMinSize = (val) => {
     const clean = val.replace(/[^0-9]/g, '');
-    // Update the visible input value directly without re-render
     const input = document.getElementById('warmup-min-size-input');
-    if (input && input.value !== clean) input.value = clean;
+    if (input && input.value !== clean) {
+        // Save cursor position, adjust for stripped chars, then restore
+        const cursorPos = (input.selectionStart || 0) - (val.length - clean.length);
+        input.value = clean;
+        const safePos = Math.max(0, Math.min(cursorPos, clean.length));
+        input.setSelectionRange(safePos, safePos);
+    }
     window.app.state.warmupMinSize = clean;
-    // Debounce: only re-render 400ms after user stops typing
     clearTimeout(_warmupMinSizeTimer);
     _warmupMinSizeTimer = setTimeout(() => {
         window.app.updateDashboard();
@@ -8107,7 +8111,12 @@ let _warmupMaxSizeTimer = null;
 window.updateWarmupMaxSize = (val) => {
     const clean = val.replace(/[^0-9]/g, '');
     const input = document.getElementById('warmup-max-size-input');
-    if (input && input.value !== clean) input.value = clean;
+    if (input && input.value !== clean) {
+        const cursorPos = (input.selectionStart || 0) - (val.length - clean.length);
+        input.value = clean;
+        const safePos = Math.max(0, Math.min(cursorPos, clean.length));
+        input.setSelectionRange(safePos, safePos);
+    }
     window.app.state.warmupMaxSize = clean;
     clearTimeout(_warmupMaxSizeTimer);
     _warmupMaxSizeTimer = setTimeout(() => {
