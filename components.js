@@ -7675,22 +7675,25 @@ function renderWarmupProgress(app, container) {
 
             <!-- Summary Cards -->
             <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 24px;">
-                <div class="card" style="padding: 20px; display: flex; align-items: center; gap: 16px;">
-                    <div style="background: rgba(59, 130, 246, 0.1); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #3b82f6;">
-                        <i data-lucide="globe" style="width: 24px; height: 24px;"></i>
+                <div class="card" style="padding: 16px 20px; display: flex; align-items: center; justify-content: space-around; gap: 20px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="background: rgba(59, 130, 246, 0.1); width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #3b82f6;">
+                            <i data-lucide="globe" style="width: 18px; height: 18px;"></i>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; white-space: nowrap;">Tracked Domains</div>
+                            <div style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-top: 2px;">${totalDomains}</div>
+                        </div>
                     </div>
-                    <div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Tracked Domains</div>
-                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin-top: 4px;">${totalDomains}</div>
-                    </div>
-                </div>
-                <div class="card" style="padding: 20px; display: flex; align-items: center; gap: 16px;">
-                    <div style="background: rgba(16, 185, 129, 0.1); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #10b981;">
-                        <i data-lucide="bar-chart-2" style="width: 24px; height: 24px;"></i>
-                    </div>
-                    <div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Total Sent (OUT) Last 24 Hours</div>
-                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin-top: 4px;">${totalSent24h.toLocaleString()}</div>
+                    <div style="height: 30px; width: 1px; background: var(--border-color); display: inline-block;"></div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="background: rgba(16, 185, 129, 0.1); width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #10b981;">
+                            <i data-lucide="bar-chart-2" style="width: 18px; height: 18px;"></i>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; white-space: nowrap;">Total Sent (OUT) Last 24h</div>
+                            <div style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-top: 2px;">${totalSent24h.toLocaleString()}</div>
+                        </div>
                     </div>
                 </div>
                 <div class="card" style="padding: 20px; display: flex; flex-direction: column; justify-content: center; gap: 10px;">
