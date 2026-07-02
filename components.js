@@ -7301,6 +7301,7 @@ function renderWarmupProgress(app, container) {
     if (app.state.warmupFilterServer === undefined) app.state.warmupFilterServer = 'all';
     if (app.state.warmupMinSize === undefined) app.state.warmupMinSize = '';
     if (app.state.warmupMaxSize === undefined) app.state.warmupMaxSize = '';
+    if (app.state.warmupTypeFilter === undefined) app.state.warmupTypeFilter = 'all';
 
     // Trigger background fetch once per view switch to keep it fresh automatically
     if (!window._hasFetchedWarmupThisSession) {
@@ -7493,6 +7494,7 @@ function renderWarmupProgress(app, container) {
 
     const minSizeFilter = parseInt(app.state.warmupMinSize, 10);
     const maxSizeFilter = parseInt(app.state.warmupMaxSize, 10);
+    const typeFilter = app.state.warmupTypeFilter || 'all';
     const filteredGroups = currentGroups.filter(g => {
         const latestUser = (g.records[0] && g.records[0].user) || '';
         const matchSearch = g.domain.toLowerCase().includes(search) || 
@@ -7503,7 +7505,8 @@ function renderWarmupProgress(app, container) {
         const latestSendSize = parseInt(g.records[0] && g.records[0].inVal, 10) || 0;
         const matchMinSize = isNaN(minSizeFilter) || minSizeFilter === 0 ? true : latestSendSize >= minSizeFilter;
         const matchMaxSize = isNaN(maxSizeFilter) || maxSizeFilter === 0 ? true : latestSendSize <= maxSizeFilter;
-        return matchSearch && matchServer && matchMinSize && matchMaxSize;
+        const matchType = typeFilter === 'all' || g.groupType === typeFilter;
+        return matchSearch && matchServer && matchMinSize && matchMaxSize && matchType;
     });
 
     filteredGroups.forEach(g => {
@@ -7541,6 +7544,7 @@ function renderWarmupProgress(app, container) {
         
         if (isRdns) {
             countRdns++;
+            g.groupType = 'rdns';
             return;
         }
 
@@ -7572,6 +7576,7 @@ function renderWarmupProgress(app, container) {
 
         if (isSwitch) {
             countSwitch++;
+            g.groupType = 'switch';
             return;
         }
 
@@ -7598,8 +7603,12 @@ function renderWarmupProgress(app, container) {
 
         if (rpType === 'intern') {
             countRpIntern++;
+            g.groupType = 'rp_intern';
         } else if (rpType === 'extern') {
             countRpExtern++;
+            g.groupType = 'rp_extern';
+        } else {
+            g.groupType = 'other';
         }
     });
 
@@ -7686,23 +7695,23 @@ function renderWarmupProgress(app, container) {
                         Last 24 Hours Distribution
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                        <div style="display: flex; align-items: center; gap: 6px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); padding: 6px 10px; border-radius: 8px;" title="RDNS (No domain in Telegram log, resolved via IP PTR)">
+                        <div onclick="window.app.state.warmupTypeFilter = window.app.state.warmupTypeFilter === 'rdns' ? 'all' : 'rdns'; window.app.updateDashboard();" style="display: flex; align-items: center; gap: 6px; background: rgba(59, 130, 246, 0.08); border: 2px solid ${app.state.warmupTypeFilter === 'rdns' ? '#3b82f6' : 'rgba(59, 130, 246, 0.2)'}; padding: 6px 10px; border-radius: 8px; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.opacity='0.75'" onmouseout="this.style.opacity='1'" title="RDNS — click to filter">
                             <span style="font-weight: 700; color: #3b82f6; font-size: 1rem;">${countRdns}</span>
                             <span style="font-size: 0.65rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">RDNS</span>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 6px; background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.2); padding: 6px 10px; border-radius: 8px;" title="Switch (Domain is the RDNS of another IP on same server)">
+                        <div onclick="window.app.state.warmupTypeFilter = window.app.state.warmupTypeFilter === 'switch' ? 'all' : 'switch'; window.app.updateDashboard();" style="display: flex; align-items: center; gap: 6px; background: rgba(139, 92, 246, 0.08); border: 2px solid ${app.state.warmupTypeFilter === 'switch' ? '#8b5cf6' : 'rgba(139, 92, 246, 0.2)'}; padding: 6px 10px; border-radius: 8px; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.opacity='0.75'" onmouseout="this.style.opacity='1'" title="Switch — click to filter">
                             <span style="font-weight: 700; color: #8b5cf6; font-size: 1rem;">${countSwitch}</span>
                             <span style="font-size: 0.65rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Switch</span>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 6px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); padding: 6px 10px; border-radius: 8px;" title="RP Intern (IP directly in SPF)">
+                        <div onclick="window.app.state.warmupTypeFilter = window.app.state.warmupTypeFilter === 'rp_intern' ? 'all' : 'rp_intern'; window.app.updateDashboard();" style="display: flex; align-items: center; gap: 6px; background: rgba(16, 185, 129, 0.08); border: 2px solid ${app.state.warmupTypeFilter === 'rp_intern' ? '#10b981' : 'rgba(16, 185, 129, 0.2)'}; padding: 6px 10px; border-radius: 8px; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.opacity='0.75'" onmouseout="this.style.opacity='1'" title="RP Intern — click to filter">
                             <span style="font-weight: 700; color: #10b981; font-size: 1rem;">${countRpIntern}</span>
                             <span style="font-size: 0.65rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">RP Intern</span>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 6px; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.2); padding: 6px 10px; border-radius: 8px;" title="RP Extern (IP included via SPF domain)">
+                        <div onclick="window.app.state.warmupTypeFilter = window.app.state.warmupTypeFilter === 'rp_extern' ? 'all' : 'rp_extern'; window.app.updateDashboard();" style="display: flex; align-items: center; gap: 6px; background: rgba(245, 158, 11, 0.08); border: 2px solid ${app.state.warmupTypeFilter === 'rp_extern' ? '#f59e0b' : 'rgba(245, 158, 11, 0.2)'}; padding: 6px 10px; border-radius: 8px; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.opacity='0.75'" onmouseout="this.style.opacity='1'" title="RP Extern — click to filter">
                             <span style="font-weight: 700; color: #f59e0b; font-size: 1rem;">${countRpExtern}</span>
                             <span style="font-size: 0.65rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">RP Extern</span>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 6px; background: rgba(6, 182, 212, 0.08); border: 1px solid rgba(6, 182, 212, 0.2); padding: 6px 10px; border-radius: 8px;" title="Unique Class C IP Subnets (first 3 octets A.B.C.*)">
+                        <div style="display: flex; align-items: center; gap: 6px; background: rgba(6, 182, 212, 0.08); border: 2px solid rgba(6, 182, 212, 0.2); padding: 6px 10px; border-radius: 8px;" title="Unique Class C IP Subnets (first 3 octets A.B.C.*)">
                             <span style="font-weight: 700; color: #06b6d4; font-size: 1rem;">${ipClassesCount}</span>
                             <span style="font-size: 0.65rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">IP Classes</span>
                         </div>
