@@ -8119,9 +8119,12 @@ window.deleteWarmupGroup = async (btn) => {
 };
 
 window.clearAllWarmupData = async () => {
-    if (!confirm("Are you sure you want to reset all Warmup Progress data? This cannot be undone.")) return;
+    if (!confirm("Are you sure you want to reset all Warmup Progress data, stats, and historical logs? This cannot be undone.")) return;
     await window.db.ref('warmupData').set(null);
+    await window.db.ref('state/warmupStats').set(null);
+    await window.db.ref('warmupRawLogs').set(null);
     window.app.state.warmupData = {};
+    window.app.state.warmupStats = {};
     window.app.updateDashboard();
 };
 
