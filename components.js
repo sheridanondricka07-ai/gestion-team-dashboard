@@ -7299,6 +7299,7 @@ function parseMessageText(text) {
 function renderWarmupProgress(app, container) {
     if (app.state.warmupSearch === undefined) app.state.warmupSearch = '';
     if (app.state.warmupFilterServer === undefined) app.state.warmupFilterServer = 'all';
+    if (app.state.warmupMinSize === undefined) app.state.warmupMinSize = '';
 
     // Trigger background fetch once per view switch to keep it fresh automatically
     if (!window._hasFetchedWarmupThisSession) {
@@ -7489,6 +7490,7 @@ function renderWarmupProgress(app, container) {
     if (app.state.warmupActiveTab === 'inactive') currentGroups = inactiveGroups;
     if (app.state.warmupActiveTab === 'highvol') currentGroups = highVolGroups;
 
+    const minSizeFilter = parseInt(app.state.warmupMinSize, 10) || 0;
     const filteredGroups = currentGroups.filter(g => {
         const latestUser = (g.records[0] && g.records[0].user) || '';
         const matchSearch = g.domain.toLowerCase().includes(search) || 
@@ -7496,7 +7498,9 @@ function renderWarmupProgress(app, container) {
                             (g.ip || '').includes(search) ||
                             latestUser.toLowerCase().includes(search);
         const matchServer = filterServer === 'all' || g.server === filterServer;
-        return matchSearch && matchServer;
+        const latestSendSize = parseInt(g.records[0] && g.records[0].inVal, 10) || 0;
+        const matchMinSize = minSizeFilter === 0 || latestSendSize >= minSizeFilter;
+        return matchSearch && matchServer && matchMinSize;
     });
 
     filteredGroups.forEach(g => {
@@ -7766,6 +7770,10 @@ function renderWarmupProgress(app, container) {
                 </div>
                 
                 <div style="display: flex; align-items: center; gap: 16px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <i data-lucide="bar-chart-2" style="width: 14px; height: 14px; color: var(--text-secondary);"></i>
+                        <input type="number" id="warmup-min-size-input" value="${app.state.warmupMinSize || ''}" placeholder="Min Size" min="0" step="100" style="width: 100px; padding: 7px 10px; font-size: 0.78rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-tertiary); color: var(--text-primary); outline: none; caret-color: var(--accent-primary);" oninput="window.updateWarmupMinSize(this.value)" title="Filter by minimum send size">
+                    </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Auto Upgrade:</span>
                         <label class="switch">
@@ -8074,6 +8082,16 @@ window.updateWarmupSearch = (val) => {
 window.updateWarmupServerFilter = (val) => {
     window.app.state.warmupFilterServer = val;
     window.app.updateDashboard();
+};
+
+window.updateWarmupMinSize = (val) => {
+    window.app.state.warmupMinSize = val;
+    window.app.updateDashboard();
+    // Retain focus after re-render
+    setTimeout(() => {
+        const input = document.getElementById('warmup-min-size-input');
+        if (input) input.focus();
+    }, 0);
 };
 
 window.fetchTelegramWarmup = async (btn) => {
