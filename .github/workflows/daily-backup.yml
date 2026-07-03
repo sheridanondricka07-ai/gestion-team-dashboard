@@ -1,0 +1,51 @@
+name: Daily Firebase Database Backup
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Every day at 00:00 UTC
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+permissions:
+  contents: write
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Fetch Firebase Backup
+        run: |
+          echo "Starting Firebase Database Backup..."
+          # Define Firebase DB URL
+          DB_URL="https://gestion-team-c-01-default-rtdb.firebaseio.com"
+          
+          # Fetch nodes separately to avoid timeouts
+          curl -s -f "$DB_URL/state.json" -o state.json
+          curl -s -f "$DB_URL/warmupData.json" -o warmupData.json
+          curl -s -f "$DB_URL/warmupNotified.json" -o warmupNotified.json
+          
+          # Combine fetched nodes into a single JSON file
+          node -e '
+            const fs = require("fs");
+            const backup = {
+              state: JSON.parse(fs.readFileSync("state.json", "utf8") || "null"),
+              warmupData: JSON.parse(fs.readFileSync("warmupData.json", "utf8") || "null"),
+              warmupNotified: JSON.parse(fs.readFileSync("warmupNotified.json", "utf8") || "null")
+            };
+            fs.writeFileSync("database_backup.json", JSON.stringify(backup, null, 2));
+          '
+          
+          # Clean up temp files
+          rm state.json warmupData.json warmupNotified.json
+          echo "Backup generated successfully in database_backup.json"
+
+      - name: Commit and Push Backup
+        run: |
+          git config --global user.name "GitHub Action Bot"
+          git config --global user.email "actions@github.com"
+          git add database_backup.json
+          # Commit only if there are changes to prevent action failures
+          git diff-index --quiet HEAD || git commit -m "chore: Automatic daily Firebase database backup [skip ci]"
+          git push origin main
