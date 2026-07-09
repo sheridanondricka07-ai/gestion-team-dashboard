@@ -1349,6 +1349,58 @@ class TeamApp {
             }
         });
 
+        // 4. Auto-detect server mailer assignments from warmupData
+        if (this.state.warmupData && Object.keys(this.state.warmupData).length > 0) {
+            const serverToUser = {};
+            const serverToTime = {};
+            
+            Object.values(this.state.warmupData).forEach(record => {
+                if (record && record.server && record.user && record.timestamp) {
+                    const srvName = record.server.trim();
+                    const userName = record.user.trim().toLowerCase();
+                    const ts = record.timestamp;
+                    
+                    if (!serverToTime[srvName] || ts > serverToTime[srvName]) {
+                        serverToTime[srvName] = ts;
+                        serverToUser[srvName] = userName;
+                    }
+                }
+            });
+            
+            const userToMailerMap = {
+                'h.nfissi': 'm1778074450399',  // Houssam Nfissi
+                'h.ghazali': 'm_1780418291424', // Hiba Ghazzali
+                'a.zegaf': 'm_1780417772662',    // Aya Zeggaf
+                'i.mjotti': 'm_1780418364251',   // Imane Mjoti
+                'reda': 'm_1781528343216',        // Reda
+                'm.zaryouh': 'admin',            // Mohamed Reda ZARYOUH
+                'i.boustani': 'm_1778003745570'  // Ismail BOUSTANI
+            };
+            
+            this.state.servers.forEach(srv => {
+                const detectedUser = serverToUser[srv.name];
+                if (detectedUser && userToMailerMap[detectedUser]) {
+                    const targetMailerId = userToMailerMap[detectedUser];
+                    if (srv.mailerId !== targetMailerId) {
+                        console.log(`Auto-assigning server ${srv.name} to mailer ID ${targetMailerId} (User: ${detectedUser})`);
+                        srv.mailerId = targetMailerId;
+                        stateChanged = true;
+                    }
+                }
+            });
+        }
+
+        // 5. Keep RPs mailerId in sync with their server's mailerId
+        this.state.rps.forEach(rp => {
+            if (rp.serverId) {
+                const srv = (this.state.servers || []).find(s => s.id === rp.serverId);
+                if (srv && rp.mailerId !== srv.mailerId) {
+                    rp.mailerId = srv.mailerId;
+                    stateChanged = true;
+                }
+            }
+        });
+
         return stateChanged;
     }
 
