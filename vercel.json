@@ -24,6 +24,9 @@
     },
     "api/check-postmaster.js": {
       "maxDuration": 60
+    },
+    "api/check-domain-age.js": {
+      "maxDuration": 60
     }
   },
   "rewrites": [

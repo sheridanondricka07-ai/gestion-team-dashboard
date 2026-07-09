@@ -1493,21 +1493,146 @@ window.copyFooterHtmlToClipboard = () => {
     alert("HTML footer copied!");
 };
 
+window.calculateAgeString = (createdDateStr) => {
+    if (!createdDateStr) return '---';
+    const created = new Date(createdDateStr);
+    const now = new Date();
+    let years = now.getFullYear() - created.getFullYear();
+    let months = now.getMonth() - created.getMonth();
+    let days = now.getDate() - created.getDate();
+
+    if (days < 0) {
+        months--;
+        const prevMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+        days += prevMonth.getDate();
+    }
+    if (months < 0) {
+        years--;
+        months += 12;
+    }
+    
+    const parts = [];
+    if (years > 0) parts.push(`${years}y`);
+    if (months > 0) parts.push(`${months}m`);
+    if (days > 0 || parts.length === 0) parts.push(`${days}d`);
+    return parts.join(' ');
+};
+
+window.checkDomainAges = async () => {
+    const input = document.getElementById('domain-age-input').value;
+    const domains = input.split(/[\n,;\s]+/).map(d => d.trim().toLowerCase()).filter(d => d.includes('.'));
+    
+    if (domains.length === 0) {
+        alert("Please enter at least one valid domain name.");
+        return;
+    }
+
+    window.app.state.domainAgeResults = [];
+    window.app.state.domainAgeChecking = true;
+    window.app.state.domainAgeProgress = { current: 0, total: domains.length };
+    window.app.updateDashboard();
+
+    const chunkSize = 3;
+    const allResults = [];
+    
+    for (let i = 0; i < domains.length; i += chunkSize) {
+        const chunk = domains.slice(i, i + chunkSize);
+        
+        try {
+            const resp = await fetch('/api/check-domain-age', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ domains: chunk })
+            });
+            
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.results) {
+                    allResults.push(...data.results);
+                }
+            } else {
+                chunk.forEach(d => {
+                    allResults.push({ domain: d, error: `API error: ${resp.statusText}` });
+                });
+            }
+        } catch (err) {
+            chunk.forEach(d => {
+                allResults.push({ domain: d, error: err.message });
+            });
+        }
+        
+        window.app.state.domainAgeProgress.current = Math.min(i + chunkSize, domains.length);
+        window.app.state.domainAgeResults = [...allResults];
+        window.app.updateDashboard();
+    }
+
+    window.app.state.domainAgeChecking = false;
+    window.app.updateDashboard();
+};
+
+window.copyDomainAgeResults = () => {
+    const results = window.app.state.domainAgeResults || [];
+    if (results.length === 0) {
+        alert("No results to copy!");
+        return;
+    }
+    
+    const text = results.map(r => {
+        if (r.error) return `${r.domain}\tError: ${r.error}`;
+        const age = window.calculateAgeString(r.created);
+        return `${r.domain}\t${r.registrar || 'N/A'}\t${r.created ? new Date(r.created).toLocaleDateString() : 'N/A'}\t${r.expires ? new Date(r.expires).toLocaleDateString() : 'N/A'}\t${age}`;
+    }).join('\n');
+    
+    navigator.clipboard.writeText(text).then(() => {
+        alert("Results copied to clipboard!");
+    });
+};
+
+window.exportDomainAgeResultsToExcel = () => {
+    const results = window.app.state.domainAgeResults || [];
+    if (results.length === 0) {
+        alert("No results to export!");
+        return;
+    }
+    
+    const data = results.map(r => ({
+        'Domain': r.domain,
+        'Registrar': r.registrar || 'N/A',
+        'Created Date': r.created ? new Date(r.created).toLocaleDateString() : 'N/A',
+        'Expiry Date': r.expires ? new Date(r.expires).toLocaleDateString() : 'N/A',
+        'Age': window.calculateAgeString(r.created),
+        'Source/Error': r.error ? `Error: ${r.error}` : (r.source || 'WHOIS')
+    }));
+    
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Domain Ages");
+    XLSX.writeFile(workbook, `domain_ages_${Date.now()}.xlsx`);
+};
+
+window.updateDomainAgeSearch = (val) => {
+    window.app.state.domainAgeSearchQuery = val;
+    window.app.updateDashboard();
+};
+
 function renderTools(app, container) {
     const { tools } = app.state;
     const role = app.state.currentUser.role;
     const activeTab = app.state.toolsActiveTab || 'hosted';
 
     container.innerHTML = `
-        <div style="padding: 16px 24px 0 24px; border-bottom: 1px solid var(--border-color); display: flex; gap: 24px; background: var(--bg-secondary);">
-            <div onclick="window.switchToolsTab('hosted')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'hosted' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'hosted' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px;">
+        <div style="padding: 16px 24px 0 24px; border-bottom: 1px solid var(--border-color); display: flex; gap: 24px; background: var(--bg-secondary); overflow-x: auto;">
+            <div onclick="window.switchToolsTab('hosted')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'hosted' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'hosted' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
                 <i data-lucide="layout-grid" style="width: 14px; height: 14px;"></i> hosted Tools
             </div>
-            <div onclick="window.switchToolsTab('imacros')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'imacros' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'imacros' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px;">
+            <div onclick="window.switchToolsTab('imacros')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'imacros' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'imacros' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
                 <i data-lucide="file-cog" style="width: 14px; height: 14px;"></i> Generate imacros File
             </div>
-            <div onclick="window.switchToolsTab('footer')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'footer' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'footer' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px;">
+            <div onclick="window.switchToolsTab('footer')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'footer' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'footer' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
                 <i data-lucide="scissors" style="width: 14px; height: 14px;"></i> Extract Footer
+            </div>
+            <div onclick="window.switchToolsTab('domainAge')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'domainAge' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'domainAge' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+                <i data-lucide="calendar" style="width: 14px; height: 14px;"></i> Domain Age Checker
             </div>
         </div>
         
@@ -1609,7 +1734,7 @@ function renderTools(app, container) {
                         <textarea id="imacros-result" readonly placeholder="Results will appear here after generation..." style="flex: 1; min-height: 420px; font-family: monospace; font-size: 0.82rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); resize: none;"></textarea>
                     </div>
                 </div>
-            ` : `
+            ` : activeTab === 'footer' ? `
                 <div style="display: flex; gap: 24px; padding: 24px; flex-wrap: wrap;">
                     <div class="card" style="flex: 1 1 400px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
                         <h3 style="font-size: 1.1rem; margin-top: 0; display: flex; align-items: center; gap: 8px;">
@@ -1648,6 +1773,122 @@ function renderTools(app, container) {
                             
                             <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Raw HTML Version</label>
                             <textarea id="footer-html-result" readonly placeholder="HTML structure of the footer..." style="flex: 1; min-height: 200px; font-family: monospace; font-size: 0.82rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); resize: none;"></textarea>
+                        </div>
+                    </div>
+                </div>
+            ` : `
+                <div style="display: flex; gap: 24px; padding: 24px; flex-wrap: wrap;">
+                    <div class="card" style="flex: 1 1 350px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <h3 style="font-size: 1.1rem; margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                            <i data-lucide="calendar" style="color: var(--accent-primary); width: 20px; height: 20px;"></i>
+                            Bulk Domain Age Checker
+                        </h3>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; margin: 0;">
+                            Paste your domain names (one per line, comma or space separated) to fetch creation date, expiration date, and age from registry WHOIS servers.
+                        </p>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <textarea id="domain-age-input" placeholder="google.com&#10;facebook.com&#10;wmn3.online&#10;durmorel.store" style="height: 200px; font-family: monospace; font-size: 0.85rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); resize: vertical;"></textarea>
+                        </div>
+
+                        ${app.state.domainAgeChecking ? `
+                            <div style="background: rgba(139, 92, 246, 0.05); border: 1px solid rgba(139, 92, 246, 0.15); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+                                <div style="display: flex; justify-content: space-between; font-size: 0.78rem; font-weight: 500;">
+                                    <span style="display: flex; align-items: center; gap: 6px;">
+                                        <i data-lucide="refresh-cw" class="spin" style="width:12px; height:12px; color: var(--accent-primary);"></i> Checking domains...
+                                    </span>
+                                    <span>${app.state.domainAgeProgress?.current || 0}/${app.state.domainAgeProgress?.total || 0}</span>
+                                </div>
+                                <div style="height: 6px; width: 100%; background: var(--bg-tertiary); border-radius: 3px; overflow: hidden;">
+                                    <div style="height: 100%; background: var(--gradient-primary); width: ${Math.round(((app.state.domainAgeProgress?.current || 0) / (app.state.domainAgeProgress?.total || 1)) * 100)}%; transition: width 0.2s;"></div>
+                                </div>
+                            </div>
+                        ` : `
+                            <button onclick="window.checkDomainAges()" style="padding: 12px; background: var(--accent-primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                <i data-lucide="search" style="width: 16px; height: 16px;"></i> Scan Domain Ages
+                            </button>
+                        `}
+                    </div>
+
+                    <div class="card" style="flex: 2 1 550px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                            <h3 style="font-size: 1.1rem; margin: 0; display: flex; align-items: center; gap: 8px;">
+                                <i data-lucide="list" style="color: var(--success); width: 20px; height: 20px;"></i>
+                                Results List (${(app.state.domainAgeResults || []).length})
+                            </h3>
+                            <div style="display: flex; gap: 8px;">
+                                <div class="search-input-wrapper" style="position: relative; width: 180px;">
+                                    <i data-lucide="search" style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); width: 12px; color: var(--text-secondary);"></i>
+                                    <input type="text" value="${app.state.domainAgeSearchQuery || ''}" placeholder="Filter results..." style="padding-left: 26px; padding-top: 5px; padding-bottom: 5px; font-size: 0.75rem; border-radius: 6px; width: 100%;" oninput="window.updateDomainAgeSearch(this.value)">
+                                </div>
+                                <button onclick="window.copyDomainAgeResults()" style="padding: 6px 10px; font-size: 0.75rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 4px; border-radius: 6px;">
+                                    <i data-lucide="copy" style="width: 12px; height: 12px;"></i> Copy
+                                </button>
+                                <button onclick="window.exportDomainAgeResultsToExcel()" style="padding: 6px 10px; font-size: 0.75rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 4px; border-radius: 6px;">
+                                    <i data-lucide="download" style="width: 12px; height: 12px;"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style="overflow-x: auto; flex: 1; min-height: 350px;">
+                            <table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.75rem;">
+                                <thead>
+                                    <tr style="text-align: left; background: var(--bg-tertiary);">
+                                        <th style="padding: 12px 8px; border-bottom: 2px solid var(--border-color);">Domain</th>
+                                        <th style="padding: 12px 8px; border-bottom: 2px solid var(--border-color);">Registrar</th>
+                                        <th style="padding: 12px 8px; border-bottom: 2px solid var(--border-color);">Created Date</th>
+                                        <th style="padding: 12px 8px; border-bottom: 2px solid var(--border-color);">Expiration Date</th>
+                                        <th style="padding: 12px 8px; border-bottom: 2px solid var(--border-color); text-align: center;">Age</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${(() => {
+                                        const query = (app.state.domainAgeSearchQuery || '').toLowerCase().trim();
+                                        const rawList = app.state.domainAgeResults || [];
+                                        const filtered = query ? rawList.filter(r => r.domain.includes(query) || (r.registrar && r.registrar.toLowerCase().includes(query))) : rawList;
+
+                                        return filtered.map((r, idx) => {
+                                            const rowBg = idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent';
+                                            if (r.error) {
+                                                return `
+                                                    <tr style="background: ${rowBg}; border-bottom: 1px solid var(--border-color);">
+                                                        <td style="padding: 10px 8px; font-weight: 600; color: #ef4444;">${r.domain}</td>
+                                                        <td colspan="4" style="padding: 10px 8px; color: var(--text-secondary); font-style: italic;">
+                                                            Error: ${r.error}
+                                                        </td>
+                                                    </tr>
+                                                `;
+                                            }
+                                            
+                                            const ageStr = window.calculateAgeString(r.created);
+                                            const createdDate = r.created ? new Date(r.created).toLocaleDateString() : '---';
+                                            const expiryDate = r.expires ? new Date(r.expires).toLocaleDateString() : '---';
+                                            
+                                            return `
+                                                <tr style="background: ${rowBg}; border-bottom: 1px solid var(--border-color);">
+                                                    <td style="padding: 10px 8px; font-weight: 600; color: var(--text-primary);">${r.domain}</td>
+                                                    <td style="padding: 10px 8px; color: var(--text-secondary);">${r.registrar || '---'}</td>
+                                                    <td style="padding: 10px 8px; color: var(--text-secondary);">${createdDate}</td>
+                                                    <td style="padding: 10px 8px; color: var(--text-secondary);">${expiryDate}</td>
+                                                    <td style="padding: 10px 8px; text-align: center;">
+                                                        <span style="display: inline-block; padding: 2px 6px; background: rgba(59, 130, 246, 0.1); border-radius: 4px; color: var(--accent-primary); font-weight: 600; font-size: 0.72rem;">
+                                                            ${ageStr}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            `;
+                                        }).join('');
+                                    })()}
+                                    ${!(app.state.domainAgeResults && app.state.domainAgeResults.length > 0) ? `
+                                        <tr>
+                                            <td colspan="5" style="text-align: center; padding: 80px; color: var(--text-secondary);">
+                                                <i data-lucide="calendar" style="width: 32px; height: 32px; opacity: 0.2; margin-bottom: 10px; display: inline-block;"></i>
+                                                <div style="font-size: 0.8rem;">No domains checked yet. Paste list on the left and scan.</div>
+                                            </td>
+                                        </tr>
+                                    ` : ''}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
