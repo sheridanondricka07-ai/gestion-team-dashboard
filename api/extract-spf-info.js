@@ -1,6 +1,201 @@
 const dns = require('dns').promises;
+const net = require('net');
 
 const DB_URL = "https://gestion-team-c-01-default-rtdb.firebaseio.com";
+
+// ==========================================
+// WHOIS & RDAP DOMAIN AGE LOOKUP CODE (POST)
+// ==========================================
+
+function queryWhois(domain, server = 'whois.iana.org') {
+    return new Promise((resolve, reject) => {
+        const client = net.createConnection(43, server, () => {
+            client.write(domain + '\r\n');
+        });
+        
+        let data = '';
+        client.setTimeout(6000);
+        
+        client.on('data', (chunk) => {
+            data += chunk;
+        });
+        
+        client.on('end', () => {
+            resolve(data);
+        });
+        
+        client.on('timeout', () => {
+            client.destroy();
+            reject(new Error('Connection timeout'));
+        });
+        
+        client.on('error', (err) => {
+            reject(err);
+        });
+    });
+}
+
+function parseWhois(text) {
+    const lines = text.split('\n');
+    let created = null;
+    let expires = null;
+    let registrar = null;
+
+    const creationKeys = [
+        'creation date', 'created on', 'created date', 
+        'registration date', 'created:', 'registered:',
+        'registered on'
+    ];
+    
+    const expiryKeys = [
+        'expiration date', 'expiry date', 'expires on', 
+        'expires:', 'expiration:', 'registry expiry date'
+    ];
+    
+    const registrarKeys = [
+        'registrar:', 'sponsoring registrar', 'registrar name'
+    ];
+
+    for (let line of lines) {
+        const clean = line.trim();
+        const lower = clean.toLowerCase();
+        
+        if (!created) {
+            for (const key of creationKeys) {
+                if (lower.startsWith(key) || (lower.includes(key) && lower.indexOf(key) < 15)) {
+                    const idx = lower.indexOf(key);
+                    const val = clean.substring(idx + key.length).replace(/^[^\w]+/, '').trim();
+                    const ts = Date.parse(val);
+                    if (!isNaN(ts)) {
+                        created = new Date(ts).toISOString();
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (!expires) {
+            for (const key of expiryKeys) {
+                if (lower.startsWith(key) || (lower.includes(key) && lower.indexOf(key) < 15)) {
+                    const idx = lower.indexOf(key);
+                    const val = clean.substring(idx + key.length).replace(/^[^\w]+/, '').trim();
+                    const ts = Date.parse(val);
+                    if (!isNaN(ts)) {
+                        expires = new Date(ts).toISOString();
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (!registrar) {
+            for (const key of registrarKeys) {
+                if (lower.startsWith(key) || (lower.includes(key) && lower.indexOf(key) < 15)) {
+                    const idx = lower.indexOf(key);
+                    const val = clean.substring(idx + key.length).replace(/^[^\w:]+/, '').trim();
+                    if (val) {
+                        registrar = val;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    return { created, expires, registrar };
+}
+
+async function lookupDomain(domain) {
+    const cleanDomain = domain.trim().toLowerCase();
+    try {
+        const ianaData = await queryWhois(cleanDomain, 'whois.iana.org');
+        
+        let referServer = '';
+        const referMatch = ianaData.match(/refer:\s+([^\s]+)/i);
+        if (referMatch) {
+            referServer = referMatch[1].trim();
+        } else {
+            const tld = cleanDomain.split('.').pop();
+            if (tld === 'com' || tld === 'net') referServer = 'whois.verisign-grs.com';
+            else if (tld === 'org') referServer = 'whois.pir.org';
+            else if (tld === 'info') referServer = 'whois.afilias.net';
+            else if (tld === 'biz') referServer = 'whois.nic.biz';
+            else if (tld === 'me') referServer = 'whois.nic.me';
+        }
+        
+        if (!referServer) {
+            const rdapUrl = `https://rdap.org/domain/${cleanDomain}`;
+            const rdapResp = await fetch(rdapUrl, { redirect: 'follow' });
+            if (rdapResp.ok) {
+                const json = await rdapResp.json();
+                const events = json.events || [];
+                const regEvent = events.find(e => e.eventAction === 'registration');
+                const expEvent = events.find(e => e.eventAction === 'expiration');
+                let registrarName = '';
+                if (json.entities && json.entities[0]) {
+                    registrarName = json.entities[0].vcardArray?.[1]?.find(prop => prop[0] === 'fn')?.[3] || '';
+                }
+                
+                if (regEvent && regEvent.eventDate) {
+                    return {
+                        domain: cleanDomain,
+                        created: new Date(regEvent.eventDate).toISOString(),
+                        expires: expEvent ? new Date(expEvent.eventDate).toISOString() : null,
+                        registrar: registrarName || 'RDAP Registry',
+                        source: 'RDAP'
+                    };
+                }
+            }
+            throw new Error('Unable to find WHOIS server or RDAP entry');
+        }
+
+        const registryData = await queryWhois(cleanDomain, referServer);
+        const parsed = parseWhois(registryData);
+
+        if (parsed.created) {
+            return {
+                domain: cleanDomain,
+                created: parsed.created,
+                expires: parsed.expires,
+                registrar: parsed.registrar || 'Unknown Registrar',
+                source: referServer
+            };
+        }
+
+        const rdapUrl = `https://rdap.org/domain/${cleanDomain}`;
+        const rdapResp = await fetch(rdapUrl, { redirect: 'follow' });
+        if (rdapResp.ok) {
+            const json = await rdapResp.json();
+            const events = json.events || [];
+            const regEvent = events.find(e => e.eventAction === 'registration');
+            const expEvent = events.find(e => e.eventAction === 'expiration');
+            if (regEvent && regEvent.eventDate) {
+                return {
+                    domain: cleanDomain,
+                    created: new Date(regEvent.eventDate).toISOString(),
+                    expires: expEvent ? new Date(expEvent.eventDate).toISOString() : null,
+                    registrar: 'RDAP Registry',
+                    source: 'RDAP'
+                };
+            }
+        }
+
+        throw new Error('WHOIS entry parsed successfully but lacked registration date');
+
+    } catch (err) {
+        return {
+            domain: cleanDomain,
+            created: null,
+            expires: null,
+            registrar: null,
+            error: err.message
+        };
+    }
+}
+
+// ==========================================
+// SPF EXTRACTION CODE (GET)
+// ==========================================
 
 async function getFirebaseData(path) {
     try {
@@ -79,7 +274,28 @@ function extractRootDomain(domain) {
     return parts.slice(-2).join('.');
 }
 
+// ==========================================
+// MAIN HANDLER
+// ==========================================
+
 export default async function handler(req, res) {
+    if (req.method === 'POST') {
+        // Bulk domain check
+        const { domains } = req.body;
+        if (!domains || !Array.isArray(domains)) {
+            return res.status(400).json({ error: 'Invalid domains list provided' });
+        }
+
+        const results = [];
+        for (const domain of domains) {
+            if (!domain.trim()) continue;
+            const resData = await lookupDomain(domain.trim());
+            results.push(resData);
+        }
+        return res.status(200).json({ results });
+    }
+
+    // Default GET: extract SPF info
     try {
         const domain = (req.query.domain || '').trim().toLowerCase();
         if (!domain) {
@@ -87,8 +303,6 @@ export default async function handler(req, res) {
         }
 
         const servers = await getFirebaseData('state/servers') || [];
-
-        // Step 1: Get SPF record of the RP domain
         const spfRecord = await getSpfRecord(domain);
         if (!spfRecord) {
             return res.status(200).json({ success: true, found: false, reason: 'No SPF record found', rawSpf: null });
@@ -96,7 +310,6 @@ export default async function handler(req, res) {
 
         const mechs = parseSpfMechanisms(spfRecord);
 
-        // Step 2: Check ip4: mechanisms (direct IP = intern, domain/subdomain = RP itself)
         for (const ip4 of mechs.ip4s) {
             const srv = matchIpAgainstServers(ip4, servers);
             if (srv) {
@@ -109,7 +322,6 @@ export default async function handler(req, res) {
             }
         }
 
-        // Step 2b: Check bare 'a' mechanism (A record of RP domain itself)
         if (mechs.bareA) {
             const aIps = await safeDnsResolve(dns.resolve4, domain);
             if (aIps) {
@@ -127,13 +339,11 @@ export default async function handler(req, res) {
             }
         }
 
-        // Step 3: Check include: mechanisms (resolve 2 levels deep)
         for (const incDomain of mechs.includes) {
             const incSpf = await getSpfRecord(incDomain);
             if (!incSpf) continue;
             const incMechs = parseSpfMechanisms(incSpf);
 
-            // Check ip4 in included domain's SPF
             for (const ip4 of incMechs.ip4s) {
                 const srv = matchIpAgainstServers(ip4, servers);
                 if (srv) {
@@ -147,7 +357,6 @@ export default async function handler(req, res) {
                 }
             }
 
-            // Level 2: nested includes
             for (const nested of incMechs.includes) {
                 const nestedSpf = await getSpfRecord(nested);
                 if (!nestedSpf) continue;
@@ -167,7 +376,6 @@ export default async function handler(req, res) {
             }
         }
 
-        // Step 4: Check a: mechanisms
         for (const aDomain of mechs.aRecords) {
             const aIps = await safeDnsResolve(dns.resolve4, aDomain);
             if (!aIps) continue;
@@ -185,7 +393,6 @@ export default async function handler(req, res) {
             }
         }
 
-        // No match found
         return res.status(200).json({
             success: true, found: false,
             reason: 'SPF exists but no mechanisms match our server IPs',

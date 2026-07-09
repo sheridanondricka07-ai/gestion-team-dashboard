@@ -1539,7 +1539,7 @@ window.checkDomainAges = async () => {
         const chunk = domains.slice(i, i + chunkSize);
         
         try {
-            const resp = await fetch('/api/check-domain-age', {
+            const resp = await fetch('/api/extract-spf-info', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ domains: chunk })

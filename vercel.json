@@ -20,12 +20,9 @@
       "maxDuration": 60
     },
     "api/extract-spf-info.js": {
-      "maxDuration": 30
-    },
-    "api/check-postmaster.js": {
       "maxDuration": 60
     },
-    "api/check-domain-age.js": {
+    "api/check-postmaster.js": {
       "maxDuration": 60
     }
   },
