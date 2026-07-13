@@ -1353,18 +1353,20 @@ window.generateImacrosFile = () => {
         const pairLimit = pair.customLimit !== null ? pair.customLimit : limit;
         const pairLimitHalfPlus3 = Math.floor(pairLimit / 2) + 3;
 
-        let pmtaWaitVal = 20;
-        if (pairLimit >= 30000) {
-            pmtaWaitVal = 45;
-        } else if (pairLimit >= 19000) {
-            pmtaWaitVal = 40;
-        } else if (pairLimit >= 10000) {
-            pmtaWaitVal = 35;
-        } else if (pairLimit >= 5000) {
-            pmtaWaitVal = 30;
-        } else {
-            pmtaWaitVal = 20;
-        }
+         let pmtaWaitVal = parseInt(document.getElementById('imacros-pmta-wait').value) || 0;
+         if (pmtaWaitVal <= 0) {
+             if (pairLimit >= 30000) {
+                 pmtaWaitVal = 45;
+             } else if (pairLimit >= 19000) {
+                 pmtaWaitVal = 40;
+             } else if (pairLimit >= 10000) {
+                 pmtaWaitVal = 35;
+             } else if (pairLimit >= 5000) {
+                 pmtaWaitVal = 30;
+             } else {
+                 pmtaWaitVal = 20;
+             }
+         }
 
         // domain,id_news,server_name,pmta_wait,ip,limit,random_number,(limit/2)+3,between_drops_wait
         const row = `${pair.domain},${idNews},${serverName},${pmtaWaitVal},${pair.ip},${pairLimit},${randNum},${pairLimitHalfPlus3},${betweenDropsWait}`;
