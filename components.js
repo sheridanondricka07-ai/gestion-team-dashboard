@@ -1321,10 +1321,14 @@ window.generateImacrosFile = () => {
     const autoWaitTime = Math.round(rotationTime / uniqueDomains);
 
     const waitInput = document.getElementById('imacros-between-drops-wait');
-    if (waitInput) {
-        waitInput.value = autoWaitTime;
+    let betweenDropsWait = parseInt(waitInput ? waitInput.value : '') || 0;
+
+    if (betweenDropsWait <= 0) {
+        betweenDropsWait = autoWaitTime;
+        if (waitInput) {
+            waitInput.value = autoWaitTime;
+        }
     }
-    const betweenDropsWait = autoWaitTime;
 
     const generatedLines = [];
 
