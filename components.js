@@ -9008,31 +9008,7 @@ window.downloadWarmup24hReport = () => {
         }
     });
 
-    const STRATEGY = {
-        '100': { drops: 7, next: 200 },
-        '200': { drops: 7, next: 300 },
-        '300': { drops: 2, next: 500 },
-        '500': { drops: 13, next: 1000 },
-        '1000': { drops: 7, next: 2000 },
-        '2000': { drops: 9, next: 4000 },
-        '4000': { drops: 7, next: 7000 },
-        '7000': { drops: 7, next: 10000 },
-        '10000': { drops: 5, next: 15000 },
-        '15000-19000': { drops: 25, next: 21000 },
-        '21000': { drops: 2, next: 27000 },
-        '27000': { drops: 3, next: 50000 },
-        '50000': { drops: 1, next: 50000 }
-    };
-
-    function getLevelBand(val) {
-        if (val >= 15000 && val <= 19000) return '15000-19000';
-        const levels = [100, 200, 300, 500, 1000, 2000, 4000, 7000, 10000, 21000, 27000, 50000];
-        let best = null;
-        for (const lvl of levels) {
-            if (val >= lvl) best = lvl;
-        }
-        return best ? best.toString() : val.toString();
-    }
+    const PLAN = [209, 411, 1582, 3215, 4506, 7301, 10575, 13489, 16574, 18814, 18814, 18814, 18814, 100000];
 
     let csvContent = "\ufeffIP Address,Domain,User,Send Size,Succeed (Last 3 Drops >=95% of IN),Next Tier Command,Test After Command\n";
 
@@ -9064,8 +9040,39 @@ window.downloadWarmup24hReport = () => {
         let nextCommand = "";
         let nextTestCommand = "";
         if (succeed === "YES") {
-            const band = getLevelBand(sendSize);
-            const nextTierVal = STRATEGY[band] ? STRATEGY[band].next : sendSize;
+            const sendSizeNum = parseInt(sendSize, 10) || 0;
+            let nextTierVal = sendSizeNum;
+
+            if (sendSizeNum === 18814) {
+                // Count consecutive successful drops at 18814
+                let count18814 = 0;
+                for (let i = 0; i < g.records.length; i++) {
+                    const r = g.records[i];
+                    const rIn = parseInt(r.inVal, 10) || 0;
+                    const rOut = parseInt(r.outVal, 10) || 0;
+                    if (rIn === 18814 && rOut >= rIn * 0.95) {
+                        count18814++;
+                    } else {
+                        break;
+                    }
+                }
+                // If they completed at least 4 successful drops at 18814, they scale to J14 (100K)
+                if (count18814 >= 4) {
+                    nextTierVal = 100000;
+                } else {
+                    nextTierVal = 18814;
+                }
+            } else if (sendSizeNum >= 100000) {
+                nextTierVal = 100000;
+            } else {
+                // Find next index in PLAN
+                const currentIdx = PLAN.findIndex(val => val >= sendSizeNum);
+                if (currentIdx !== -1 && currentIdx < PLAN.length - 1) {
+                    nextTierVal = PLAN[currentIdx + 1];
+                } else {
+                    nextTierVal = sendSizeNum;
+                }
+            }
             
             const targetIdentifier = (domain.toLowerCase() === '[rdns]' || domain.toLowerCase() === 'rdns' || !domain || domain === '---') ? ip : domain;
             nextCommand = `update ${g.server} send_size for ${targetIdentifier} to ${nextTierVal}`;
