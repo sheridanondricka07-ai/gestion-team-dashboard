@@ -9008,7 +9008,7 @@ window.downloadWarmup24hReport = () => {
         }
     });
 
-    const PLAN = [209, 411, 1582, 3215, 4506, 7301, 10575, 13489, 16574, 18814, 18814, 18814, 18814, 100000];
+    const PLAN = [209, 411, 1582, 3215, 4506, 7301, 10575, 13489, 16574, 18814, 18814, 18814, 18814, 30000];
 
     let csvContent = "\ufeffIP Address,Domain,User,Send Size,Succeed (Last 3 Drops >=95% of IN),Next Tier Command,Test After Command\n";
 
@@ -9056,14 +9056,14 @@ window.downloadWarmup24hReport = () => {
                         break;
                     }
                 }
-                // If they completed at least 4 successful drops at 18814, they scale to J14 (100K)
+                // If they completed at least 4 successful drops at 18814, they scale to J14 (30K)
                 if (count18814 >= 4) {
-                    nextTierVal = 100000;
+                    nextTierVal = 30000;
                 } else {
                     nextTierVal = 18814;
                 }
-            } else if (sendSizeNum >= 100000) {
-                nextTierVal = 100000;
+            } else if (sendSizeNum >= 30000) {
+                nextTierVal = 30000;
             } else {
                 // Find next index in PLAN
                 const currentIdx = PLAN.findIndex(val => val >= sendSizeNum);
