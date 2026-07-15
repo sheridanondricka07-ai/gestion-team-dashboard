@@ -7856,7 +7856,18 @@ function renderWarmupProgress(app, container) {
 
 
 
-    // Send Size Tier distribution (based on latest inVal per active24 group)
+    // Send Size Tier distribution (respecting active tab, search, server, and type filters)
+    const distGroups = currentGroups.filter(g => {
+        const latestUser = (g.records[0] && g.records[0].user) || '';
+        const matchSearch = g.domain.toLowerCase().includes(search) || 
+                            (g.server || '').toLowerCase().includes(search) || 
+                            (g.ip || '').includes(search) ||
+                            latestUser.toLowerCase().includes(search);
+        const matchServer = filterServer === 'all' || g.server === filterServer;
+        const matchType = typeFilter === 'all' || g.groupType === typeFilter;
+        return matchSearch && matchServer && matchType;
+    });
+
     const sizeTiers = [
         { label: '0 – 2K',     min: 0,     max: 2000,  color: '#64748b', bg: 'rgba(100,116,139,0.08)', border: 'rgba(100,116,139,0.25)' },
         { label: '2K – 5K',   min: 2001,  max: 5000,  color: '#3b82f6', bg: 'rgba(59,130,246,0.08)',  border: 'rgba(59,130,246,0.25)' },
@@ -7868,7 +7879,7 @@ function renderWarmupProgress(app, container) {
         { label: '25.5K+',    min: 25501, max: null,  color: '#ef4444', bg: 'rgba(239,68,68,0.08)',   border: 'rgba(239,68,68,0.25)' },
     ];
     sizeTiers.forEach(t => {
-        t.count = active24Groups.filter(g => {
+        t.count = distGroups.filter(g => {
             const v = parseInt(g.records[0] && g.records[0].inVal, 10) || 0;
             return v >= t.min && (t.max === null || v <= t.max);
         }).length;
@@ -8014,7 +8025,7 @@ function renderWarmupProgress(app, container) {
             <div class="card" style="padding: 16px 20px; margin-bottom: 24px;">
                 <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; display: flex; align-items: center; gap: 6px; margin-bottom: 10px;">
                     <i data-lucide="layers" style="width: 13px; height: 13px; color: var(--accent-primary);"></i>
-                    Send Size Distribution (active 24h IPs) &mdash; click a tier to filter
+                    Send Size Distribution (${app.state.warmupActiveTab === 'active12' ? 'Active 12h' : app.state.warmupActiveTab === 'active24' ? 'Active 24h' : app.state.warmupActiveTab === 'highvol' ? 'High Vol' : app.state.warmupActiveTab === 'archived' ? 'Archived' : 'Inactive'}) &mdash; click a tier to filter
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     ${sizeTiers.map(t => `
