@@ -7454,26 +7454,7 @@ function getRdns(ip, state) {
 function getRepresentativeVolume(drops) {
     const nonZeros = drops.filter(v => v > 0);
     if (nonZeros.length === 0) return 0;
-    if (nonZeros.length === 1) return nonZeros[0];
-    
-    // Sort descending
-    nonZeros.sort((a, b) => b - a);
-    
-    // Check if any two values are close (within 30% margin of the larger one)
-    for (let i = 0; i < nonZeros.length; i++) {
-        for (let j = i + 1; j < nonZeros.length; j++) {
-            const a = nonZeros[i];
-            const b = nonZeros[j];
-            const maxVal = Math.max(a, b);
-            const minVal = Math.min(a, b);
-            if (maxVal > 0 && (maxVal - minVal) / maxVal <= 0.3) {
-                return maxVal;
-            }
-        }
-    }
-    
-    // Default to the highest non-zero value
-    return nonZeros[0];
+    return Math.max(...nonZeros);
 }
 
 function parseMessageText(text) {
@@ -7852,7 +7833,7 @@ function renderWarmupProgress(app, container) {
 
     filteredGroups.forEach(g => {
         const recentOuts = g.records
-            .filter(r => r.timestamp >= twentyFourHoursAgo)
+            .slice(0, 5)
             .map(r => r.outVal);
         g.repOut = getRepresentativeVolume(recentOuts.length > 0 ? recentOuts : [0]);
     });
