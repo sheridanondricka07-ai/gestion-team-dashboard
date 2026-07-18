@@ -1234,17 +1234,22 @@ window.generateImacrosFile = () => {
             parts = trimmed.split(/\s+/).map(p => p.trim());
         }
 
-        if (parts.length >= 2) {
-            let ip = '';
-            let domain = '';
-            let serverName = null;
-            let customLimit = null;
+        let ip = '';
+        let domain = '';
+        let serverName = null;
+        let customLimit = null;
 
+        if (parts.length === 1) {
+            if (ipRegex.test(parts[0])) {
+                ip = parts[0];
+                domain = '[rdns]';
+            }
+        } else if (parts.length >= 2) {
             // Check if first part is NOT an IP, but second part IS an IP
             if (!ipRegex.test(parts[0]) && ipRegex.test(parts[1])) {
                 serverName = parts[0];
                 ip = parts[1];
-                domain = parts[2] || '';
+                domain = parts[2] || '[rdns]';
                 if (parts.length >= 4) {
                     const parsedLimit = parseInt(parts[3]);
                     if (!isNaN(parsedLimit)) {
@@ -1254,7 +1259,7 @@ window.generateImacrosFile = () => {
             } else {
                 // Standard: IP;domain or IP;domain;limit
                 ip = parts[0];
-                domain = parts[1];
+                domain = parts[1] || '[rdns]';
                 if (parts.length >= 3) {
                     const parsedLimit = parseInt(parts[2]);
                     if (!isNaN(parsedLimit)) {
@@ -1262,15 +1267,15 @@ window.generateImacrosFile = () => {
                     }
                 }
             }
+        }
 
-            if (ip && domain) {
-                parsedPairs.push({
-                    ip,
-                    domain,
-                    serverName,
-                    customLimit
-                });
-            }
+        if (ip && domain) {
+            parsedPairs.push({
+                ip,
+                domain,
+                serverName,
+                customLimit
+            });
         }
     }
 
