@@ -7840,6 +7840,7 @@ function renderWarmupProgress(app, container) {
     filteredGroups.sort((a, b) => b.repOut - a.repOut);
 
     const totalDomains = active24Groups.length;
+    const totalUniqueIps = Array.from(seenActiveIps).filter(ip => ip && ip !== '---').length;
     const totalArchived = archivedGroups.length;
     const totalInactive = inactiveGroups.length;
     const totalLogs = rawRecords.length;
@@ -7974,6 +7975,16 @@ function renderWarmupProgress(app, container) {
                         <div>
                             <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; white-space: nowrap;">Tracked Domains</div>
                             <div style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-top: 2px;">${totalDomains}</div>
+                        </div>
+                    </div>
+                    <div style="height: 30px; width: 1px; background: var(--border-color); display: inline-block;"></div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="background: rgba(139, 92, 246, 0.1); width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #8b5cf6;">
+                            <i data-lucide="shield" style="width: 18px; height: 18px;"></i>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; white-space: nowrap;">Tracked IPs</div>
+                            <div style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-top: 2px;">${totalUniqueIps}</div>
                         </div>
                     </div>
                     <div style="height: 30px; width: 1px; background: var(--border-color); display: inline-block;"></div>
