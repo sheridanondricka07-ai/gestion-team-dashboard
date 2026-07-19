@@ -96,13 +96,12 @@ export default async function handler(req, res) {
 
                                     let statusVal = 'none';
                                     if (folder === 'INBOX') {
-                                        const isMatch = (targetRdns && rpDomain && (rpFull.includes(targetRdns) || targetRdns.includes(rpDomain)));
-                                        statusVal = isMatch ? 'rdns' : 'rp_test';
+                                        statusVal = 'rdns';
                                     } else if (folder === 'SPAM') {
                                         statusVal = 'spam';
                                     }
 
-                                    const priority = { 'rdns': 3, 'rp_test': 2, 'spam': 1, 'none': 0 };
+                                    const priority = { 'rdns': 2, 'spam': 1, 'none': 0 };
                                     const existing = results[ip];
                                     let replace = false;
                                     if (!existing) {

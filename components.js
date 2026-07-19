@@ -3322,7 +3322,6 @@ window.copyAllLinkedRps = (btn) => {
 
 const STATUS_TYPES = [
     { id: 'none', label: 'None', color: 'transparent' },
-    { id: 'rp_test', label: 'RP TEST', color: '#22c55e' },
     { id: 'spam', label: 'SPAM', color: '#ef4444' },
     { id: 'paused', label: 'PAUSED', color: '#3b82f6' },
     { id: 'change_dom', label: 'Change DOM', color: '#eab308' },
@@ -3406,6 +3405,7 @@ function renderStatus(app, container) {
                 const safeIp = ip.replace(/\./g, '_');
                 const filterDate = app.selectedFilterDate;
                 let sid = (statuses && statuses[safeIp] && statuses[safeIp][filterDate]) || 'none';
+                if (sid === 'rp_test') sid = 'rdns';
                 if (sid === 'down' || sid === 'bounce') sid = 'down_bounce';
                 if (app.statusFilters.includes(sid)) {
                     matchesStatus = true;
@@ -3430,7 +3430,8 @@ function renderStatus(app, container) {
         servers.forEach(srv => {
             (srv.allIps || []).forEach(ip => {
                 const safeIp = ip.replace(/\./g, '_');
-                const sid = (statuses && statuses[safeIp] && statuses[safeIp][day]) || 'none';
+                let sid = (statuses && statuses[safeIp] && statuses[safeIp][day]) || 'none';
+                if (sid === 'rp_test') sid = 'rdns';
                 if (sid !== 'none' && counts[sid] !== undefined) counts[sid]++;
             });
         });
@@ -3566,7 +3567,8 @@ function renderStatus(app, container) {
                                         </td>
                                         ${days.map(date => {
                                             const safeIp = ip.replace(/\./g, '_');
-                                            const currentStatusId = (statuses && statuses[safeIp] && statuses[safeIp][date]) || 'none';
+                                            let currentStatusId = (statuses && statuses[safeIp] && statuses[safeIp][date]) || 'none';
+                                            if (currentStatusId === 'rp_test') currentStatusId = 'rdns';
                                             const currentStatus = STATUS_TYPES.find(s => s.id === currentStatusId) || STATUS_TYPES[0];
                                             const isSelected = date === app.selectedFilterDate;
                                             return `
@@ -3665,7 +3667,8 @@ window.saveBulkStatus = async (btn) => {
 
 window.cycleStatus = (ip, date, el) => {
     const safeIp = ip.replace(/\./g, '_');
-    const currentStatusId = (window.app.state.statuses && window.app.state.statuses[safeIp] && window.app.state.statuses[safeIp][date]) || 'none';
+    let currentStatusId = (window.app.state.statuses && window.app.state.statuses[safeIp] && window.app.state.statuses[safeIp][date]) || 'none';
+    if (currentStatusId === 'rp_test') currentStatusId = 'rdns';
     const currentIndex = STATUS_TYPES.findIndex(s => s.id === currentStatusId);
     const nextIndex = (currentIndex + 1) % STATUS_TYPES.length;
     const nextStatus = STATUS_TYPES[nextIndex];
@@ -5157,9 +5160,7 @@ window.runGmailIPStatusSync = async (btn) => {
             
             let newStatusId = 'none';
             if (folder === 'INBOX') {
-                // MATCH LOGIC: Check if Return-Path matches the RDNS hostname or domain
-                const isMatch = (targetRdns && rpDomain && (rpFull.includes(targetRdns) || targetRdns.includes(rpDomain)));
-                newStatusId = isMatch ? 'rdns' : 'rp_test';
+                newStatusId = 'rdns';
             } else if (folder === 'SPAM') {
                 newStatusId = 'spam';
             }
@@ -5168,12 +5169,10 @@ window.runGmailIPStatusSync = async (btn) => {
                 if (!statuses[safeIp]) statuses[safeIp] = {};
                 const currentStatusId = statuses[safeIp][today] || 'none';
                 
-                // OVERRIDE RULES: RDNS > RP TEST > SPAM
+                // OVERRIDE RULES: RDNS > SPAM
                 let shouldApply = false;
                 if (newStatusId === 'rdns') {
                     shouldApply = true;
-                } else if (newStatusId === 'rp_test') {
-                    if (currentStatusId !== 'rdns') shouldApply = true;
                 } else if (newStatusId === 'spam') {
                     if (currentStatusId === 'none' || currentStatusId === 'spam' || currentStatusId === 'down') shouldApply = true;
                 }
@@ -5185,7 +5184,7 @@ window.runGmailIPStatusSync = async (btn) => {
                     const item = document.createElement('div');
                     item.style.cssText = 'display: flex; justify-content: space-between; font-size: 0.8rem; padding: 4px 8px; background: rgba(255,255,255,0.03); border-radius: 4px; margin-bottom: 4px;';
                     const statusLabel = newStatusId.toUpperCase();
-                    const statusColor = newStatusId === 'rdns' ? '#166534' : (newStatusId === 'rp_test' ? '#22c55e' : '#ef4444');
+                    const statusColor = newStatusId === 'rdns' ? '#166534' : '#ef4444';
                     item.innerHTML = `<span>${ip}</span><span style="color: ${statusColor}; font-weight: 700;">${statusLabel}</span>`;
                     listDiv.appendChild(item);
                 }

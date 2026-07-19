@@ -471,13 +471,12 @@ export default async function handler(req, res) {
 
                                                 let statusVal = 'none';
                                                 if (folder === 'INBOX') {
-                                                    const isMatch = (targetRdns && rpDomain && (rpFull.includes(targetRdns) || targetRdns.includes(rpDomain)));
-                                                    statusVal = isMatch ? 'rdns' : 'rp_test';
+                                                    statusVal = 'rdns';
                                                 } else if (folder === 'SPAM') {
                                                     statusVal = 'spam';
                                                 }
 
-                                                const priority = { 'rdns': 3, 'rp_test': 2, 'spam': 1, 'none': 0 };
+                                                const priority = { 'rdns': 2, 'spam': 1, 'none': 0 };
                                                 const existing = resultsObj[ip];
                                                 let replace = false;
                                                 if (!existing) {
@@ -567,19 +566,16 @@ export default async function handler(req, res) {
                             let newStatusId = 'none';
 
                             if (folder === 'INBOX') {
-                                const isMatch = (targetRdns && rpDomain && (rpFull.includes(targetRdns) || targetRdns.includes(rpDomain)));
-                                newStatusId = isMatch ? 'rdns' : 'rp_test';
+                                newStatusId = 'rdns';
                             } else if (folder === 'SPAM') {
                                 newStatusId = 'spam';
                             }
 
-                            // Priority override rules: RDNS > RP TEST > SPAM
+                            // Priority override rules: RDNS > SPAM
                             const currentStatusId = statuses[safeIp][today] || 'none';
                             let shouldApply = false;
                             if (newStatusId === 'rdns') {
                                 shouldApply = true;
-                            } else if (newStatusId === 'rp_test') {
-                                if (currentStatusId !== 'rdns') shouldApply = true;
                             } else if (newStatusId === 'spam') {
                                 if (currentStatusId === 'none' || currentStatusId === 'spam' || currentStatusId === 'down') shouldApply = true;
                             }
@@ -598,7 +594,6 @@ export default async function handler(req, res) {
                         // Final counts
                         const finalStatus = statuses[safeIp][today];
                         if (finalStatus === 'rdns') rdnsCount++;
-                        else if (finalStatus === 'rp_test') rpTestCount++;
                         else if (finalStatus === 'spam') spamCount++;
                         else if (finalStatus === 'down') downCount++;
                     });
@@ -621,15 +616,14 @@ export default async function handler(req, res) {
                                             `⏰ <b>Time:</b> 10:30 AM (Morocco Time)\n\n` +
                                             `📊 <b>STATUS SUMMARY:</b>\n` +
                                             `• <b>Total Checked:</b> <code>${targetIps.length}</code> IPs\n` +
-                                            `• 🟢 <b>RDNS (Inbox Match):</b> <code>${rdnsCount}</code> IPs\n` +
-                                            `• 🟢 <b>RP TEST (Inbox Unmatched):</b> <code>${rpTestCount}</code> IPs\n` +
+                                            `• 🟢 <b>RDNS (Inbox):</b> <code>${rdnsCount}</code> IPs\n` +
                                             `• 🔴 <b>SPAM:</b> <code>${spamCount}</code> IPs\n` +
                                             `• 🟠 <b>Not Received (DOWN):</b> <code>${downCount}</code> IPs\n\n` +
                                             `⚙️ <i>All IP statuses successfully updated and filled in the dashboard.</i>`;
                     await sendTelegram(telegramMessage, 17);
 
                     results.gmailStatusSyncTriggered = true;
-                    results.gmailStatusStats = { totalChecked: targetIps.length, rdnsCount, rpTestCount, spamCount, downCount };
+                    results.gmailStatusStats = { totalChecked: targetIps.length, rdnsCount, spamCount, downCount };
                 }
             }
         } catch (e) {
