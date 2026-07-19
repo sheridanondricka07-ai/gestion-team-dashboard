@@ -431,7 +431,7 @@ export default async function handler(req, res) {
 
                     const connection = await imap.connect(config);
                     const boxes = ['INBOX', '[Gmail]/Spam'];
-                    const timeWindow = new Date(Date.now() - 90 * 60 * 1000);
+                    const timeWindow = new Date(Date.now() - 4 * 60 * 60 * 1000);
 
                     for (const boxName of boxes) {
                         try {
@@ -527,7 +527,7 @@ export default async function handler(req, res) {
                     const telegramMessage = `⚠️ <b>Daily Gmail IP Delivery Sync: IPs Not Found</b>\n` +
                                             `📅 <b>Date:</b> ${formattedDate}\n` +
                                             `⏰ <b>Time:</b> 10:30 AM (Morocco Time)\n\n` +
-                                            `🔴 <b>No IPs Found:</b> No delivery data or IP headers were matched in your recent emails (last 90 mins).\n` +
+                                            `🔴 <b>No IPs Found:</b> No delivery data or IP headers were matched in your recent emails (last 4 hours).\n` +
                                             `<i>All target IPs have been marked as DOWN in the dashboard. Please verify test email delivery.</i>`;
                     await sendTelegram(telegramMessage, 17);
 

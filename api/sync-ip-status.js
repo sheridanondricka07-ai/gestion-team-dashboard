@@ -40,7 +40,7 @@ export default async function handler(req, res) {
 
         const connection = await imap.connect(config);
         const results = {}; // { [ip]: { folder: 'INBOX'|'SPAM', returnPath: '...', headerRdns: '...', status: '...' } }
-        const timeWindow = new Date(Date.now() - 90 * 60 * 1000);
+        const timeWindow = new Date(Date.now() - 4 * 60 * 60 * 1000);
         
         const boxes = ['INBOX', '[Gmail]/Spam'];
 
