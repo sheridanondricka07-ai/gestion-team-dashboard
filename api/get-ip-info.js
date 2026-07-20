@@ -15,9 +15,10 @@ module.exports = async function handler(req, res) {
         return res.status(200).end();
     }
 
-    // --- FOOTER EXTRACTOR (GET method) ---
+    // --- FOOTER & HEADER EXTRACTOR (GET method) ---
     if (req.method === 'GET') {
         try {
+            const targetElement = req.query.target === 'header' ? 'header' : 'footer';
             let domainsList = [];
             try {
                 const filePath = path.join(process.cwd(), 'domains.txt');
@@ -43,7 +44,7 @@ module.exports = async function handler(req, res) {
             let targetUrl = '';
             let html = '';
             let type = 'tag';
-            let footerHtml = '';
+            let extractedHtml = '';
             let cleanText = '';
             let success = false;
             let attempts = 0;
@@ -78,29 +79,51 @@ module.exports = async function handler(req, res) {
 
                     html = await response.text();
 
-                    // Try matching <footer> tag
-                    let footerMatch = html.match(/<footer[^>]*>([\s\S]*?)<\/footer>/i);
-                    type = 'tag';
+                    if (targetElement === 'header') {
+                        let headerMatch = html.match(/<header[^>]*>([\s\S]*?)<\/header>/i);
+                        type = 'tag';
 
-                    if (!footerMatch) {
-                        footerMatch = html.match(/<div[^>]*class=["'][^"']*\bfooter\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)
-                                  || html.match(/<div[^>]*id=["'][^"']*\bfooter\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
-                        type = 'div';
-                    }
+                        if (!headerMatch) {
+                            headerMatch = html.match(/<div[^>]*class=["'][^"']*\b(?:header|navbar|topbar)\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)
+                                      || html.match(/<div[^>]*id=["'][^"']*\b(?:header|navbar|topbar)\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+                            type = 'div';
+                        }
 
-                    if (footerMatch) {
-                        footerHtml = footerMatch[0];
+                        if (headerMatch) {
+                            extractedHtml = headerMatch[0];
+                        } else {
+                            const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+                            const bodyContent = bodyMatch ? bodyMatch[1] : html;
+                            const cleanBody = cleanHtml(bodyContent);
+                            const fallbackText = cleanBody.substring(0, Math.min(cleanBody.length, 800));
+                            extractedHtml = '<div>' + fallbackText + '</div>';
+                            type = 'fallback';
+                        }
+                        // Remove script tags from HTML output as requested
+                        extractedHtml = extractedHtml.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
                     } else {
-                        // Fallback: body content or generic div
-                        const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-                        const bodyContent = bodyMatch ? bodyMatch[1] : html;
-                        const cleanBody = cleanHtml(bodyContent);
-                        const fallbackText = cleanBody.substring(Math.max(0, cleanBody.length - 800));
-                        footerHtml = '<div>' + fallbackText + '</div>';
-                        type = 'fallback';
+                        let footerMatch = html.match(/<footer[^>]*>([\s\S]*?)<\/footer>/i);
+                        type = 'tag';
+
+                        if (!footerMatch) {
+                            footerMatch = html.match(/<div[^>]*class=["'][^"']*\bfooter\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)
+                                      || html.match(/<div[^>]*id=["'][^"']*\bfooter\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+                            type = 'div';
+                        }
+
+                        if (footerMatch) {
+                            extractedHtml = footerMatch[0];
+                        } else {
+                            const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+                            const bodyContent = bodyMatch ? bodyMatch[1] : html;
+                            const cleanBody = cleanHtml(bodyContent);
+                            const fallbackText = cleanBody.substring(Math.max(0, cleanBody.length - 800));
+                            extractedHtml = '<div>' + fallbackText + '</div>';
+                            type = 'fallback';
+                        }
                     }
 
-                    cleanText = cleanHtml(footerHtml);
+                    cleanText = cleanHtml(extractedHtml);
                     
                     if (cleanText.length > 5) {
                         success = true;
@@ -111,13 +134,13 @@ module.exports = async function handler(req, res) {
             }
 
             if (!success) {
-                return res.status(500).json({ error: 'Failed to extract a valid footer after multiple random website attempts.' });
+                return res.status(500).json({ error: `Failed to extract a valid ${targetElement} after multiple random website attempts.` });
             }
 
             return res.status(200).json({
                 source: targetUrl.replace(/^https?:\/\//i, ''),
                 type: type,
-                html: footerHtml,
+                html: extractedHtml,
                 text: cleanText
             });
 

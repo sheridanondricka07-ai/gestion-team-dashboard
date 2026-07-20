@@ -1210,7 +1210,7 @@ window.extractHeader = async () => {
     if (window.lucide) window.lucide.createIcons();
 
     try {
-        const response = await fetch(`/api/extract-header`);
+        const response = await fetch(`/api/get-ip-info?target=header`);
         if (!response.ok) {
             const errData = await response.json().catch(() => ({}));
             throw new Error(errData.error || `HTTP Status ${response.status}`);
