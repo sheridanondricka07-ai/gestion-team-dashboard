@@ -1202,22 +1202,34 @@ window.testTelegramBot = async (btn) => {
 
 window.processExtractHeaders = () => {
     const input = document.getElementById('extract-headers-input');
-    const output = document.getElementById('extract-headers-output');
-    if (!input || !output) return;
+    const htmlOutput = document.getElementById('extract-headers-html-output');
+    const textOutput = document.getElementById('extract-headers-text-output');
+    if (!input || !htmlOutput || !textOutput) return;
     
     let text = input.value;
-    // Remove script tags and their contents
-    text = text.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-    output.value = text;
+    // Raw HTML Version: Remove script tags and their contents
+    const cleanHtml = text.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    htmlOutput.value = cleanHtml;
+    
+    // Clean Text Version: Strip all HTML tags
+    const tmp = document.createElement('div');
+    tmp.innerHTML = cleanHtml;
+    textOutput.value = tmp.innerText || tmp.textContent || '';
 };
 
-window.copyExtractHeadersToClipboard = () => {
-    const output = document.getElementById('extract-headers-output');
-    if (!output || !output.value) return;
-    navigator.clipboard.writeText(output.value).then(() => {
-        alert('Copied to clipboard!');
-    }).catch(err => {
-        alert('Failed to copy text: ' + err);
+window.copyExtractHeadersText = () => {
+    const textarea = document.getElementById('extract-headers-text-output');
+    if (!textarea || !textarea.value) { alert("No text to copy!"); return; }
+    navigator.clipboard.writeText(textarea.value).then(() => {
+        alert("Plain text copied!");
+    });
+};
+
+window.copyExtractHeadersHtml = () => {
+    const textarea = document.getElementById('extract-headers-html-output');
+    if (!textarea || !textarea.value) { alert("No HTML to copy!"); return; }
+    navigator.clipboard.writeText(textarea.value).then(() => {
+        alert("HTML copied!");
     });
 };
 
@@ -1822,24 +1834,36 @@ function renderTools(app, container) {
                             Paste your raw text or HTML here. This tool will extract the content without <code>&lt;script&gt;</code> tags.
                         </p>
                         
-                        <textarea id="extract-headers-input" placeholder="Paste content here..." style="height: 250px; font-family: monospace; font-size: 0.85rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); resize: vertical;"></textarea>
+                        <textarea id="extract-headers-input" placeholder="Paste content here..." style="flex: 1; min-height: 250px; font-family: monospace; font-size: 0.85rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); resize: vertical;"></textarea>
 
                         <button onclick="window.processExtractHeaders()" style="padding: 12px; background: var(--accent-primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;">
                             <i data-lucide="code" style="width: 16px; height: 16px;"></i> Extract & Clean
                         </button>
                     </div>
 
-                    <div class="card" style="flex: 1 1 350px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <h3 style="font-size: 1.1rem; margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                    <div class="card" style="flex: 1.5 1 500px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                            <h3 style="font-size: 1.1rem; margin: 0; display: flex; align-items: center; gap: 8px;">
                                 <i data-lucide="check-circle" style="color: var(--success); width: 20px; height: 20px;"></i>
-                                Output
+                                Extracted Headers
                             </h3>
-                            <button onclick="window.copyExtractHeadersToClipboard()" style="padding: 6px 12px; font-size: 0.8rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer;">
-                                <i data-lucide="copy" style="width: 12px; height: 12px; display: inline-block; margin-right: 4px;"></i> Copy
-                            </button>
+                            <div style="display: flex; gap: 8px;">
+                                <button onclick="window.copyExtractHeadersText()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                                    <i data-lucide="copy" style="width: 12px; height: 12px;"></i> Copy Text
+                                </button>
+                                <button onclick="window.copyExtractHeadersHtml()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                                    <i data-lucide="code" style="width: 12px; height: 12px;"></i> Copy HTML
+                                </button>
+                            </div>
                         </div>
-                        <textarea id="extract-headers-output" readonly placeholder="Output will appear here..." style="flex: 1; min-height: 250px; font-family: monospace; font-size: 0.85rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); resize: vertical;"></textarea>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 10px; flex: 1;">
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Clean Text Version</label>
+                            <textarea id="extract-headers-text-output" readonly placeholder="Plain text version of the headers..." style="height: 120px; font-family: inherit; font-size: 0.85rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); resize: none;"></textarea>
+                            
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Raw HTML Version</label>
+                            <textarea id="extract-headers-html-output" readonly placeholder="HTML structure of the headers..." style="flex: 1; min-height: 200px; font-family: monospace; font-size: 0.82rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); resize: none;"></textarea>
+                        </div>
                     </div>
                 </div>
             ` : `
