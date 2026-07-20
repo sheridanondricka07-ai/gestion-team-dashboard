@@ -24,7 +24,7 @@ export default async function handler(req, res) {
     try {
         const connection = await imap.connect(config);
         const results = {};
-        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+        const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
         
         // Gmail standard folder names
         const boxes = ['INBOX', '[Gmail]/Spam'];
@@ -52,8 +52,8 @@ export default async function handler(req, res) {
                     const headerPart = msg.parts.find(part => part.which === 'HEADER');
                     const msgDate = new Date(msg.attributes.date);
 
-                    // Skip emails older than 2 hours
-                    if (msgDate < twoHoursAgo) continue;
+                    // Skip emails older than 4 hours
+                    if (msgDate < fourHoursAgo) continue;
 
                     const headers = headerPart.body;
                     const receivedHeaders = headers.received || [];

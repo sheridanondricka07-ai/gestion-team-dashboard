@@ -1200,6 +1200,27 @@ window.testTelegramBot = async (btn) => {
     }
 };
 
+window.processExtractHeaders = () => {
+    const input = document.getElementById('extract-headers-input');
+    const output = document.getElementById('extract-headers-output');
+    if (!input || !output) return;
+    
+    let text = input.value;
+    // Remove script tags and their contents
+    text = text.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    output.value = text;
+};
+
+window.copyExtractHeadersToClipboard = () => {
+    const output = document.getElementById('extract-headers-output');
+    if (!output || !output.value) return;
+    navigator.clipboard.writeText(output.value).then(() => {
+        alert('Copied to clipboard!');
+    }).catch(err => {
+        alert('Failed to copy text: ' + err);
+    });
+};
+
 window.switchToolsTab = (tab) => {
     window.app.state.toolsActiveTab = tab;
     window.app.updateDashboard();
@@ -1242,14 +1263,14 @@ window.generateImacrosFile = () => {
         if (parts.length === 1) {
             if (ipRegex.test(parts[0])) {
                 ip = parts[0];
-                domain = '[rdns]';
+                domain = '[DRDNS]';
             }
         } else if (parts.length >= 2) {
             // Check if first part is NOT an IP, but second part IS an IP
             if (!ipRegex.test(parts[0]) && ipRegex.test(parts[1])) {
                 serverName = parts[0];
                 ip = parts[1];
-                domain = parts[2] || '[rdns]';
+                domain = parts[2] || '[DRDNS]';
                 if (parts.length >= 4) {
                     const parsedLimit = parseInt(parts[3]);
                     if (!isNaN(parsedLimit)) {
@@ -1259,7 +1280,7 @@ window.generateImacrosFile = () => {
             } else {
                 // Standard: IP;domain or IP;domain;limit
                 ip = parts[0];
-                domain = parts[1] || '[rdns]';
+                domain = parts[1] || '[DRDNS]';
                 if (parts.length >= 3) {
                     const parsedLimit = parseInt(parts[2]);
                     if (!isNaN(parsedLimit)) {
@@ -1639,6 +1660,9 @@ function renderTools(app, container) {
             <div onclick="window.switchToolsTab('imacros')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'imacros' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'imacros' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
                 <i data-lucide="file-cog" style="width: 14px; height: 14px;"></i> Generate imacros File
             </div>
+            <div onclick="window.switchToolsTab('extractHeaders')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'extractHeaders' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'extractHeaders' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+                <i data-lucide="file-text" style="width: 14px; height: 14px;"></i> Extract Headers
+            </div>
             <div onclick="window.switchToolsTab('footer')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'footer' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'footer' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
                 <i data-lucide="scissors" style="width: 14px; height: 14px;"></i> Extract Footer
             </div>
@@ -1785,6 +1809,37 @@ function renderTools(app, container) {
                             <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Raw HTML Version</label>
                             <textarea id="footer-html-result" readonly placeholder="HTML structure of the footer..." style="flex: 1; min-height: 200px; font-family: monospace; font-size: 0.82rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); resize: none;"></textarea>
                         </div>
+                    </div>
+                </div>
+            ` : activeTab === 'extractHeaders' ? `
+                <div style="display: flex; gap: 24px; padding: 24px; flex-wrap: wrap;">
+                    <div class="card" style="flex: 1 1 350px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <h3 style="font-size: 1.1rem; margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                            <i data-lucide="file-text" style="color: var(--accent-primary); width: 20px; height: 20px;"></i>
+                            Extract Headers
+                        </h3>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; margin: 0;">
+                            Paste your raw text or HTML here. This tool will extract the content without <code>&lt;script&gt;</code> tags.
+                        </p>
+                        
+                        <textarea id="extract-headers-input" placeholder="Paste content here..." style="height: 250px; font-family: monospace; font-size: 0.85rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); resize: vertical;"></textarea>
+
+                        <button onclick="window.processExtractHeaders()" style="padding: 12px; background: var(--accent-primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                            <i data-lucide="code" style="width: 16px; height: 16px;"></i> Extract & Clean
+                        </button>
+                    </div>
+
+                    <div class="card" style="flex: 1 1 350px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h3 style="font-size: 1.1rem; margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                                <i data-lucide="check-circle" style="color: var(--success); width: 20px; height: 20px;"></i>
+                                Output
+                            </h3>
+                            <button onclick="window.copyExtractHeadersToClipboard()" style="padding: 6px 12px; font-size: 0.8rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer;">
+                                <i data-lucide="copy" style="width: 12px; height: 12px; display: inline-block; margin-right: 4px;"></i> Copy
+                            </button>
+                        </div>
+                        <textarea id="extract-headers-output" readonly placeholder="Output will appear here..." style="flex: 1; min-height: 250px; font-family: monospace; font-size: 0.85rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); resize: vertical;"></textarea>
                     </div>
                 </div>
             ` : `
@@ -4843,7 +4898,7 @@ window.showGmailSyncModal = () => {
                 </div>
                 <div>
                     <h2 style="margin: 0; font-size: 1.25rem;">Gmail VMTA Sync</h2>
-                    <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Scanning Inbox & Spam (Last 2 Hours).</p>
+                    <p style="margin: 4px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Scanning Inbox & Spam (Last 4 Hours).</p>
                 </div>
             </div>
 
