@@ -9164,10 +9164,19 @@ window.downloadWarmup24hReport = () => {
             } else if (sendSizeNum >= 30000) {
                 nextTierVal = 30000;
             } else {
-                // Find next index in PLAN
-                const currentIdx = PLAN.findIndex(val => val >= sendSizeNum);
-                if (currentIdx !== -1 && currentIdx < PLAN.length - 1) {
-                    nextTierVal = PLAN[currentIdx + 1];
+                // Find the closest tier in PLAN that the user just completed
+                let closestIdx = 0;
+                let minDiff = Infinity;
+                for (let i = 0; i < PLAN.length; i++) {
+                    const diff = Math.abs(PLAN[i] - sendSizeNum);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        closestIdx = i;
+                    }
+                }
+                
+                if (closestIdx < PLAN.length - 1) {
+                    nextTierVal = PLAN[closestIdx + 1];
                 } else {
                     nextTierVal = sendSizeNum;
                 }
