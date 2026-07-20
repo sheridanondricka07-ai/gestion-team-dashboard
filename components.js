@@ -1200,21 +1200,35 @@ window.testTelegramBot = async (btn) => {
     }
 };
 
-window.processExtractHeaders = () => {
-    const input = document.getElementById('extract-headers-input');
-    const htmlOutput = document.getElementById('extract-headers-html-output');
-    const textOutput = document.getElementById('extract-headers-text-output');
-    if (!input || !htmlOutput || !textOutput) return;
-    
-    let text = input.value;
-    // Raw HTML Version: Remove script tags and their contents
-    const cleanHtml = text.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-    htmlOutput.value = cleanHtml;
-    
-    // Clean Text Version: Strip all HTML tags
-    const tmp = document.createElement('div');
-    tmp.innerHTML = cleanHtml;
-    textOutput.value = tmp.innerText || tmp.textContent || '';
+window.extractHeader = async () => {
+    const btn = document.getElementById('btn-extract-header');
+    const sourceLabel = document.getElementById('header-source-label');
+    const oldText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<i data-lucide="loader" class="spin" style="width:16px; height:16px; margin-right:6px; vertical-align:middle;"></i> Extracting Random Header...`;
+    if (sourceLabel) sourceLabel.textContent = `Fetching a random website...`;
+    if (window.lucide) window.lucide.createIcons();
+
+    try {
+        const response = await fetch(`/api/extract-header`);
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error || `HTTP Status ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        document.getElementById('extract-headers-text-output').value = data.text || '';
+        document.getElementById('extract-headers-html-output').value = data.html || '';
+        if (sourceLabel) sourceLabel.textContent = `Source: ${data.source} (Type: ${data.type})`;
+    } catch (err) {
+        alert("Extraction failed: " + err.message);
+        if (sourceLabel) sourceLabel.textContent = `Failed to fetch random header.`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = oldText;
+        if (window.lucide) window.lucide.createIcons();
+    }
 };
 
 window.copyExtractHeadersText = () => {
@@ -1825,20 +1839,19 @@ function renderTools(app, container) {
                 </div>
             ` : activeTab === 'extractHeaders' ? `
                 <div style="display: flex; gap: 24px; padding: 24px; flex-wrap: wrap;">
-                    <div class="card" style="flex: 1 1 350px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                    <div class="card" style="flex: 1 1 400px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
                         <h3 style="font-size: 1.1rem; margin-top: 0; display: flex; align-items: center; gap: 8px;">
                             <i data-lucide="file-text" style="color: var(--accent-primary); width: 20px; height: 20px;"></i>
-                            Extract Headers
+                            Header Extractor
                         </h3>
-                        <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; margin: 0;">
-                            Paste your raw text or HTML here. This tool will extract the content without <code>&lt;script&gt;</code> tags.
-                        </p>
                         
-                        <textarea id="extract-headers-input" placeholder="Paste content here..." style="flex: 1; min-height: 250px; font-family: monospace; font-size: 0.85rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); resize: vertical;"></textarea>
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; margin: 0;">Click the button below to extract a header from a random website. Each click picks a different site.</p>
 
-                        <button onclick="window.processExtractHeaders()" style="padding: 12px; background: var(--accent-primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                            <i data-lucide="code" style="width: 16px; height: 16px;"></i> Extract & Clean
+                        <button id="btn-extract-header" onclick="window.extractHeader()" style="margin-top: 8px; padding: 14px; background: var(--accent-primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.9rem;">
+                            <i data-lucide="shuffle" style="width: 16px; height: 16px;"></i> Extract Random Header
                         </button>
+
+                        <div id="header-source-label" style="font-size: 0.8rem; color: var(--text-secondary); font-style: italic;"></div>
                     </div>
 
                     <div class="card" style="flex: 1.5 1 500px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
