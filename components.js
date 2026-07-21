@@ -1233,18 +1233,14 @@ window.extractHeader = async () => {
 
 window.copyExtractHeadersText = () => {
     const textarea = document.getElementById('extract-headers-text-output');
-    if (!textarea || !textarea.value) { alert("No text to copy!"); return; }
-    navigator.clipboard.writeText(textarea.value).then(() => {
-        alert("Plain text copied!");
-    });
+    if (!textarea || !textarea.value) return;
+    navigator.clipboard.writeText(textarea.value);
 };
 
 window.copyExtractHeadersHtml = () => {
     const textarea = document.getElementById('extract-headers-html-output');
-    if (!textarea || !textarea.value) { alert("No HTML to copy!"); return; }
-    navigator.clipboard.writeText(textarea.value).then(() => {
-        alert("HTML copied!");
-    });
+    if (!textarea || !textarea.value) return;
+    navigator.clipboard.writeText(textarea.value);
 };
 
 window.switchToolsTab = (tab) => {
@@ -1531,24 +1527,16 @@ window.extractFooter = async () => {
 
 window.copyFooterToClipboard = () => {
     const textarea = document.getElementById('footer-text-result');
-    if (!textarea || !textarea.value) {
-        alert("No text to copy!");
-        return;
-    }
+    if (!textarea || !textarea.value) return;
     textarea.select();
     document.execCommand('copy');
-    alert("Plain text footer copied!");
 };
 
 window.copyFooterHtmlToClipboard = () => {
     const textarea = document.getElementById('footer-html-result');
-    if (!textarea || !textarea.value) {
-        alert("No HTML to copy!");
-        return;
-    }
+    if (!textarea || !textarea.value) return;
     textarea.select();
     document.execCommand('copy');
-    alert("HTML footer copied!");
 };
 
 window.calculateAgeString = (createdDateStr) => {
