@@ -2101,13 +2101,17 @@ CRITICAL RULES:
 5. Output ONLY raw HTML code starting with <!DOCTYPE html>. Do NOT include markdown fences, backticks, or extra conversational text.`;
 
     try {
-        const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-pro'];
+        const apiEndpoints = [
+            `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+            `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key=${apiKey}`
+        ];
         let response = null;
         let lastErr = null;
 
-        for (const m of modelsToTry) {
+        for (const ep of apiEndpoints) {
             try {
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`, {
+                const res = await fetch(ep, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
