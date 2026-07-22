@@ -8917,9 +8917,17 @@ function renderWarmupProgress(app, container) {
     const seenActiveServers = new Set();
 
     groups.forEach(g => {
-        g.records.sort((a, b) => b.timestamp - a.timestamp);
-        const latestTimestamp = g.records[0] ? g.records[0].timestamp : 0;
-        
+        g.records.sort((a, b) => {
+            let tsA = Number(a.timestamp) || 0;
+            let tsB = Number(b.timestamp) || 0;
+            if (tsA > 0 && tsA < 1e11) tsA *= 1000;
+            if (tsB > 0 && tsB < 1e11) tsB *= 1000;
+            return tsB - tsA;
+        });
+
+        let latestTimestamp = g.records[0] ? Number(g.records[0].timestamp) || 0 : 0;
+        if (latestTimestamp > 0 && latestTimestamp < 1e11) latestTimestamp *= 1000;
+
         const d = g.domain ? g.domain.trim().toLowerCase() : '';
         const i = g.ip ? g.ip.trim() : '';
         const s = g.server ? g.server.trim() : '';
@@ -8999,7 +9007,9 @@ function renderWarmupProgress(app, container) {
         return last3.some(r => (parseInt(r.outVal) || 0) > 19000);
     });
 
-    if (!app.state.warmupActiveTab || app.state.warmupActiveTab === 'active') app.state.warmupActiveTab = 'active12';
+    if (!app.state.warmupActiveTab || app.state.warmupActiveTab === 'active') {
+        app.state.warmupActiveTab = active12Groups.length > 0 ? 'active12' : 'active24';
+    }
     let currentGroups = active12Groups;
     if (app.state.warmupActiveTab === 'active24') currentGroups = active24Groups;
     if (app.state.warmupActiveTab === 'archived') currentGroups = archivedGroups;
