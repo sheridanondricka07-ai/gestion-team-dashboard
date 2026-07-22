@@ -1243,6 +1243,51 @@ window.copyExtractHeadersHtml = () => {
     navigator.clipboard.writeText(textarea.value);
 };
 
+window.generateRandomText = async () => {
+    const btn = document.getElementById('btn-generate-text');
+    const countInput = document.getElementById('generate-text-count');
+    const sourceLabel = document.getElementById('generate-text-source-label');
+    const resultOutput = document.getElementById('generate-text-result');
+
+    const count = parseInt(countInput ? countInput.value : 1) || 1;
+
+    const oldText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<i data-lucide="loader" class="spin" style="width:16px; height:16px; margin-right:6px; vertical-align:middle;"></i> Extracting ${count} Text(s)...`;
+    if (sourceLabel) sourceLabel.textContent = `Fetching random website text...`;
+    if (window.lucide) window.lucide.createIcons();
+
+    try {
+        const response = await fetch(`/api/get-ip-info?target=text&count=${count}`);
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error || `HTTP Status ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        if (resultOutput) {
+            resultOutput.value = data.text || '';
+        }
+        if (sourceLabel) {
+            sourceLabel.textContent = `Extracted ${data.count || count} text(s) from ${data.source || 'random sites'}`;
+        }
+    } catch (err) {
+        alert("Extraction failed: " + err.message);
+        if (sourceLabel) sourceLabel.textContent = `Failed to fetch text.`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = oldText;
+        if (window.lucide) window.lucide.createIcons();
+    }
+};
+
+window.copyGeneratedTextToClipboard = () => {
+    const textarea = document.getElementById('generate-text-result');
+    if (!textarea || !textarea.value) return;
+    navigator.clipboard.writeText(textarea.value);
+};
+
 window.switchToolsTab = (tab) => {
     window.app.state.toolsActiveTab = tab;
     window.app.updateDashboard();
@@ -1674,6 +1719,9 @@ function renderTools(app, container) {
             <div onclick="window.switchToolsTab('imacros')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'imacros' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'imacros' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
                 <i data-lucide="file-cog" style="width: 14px; height: 14px;"></i> Generate imacros File
             </div>
+            <div onclick="window.switchToolsTab('generateText')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'generateText' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'generateText' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+                <i data-lucide="align-left" style="width: 14px; height: 14px;"></i> Generate Text
+            </div>
             <div onclick="window.switchToolsTab('extractHeaders')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'extractHeaders' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'extractHeaders' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
                 <i data-lucide="file-text" style="width: 14px; height: 14px;"></i> Extract Headers
             </div>
@@ -1864,6 +1912,45 @@ function renderTools(app, container) {
                             
                             <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Raw HTML Version</label>
                             <textarea id="extract-headers-html-output" readonly placeholder="HTML structure of the headers..." style="flex: 1; min-height: 200px; font-family: monospace; font-size: 0.82rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); resize: none;"></textarea>
+                        </div>
+                    </div>
+                </div>
+            ` : activeTab === 'generateText' ? `
+                <div style="display: flex; gap: 24px; padding: 24px; flex-wrap: wrap;">
+                    <div class="card" style="flex: 1 1 400px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <h3 style="font-size: 1.1rem; margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                            <i data-lucide="align-left" style="color: var(--accent-primary); width: 20px; height: 20px;"></i>
+                            Generate Text
+                        </h3>
+                        
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; margin: 0;">Extract clean text or medium paragraphs from random websites (text only). Enter the number of texts you want to generate.</p>
+
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Number of Texts to Extract</label>
+                            <input type="number" id="generate-text-count" min="1" max="50" value="1" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem;" placeholder="e.g. 10">
+                        </div>
+
+                        <button id="btn-generate-text" onclick="window.generateRandomText()" style="margin-top: 8px; padding: 14px; background: var(--accent-primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.9rem;">
+                            <i data-lucide="sparkles" style="width: 16px; height: 16px;"></i> Extract Random Text
+                        </button>
+
+                        <div id="generate-text-source-label" style="font-size: 0.8rem; color: var(--text-secondary); font-style: italic;"></div>
+                    </div>
+
+                    <div class="card" style="flex: 1.5 1 500px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                            <h3 style="font-size: 1.1rem; margin: 0; display: flex; align-items: center; gap: 8px;">
+                                <i data-lucide="check-circle" style="color: var(--success); width: 20px; height: 20px;"></i>
+                                Extracted Text
+                            </h3>
+                            <button onclick="window.copyGeneratedTextToClipboard()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 6px; cursor: pointer; border-radius: 6px;">
+                                <i data-lucide="copy" style="width: 12px; height: 12px;"></i> Copy Text
+                            </button>
+                        </div>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 10px; flex: 1;">
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Clean Text Version</label>
+                            <textarea id="generate-text-result" readonly placeholder="Extracted text will appear here..." style="flex: 1; min-height: 250px; font-family: inherit; font-size: 0.85rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); resize: vertical;"></textarea>
                         </div>
                     </div>
                 </div>

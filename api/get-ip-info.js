@@ -15,10 +15,10 @@ module.exports = async function handler(req, res) {
         return res.status(200).end();
     }
 
-    // --- FOOTER & HEADER EXTRACTOR (GET method) ---
+    // --- FOOTER, HEADER & TEXT EXTRACTOR (GET method) ---
     if (req.method === 'GET') {
         try {
-            const targetElement = req.query.target === 'header' ? 'header' : 'footer';
+            const targetElement = req.query.target;
             let domainsList = [];
             try {
                 const filePath = path.join(process.cwd(), 'domains.txt');
@@ -39,6 +39,56 @@ module.exports = async function handler(req, res) {
                     'nationalgeographic.com', 'bbc.com', 'nytimes.com', 'cnn.com', 
                     'theguardian.com', 'forbes.com', 'bloomberg.com'
                 ];
+            }
+
+            if (targetElement === 'text') {
+                const count = Math.min(Math.max(parseInt(req.query.count) || 1, 1), 50);
+                const extractedTexts = [];
+                const sources = [];
+                let attempts = 0;
+                const maxAttempts = 15;
+
+                while (extractedTexts.length < count && attempts < maxAttempts) {
+                    attempts++;
+                    const currentDomain = domainsList[Math.floor(Math.random() * domainsList.length)];
+                    let targetUrl = currentDomain;
+                    if (!/^https?:\/\//i.test(targetUrl)) targetUrl = 'https://' + targetUrl;
+
+                    try {
+                        const response = await fetch(targetUrl, {
+                            headers: {
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
+                            },
+                            signal: AbortSignal.timeout(6000)
+                        });
+
+                        if (!response.ok) continue;
+                        const htmlText = await response.text();
+
+                        const paragraphs = extractParagraphsFromHtml(htmlText);
+                        for (const p of paragraphs) {
+                            if (extractedTexts.length < count && !extractedTexts.includes(p)) {
+                                extractedTexts.push(p);
+                            }
+                        }
+
+                        if (paragraphs.length > 0 && !sources.includes(currentDomain)) {
+                            sources.push(currentDomain);
+                        }
+                    } catch (e) {
+                        console.log(`Attempt ${attempts} failed for ${currentDomain}: ${e.message}`);
+                    }
+                }
+
+                if (extractedTexts.length === 0) {
+                    return res.status(500).json({ error: 'Failed to extract valid text from random website attempts.' });
+                }
+
+                return res.status(200).json({
+                    source: sources.join(', '),
+                    count: extractedTexts.length,
+                    text: extractedTexts.join(';\n\n')
+                });
             }
 
             let targetUrl = '';
@@ -227,4 +277,42 @@ function cleanHtml(html) {
     // Normalize spaces
     clean = clean.replace(/\s+/g, ' ').trim();
     return clean;
+}
+
+function extractParagraphsFromHtml(html) {
+    let clean = html
+        .replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, '')
+        .replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, '')
+        .replace(/<head[^>]*>([\s\S]*?)<\/head>/gi, '')
+        .replace(/<nav[^>]*>([\s\S]*?)<\/nav>/gi, '')
+        .replace(/<header[^>]*>([\s\S]*?)<\/header>/gi, '')
+        .replace(/<footer[^>]*>([\s\S]*?)<\/footer>/gi, '')
+        .replace(/<svg[^>]*>([\s\S]*?)<\/svg>/gi, '');
+
+    const pMatches = clean.match(/<p[^>]*>([\s\S]*?)<\/p>/gi) || [];
+    const paragraphs = [];
+
+    for (const match of pMatches) {
+        const text = cleanHtml(match);
+        if (text.length >= 60 && text.length <= 400 && !/cookie|privacy policy|all rights reserved|javascript/i.test(text)) {
+            paragraphs.push(text);
+        }
+    }
+
+    if (paragraphs.length === 0) {
+        const fullClean = cleanHtml(clean);
+        const sentences = fullClean.split(/(?<=[.!?])\s+/);
+        let currentChunk = '';
+        for (const s of sentences) {
+            if ((currentChunk + ' ' + s).length <= 350) {
+                currentChunk = (currentChunk + ' ' + s).trim();
+            } else {
+                if (currentChunk.length >= 60) paragraphs.push(currentChunk);
+                currentChunk = s;
+            }
+        }
+        if (currentChunk.length >= 60 && currentChunk.length <= 400) paragraphs.push(currentChunk);
+    }
+
+    return paragraphs;
 }
