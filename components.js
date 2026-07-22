@@ -1804,7 +1804,98 @@ window.downloadCleanNews = () => {
     URL.revokeObjectURL(url);
 };
 
-// ===== EMAIL HTML ENHANCER TOOL =====
+// ===== EMAIL HTML ENHANCER & PRO BUILDER TOOL =====
+window.applyEmailEnhancerPreset = (preset) => {
+    const themeEl = document.getElementById('email-enhancer-theme');
+    const inputEl = document.getElementById('email-enhancer-input');
+    const preheaderEl = document.getElementById('email-enhancer-preheader');
+    const ctaTextEl = document.getElementById('email-enhancer-cta-text');
+    const ctaUrlEl = document.getElementById('email-enhancer-cta-url');
+    const heroOpt = document.getElementById('email-enhancer-opt-hero');
+    const heroTitleEl = document.getElementById('email-enhancer-hero-title');
+    const couponOpt = document.getElementById('email-enhancer-opt-coupon');
+    const couponCodeEl = document.getElementById('email-enhancer-coupon-code');
+    const testimonialOpt = document.getElementById('email-enhancer-opt-testimonial');
+    const urgencyOpt = document.getElementById('email-enhancer-opt-urgency');
+    const calloutOpt = document.getElementById('email-enhancer-opt-callout');
+
+    if (preset === 'flash_sale') {
+        if (themeEl) themeEl.value = 'promo';
+        if (inputEl) inputEl.value = "We are unlocking our biggest sale of the season! For the next 24 hours only, take advantage of huge discounts across our entire catalog.\n\nDon't miss out on these exclusive savings before inventory runs out.";
+        if (preheaderEl) preheaderEl.value = "🔥 Flash Sale Alert: Take 50% OFF everything for the next 24 hours!";
+        if (ctaTextEl) ctaTextEl.value = "Shop 50% Off Sale Now →";
+        if (heroOpt) heroOpt.checked = true;
+        if (heroTitleEl) heroTitleEl.value = "🔥 FLASH SALE: 50% OFF EVERYTHING";
+        if (couponOpt) couponOpt.checked = true;
+        if (couponCodeEl) couponCodeEl.value = "FLASH50";
+        if (urgencyOpt) urgencyOpt.checked = true;
+        if (testimonialOpt) testimonialOpt.checked = true;
+        if (calloutOpt) calloutOpt.checked = true;
+    } else if (preset === 'launch') {
+        if (themeEl) themeEl.value = 'saas';
+        if (inputEl) inputEl.value = "After months of development, we are thrilled to officially unveil our newest feature release.\n\nDesigned from the ground up to streamline your workflow and accelerate your results, this update gives you complete control with zero setup required.";
+        if (preheaderEl) preheaderEl.value = "🚀 It's finally here! Check out our biggest update of the year.";
+        if (ctaTextEl) ctaTextEl.value = "Explore New Features →";
+        if (heroOpt) heroOpt.checked = true;
+        if (heroTitleEl) heroTitleEl.value = "🚀 INTRODUCING OUR NEWEST RELEASE";
+        if (couponOpt) couponOpt.checked = false;
+        if (urgencyOpt) urgencyOpt.checked = false;
+        if (testimonialOpt) testimonialOpt.checked = true;
+        if (calloutOpt) calloutOpt.checked = true;
+    } else if (preset === 'vip_invite') {
+        if (themeEl) themeEl.value = 'dark';
+        if (inputEl) inputEl.value = "As one of our most valued members, you have been selected for exclusive VIP early access.\n\nGet first priority before we open access to the general public tomorrow.";
+        if (preheaderEl) preheaderEl.value = "✨ You are invited: Exclusive VIP Early Access inside.";
+        if (ctaTextEl) ctaTextEl.value = "Claim VIP Early Access →";
+        if (heroOpt) heroOpt.checked = true;
+        if (heroTitleEl) heroTitleEl.value = "✨ EXCLUSIVE VIP INVITATION";
+        if (couponOpt) couponOpt.checked = true;
+        if (couponCodeEl) couponCodeEl.value = "VIPACCESS";
+        if (urgencyOpt) urgencyOpt.checked = true;
+        if (testimonialOpt) testimonialOpt.checked = true;
+        if (calloutOpt) calloutOpt.checked = false;
+    } else if (preset === 'minimal') {
+        if (themeEl) themeEl.value = 'minimal';
+        if (inputEl) inputEl.value = "Hi there,\n\nJust a quick note to share a few valuable insights and key updates for this week.\n\nRead the full summary and let us know your thoughts.";
+        if (preheaderEl) preheaderEl.value = "Quick update & weekly insights for you.";
+        if (ctaTextEl) ctaTextEl.value = "Read Full Post →";
+        if (heroOpt) heroOpt.checked = false;
+        if (couponOpt) couponOpt.checked = false;
+        if (urgencyOpt) urgencyOpt.checked = false;
+        if (testimonialOpt) testimonialOpt.checked = false;
+        if (calloutOpt) calloutOpt.checked = false;
+    }
+
+    window.generateEnhancedEmailHtml();
+};
+
+window.generateSubjectLines = () => {
+    const inputEl = document.getElementById('email-enhancer-input');
+    const text = inputEl ? inputEl.value.trim() : '';
+    const container = document.getElementById('email-enhancer-subjects-list');
+    if (!container) return;
+
+    const subjects = [
+        `🔥 Limited Time: ${text ? text.substring(0, 35) + '...' : 'Special Offer Inside'}`,
+        `🚀 Quick Announcement: Important updates for you`,
+        `⏰ Ending Soon: Don't miss out on this offer`,
+        `✨ Exclusive Access: Hand-picked just for you`,
+        `💡 Quick question about your recent updates...`
+    ];
+
+    container.innerHTML = `
+        <div style="background: rgba(59,130,246,0.06); border: 1px solid rgba(59,130,246,0.15); border-radius: 8px; padding: 12px; font-size: 0.8rem; display: flex; flex-direction: column; gap: 6px;">
+            <strong style="color: var(--accent-primary);">💡 Recommended High-Open-Rate Subject Lines:</strong>
+            ${subjects.map(s => `
+                <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-primary); padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                    <span style="font-family: inherit;">${s}</span>
+                    <button onclick="navigator.clipboard.writeText('${s.replace(/'/g, "\\'")}')" style="padding: 2px 8px; font-size: 0.72rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 4px; cursor: pointer;">Copy</button>
+                </div>
+            `).join('')}
+        </div>
+    `;
+};
+
 window.generateEnhancedEmailHtml = () => {
     const input = document.getElementById('email-enhancer-input')?.value || '';
     const theme = document.getElementById('email-enhancer-theme')?.value || 'saas';
@@ -1818,6 +1909,17 @@ window.generateEnhancedEmailHtml = () => {
     const heroTitle = document.getElementById('email-enhancer-hero-title')?.value || 'Exclusive Special Announcement';
     const addCallout = document.getElementById('email-enhancer-opt-callout')?.checked ?? false;
     const calloutText = document.getElementById('email-enhancer-callout-text')?.value || '⚡ Limited Time Offer: Valid for the next 24 hours only.';
+    
+    const addCoupon = document.getElementById('email-enhancer-opt-coupon')?.checked ?? false;
+    const couponCode = document.getElementById('email-enhancer-coupon-code')?.value || 'SAVE50';
+
+    const addUrgency = document.getElementById('email-enhancer-opt-urgency')?.checked ?? false;
+    const urgencyText = document.getElementById('email-enhancer-urgency-text')?.value || '🔥 84% of available spots claimed — Only 16 remaining!';
+
+    const addTestimonial = document.getElementById('email-enhancer-opt-testimonial')?.checked ?? false;
+    const testimonialQuote = document.getElementById('email-enhancer-testimonial-quote')?.value || '"This completely transformed our campaign results within the first 24 hours!"';
+    const testimonialAuthor = document.getElementById('email-enhancer-testimonial-author')?.value || '— Alex M., Verified Customer';
+
     const addFooter = document.getElementById('email-enhancer-opt-footer')?.checked ?? true;
 
     let contentHtml = input.trim();
@@ -1916,6 +2018,40 @@ window.generateEnhancedEmailHtml = () => {
         </table>
     ` : '';
 
+    const couponHtml = addCoupon ? `
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" role="presentation" style="margin: 24px 0; border: 2px dashed ${t.accent}; border-radius: 8px; background: rgba(0,0,0,0.02);">
+            <tr>
+                <td style="padding: 20px; text-align: center; font-family: Arial, sans-serif;">
+                    <p style="margin: 0 0 6px 0; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: ${t.accent};">YOUR PROMO CODE</p>
+                    <div style="font-size: 24px; font-weight: 800; letter-spacing: 2px; color: ${t.headingText}; margin: 4px 0;">${couponCode}</div>
+                    <p style="margin: 6px 0 0 0; font-size: 12px; color: #64748b;">Use code at checkout to claim your discount</p>
+                </td>
+            </tr>
+        </table>
+    ` : '';
+
+    const urgencyHtml = addUrgency ? `
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" role="presentation" style="margin: 16px 0; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px;">
+            <tr>
+                <td style="padding: 12px 16px; font-size: 13px; font-weight: 600; color: #991b1b; text-align: center; font-family: Arial, sans-serif;">
+                    ${urgencyText}
+                </td>
+            </tr>
+        </table>
+    ` : '';
+
+    const testimonialHtml = addTestimonial ? `
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" role="presentation" style="margin: 24px 0; background: rgba(0,0,0,0.03); border-radius: 8px;">
+            <tr>
+                <td style="padding: 20px; text-align: center; font-family: Arial, sans-serif;">
+                    <div style="color: #f59e0b; font-size: 18px; margin-bottom: 8px;">★★★★★</div>
+                    <p style="margin: 0 0 8px 0; font-size: 14px; font-style: italic; color: ${t.text}; line-height: 1.5;">${testimonialQuote}</p>
+                    <p style="margin: 0; font-size: 12px; font-weight: 700; color: ${t.headingText};">${testimonialAuthor}</p>
+                </td>
+            </tr>
+        </table>
+    ` : '';
+
     const preheaderHtml = preheader ? `
         <div style="display: none; font-size: 1px; color: #333333; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
             ${preheader} &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
@@ -1949,9 +2085,12 @@ window.generateEnhancedEmailHtml = () => {
                     ${heroHtml ? `<tr><td>${heroHtml}</td></tr>` : ''}
                     <tr>
                         <td style="padding: 32px 28px; color: ${t.text}; font-size: 15px; line-height: 1.6;">
+                            ${urgencyHtml}
                             ${calloutHtml}
                             ${contentHtml}
+                            ${couponHtml}
                             ${buttonHtml}
+                            ${testimonialHtml}
                             ${footerHtml}
                         </td>
                     </tr>
@@ -2860,9 +2999,19 @@ function renderTools(app, container) {
                         
                         <p style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5; margin: 0;">Turn raw text or basic HTML into high-converting, mobile-responsive, Gmail-optimized HTML email templates with bulletproof CTAs and preheaders.</p>
 
+                        <div style="display: flex; flex-direction: column; gap: 8px; background: rgba(59,130,246,0.04); border: 1px solid rgba(59,130,246,0.12); padding: 12px; border-radius: 8px;">
+                            <label style="font-size: 0.78rem; font-weight: 700; color: var(--accent-primary); text-transform: uppercase; letter-spacing: 0.5px;">⚡ High-Convert Presets (1-Click Fill)</label>
+                            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                                <button onclick="window.applyEmailEnhancerPreset('flash_sale')" style="padding: 6px 10px; font-size: 0.75rem; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; font-weight: 500;">🔥 Flash Sale</button>
+                                <button onclick="window.applyEmailEnhancerPreset('launch')" style="padding: 6px 10px; font-size: 0.75rem; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; font-weight: 500;">🚀 Product Launch</button>
+                                <button onclick="window.applyEmailEnhancerPreset('vip_invite')" style="padding: 6px 10px; font-size: 0.75rem; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; font-weight: 500;">✨ VIP Invite</button>
+                                <button onclick="window.applyEmailEnhancerPreset('minimal')" style="padding: 6px 10px; font-size: 0.75rem; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; font-weight: 500;">📰 Clean Digest</button>
+                            </div>
+                        </div>
+
                         <div style="display: flex; flex-direction: column; gap: 6px;">
                             <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Email Content (Plain Text or HTML)</label>
-                            <textarea id="email-enhancer-input" placeholder="Paste your email copy or basic HTML here..." style="min-height: 140px; font-family: inherit; font-size: 0.85rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); resize: vertical;"></textarea>
+                            <textarea id="email-enhancer-input" placeholder="Paste your email copy or basic HTML here..." style="min-height: 120px; font-family: inherit; font-size: 0.85rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); resize: vertical;"></textarea>
                         </div>
 
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
@@ -2889,9 +3038,14 @@ function renderTools(app, container) {
                         </div>
 
                         <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Preheader / Teaser Text (Shown in Gmail Inbox List)</label>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Preheader / Teaser Text (Shown in Inbox List)</label>
+                                <button onclick="window.generateSubjectLines()" style="padding: 2px 8px; font-size: 0.72rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--accent-primary); border-radius: 4px; cursor: pointer;">💡 Subject Ideas</button>
+                            </div>
                             <input type="text" id="email-enhancer-preheader" placeholder="e.g. Open to claim your 50% discount before it expires!" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem;">
                         </div>
+
+                        <div id="email-enhancer-subjects-list"></div>
 
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                             <div style="display: flex; flex-direction: column; gap: 6px;">
@@ -2904,22 +3058,30 @@ function renderTools(app, container) {
                             </div>
                         </div>
 
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.8rem;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.78rem;">
                             <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
                                 <input type="checkbox" id="email-enhancer-opt-sanitize" checked style="accent-color: var(--accent-primary);">
                                 Inline CSS & Sanitize Tags
                             </label>
                             <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
                                 <input type="checkbox" id="email-enhancer-opt-hero" style="accent-color: var(--accent-primary);">
-                                Add Hero Header Banner
+                                Hero Header Banner
                             </label>
                             <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
-                                <input type="checkbox" id="email-enhancer-opt-callout" style="accent-color: var(--accent-primary);">
-                                Add Urgency Callout Box
+                                <input type="checkbox" id="email-enhancer-opt-coupon" style="accent-color: var(--accent-primary);">
+                                Promo Coupon Box
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
+                                <input type="checkbox" id="email-enhancer-opt-urgency" style="accent-color: var(--accent-primary);">
+                                Urgency Stock Bar
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
+                                <input type="checkbox" id="email-enhancer-opt-testimonial" style="accent-color: var(--accent-primary);">
+                                5-Star Testimonial
                             </label>
                             <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
                                 <input type="checkbox" id="email-enhancer-opt-footer" checked style="accent-color: var(--accent-primary);">
-                                Add Unsubscribe Footer
+                                Unsubscribe Footer
                             </label>
                         </div>
 
