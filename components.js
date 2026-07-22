@@ -1632,6 +1632,178 @@ window.copyEncodedText = () => {
     navigator.clipboard.writeText(textarea.value);
 };
 
+// ===== CLEAN NEWS TOOL =====
+window._cleanNewsRemovePatterns = [
+    /^Return-Path:/i,
+    /^Received-SPF:/i,
+    /^Authentication-Results:/i,
+    /^DKIM-Signature:/i,
+    /^ARC-/i,
+    /^Delivered-To:/i,
+    /^X-/i
+];
+
+window._encodeMimeBase64 = (text) => {
+    if (!text) return text;
+    if (/=\?.+\?[BbQq]\?.+\?=/.test(text)) return text;
+    try {
+        const utf8Bytes = new TextEncoder().encode(text);
+        let binary = '';
+        for (let i = 0; i < utf8Bytes.length; i++) {
+            binary += String.fromCharCode(utf8Bytes[i]);
+        }
+        const encoded = btoa(binary);
+        return `=?UTF-8?B?${encoded}?=`;
+    } catch(e) {
+        return text;
+    }
+};
+
+window._redactDomain = (domain) => {
+    domain = (domain || '').trim();
+    const parts = domain.split('.');
+    if (parts.length > 1) {
+        parts[parts.length - 1] = '[RDNS]';
+        return parts.join('.');
+    }
+    return '[RDNS]';
+};
+
+window.cleanNewsContent = () => {
+    const input = document.getElementById('clean-news-input');
+    const output = document.getElementById('clean-news-output');
+    if (!input || !output) return;
+
+    const raw = input.value;
+    if (!raw.trim()) return;
+
+    const encodeSubject = document.getElementById('clean-news-opt-encode-subject')?.checked ?? true;
+    const redactFrom = document.getElementById('clean-news-opt-redact-from')?.checked ?? true;
+    const redactMsgId = document.getElementById('clean-news-opt-redact-msgid')?.checked ?? true;
+    const removeTrackers = document.getElementById('clean-news-opt-remove-trackers')?.checked ?? true;
+    const mirrorCc = document.getElementById('clean-news-opt-mirror-cc')?.checked ?? false;
+    const clearSubject = document.getElementById('clean-news-opt-clear-subject')?.checked ?? false;
+
+    let headerText = raw;
+    let bodyText = '';
+    let sep = '\n\n';
+
+    const doubleCrlf = raw.indexOf('\r\n\r\n');
+    const doubleLf = raw.indexOf('\n\n');
+
+    if (doubleCrlf !== -1 && (doubleLf === -1 || doubleCrlf <= doubleLf)) {
+        headerText = raw.substring(0, doubleCrlf);
+        bodyText = raw.substring(doubleCrlf + 4);
+        sep = '\r\n\r\n';
+    } else if (doubleLf !== -1) {
+        headerText = raw.substring(0, doubleLf);
+        bodyText = raw.substring(doubleLf + 2);
+        sep = '\n\n';
+    }
+
+    const lines = headerText.split(/\r?\n/);
+    const filteredLines = [];
+    let keep = true;
+
+    for (const line of lines) {
+        if (/^[ \t]/.test(line)) {
+            if (!keep) continue;
+            if (filteredLines.length > 0) {
+                filteredLines[filteredLines.length - 1] += ' ' + line.trim();
+            }
+            continue;
+        }
+
+        keep = true;
+        if (removeTrackers) {
+            for (const pat of window._cleanNewsRemovePatterns) {
+                if (pat.test(line)) {
+                    keep = false;
+                    break;
+                }
+            }
+        }
+        if (!keep) continue;
+        filteredLines.push(line);
+    }
+
+    let txt = filteredLines.join('\r\n');
+
+    if (clearSubject) {
+        txt = txt.replace(/^Subject:.*?(?=\r?\n(?:[^ \t\r\n])|\r?\n\r?\n|$)/igm, 'Subject: ');
+    } else if (encodeSubject) {
+        txt = txt.replace(/^Subject:\s*(.+?)\r?$/igm, (m, subj) => {
+            const trimmed = subj.trim();
+            if (!/=\?.+\?[BbQq]\?.+\?=/.test(trimmed)) {
+                return `Subject: ${window._encodeMimeBase64(trimmed)}`;
+            }
+            return `Subject: ${trimmed}`;
+        });
+    }
+
+    if (redactFrom) {
+        const fixAddr = (hdr) => {
+            const re = new RegExp(`^${hdr}:\\s*(?:([^<@\\r\\n]*?)\\s*<([^@<>\\s]+)@([^@<>\\s>]+)>|([^@<>\\s\\r\\n]+)@([^@<>\\s\\r\\n]+))\\r?$`, 'igm');
+            txt = txt.replace(re, (m, name, user1, domain1, user2, domain2) => {
+                if (user1 !== undefined && user1 !== null) {
+                    let cleanName = (name || '').trim().replace(/^"|"$/g, '');
+                    const redDomain = window._redactDomain(domain1);
+                    if (cleanName) {
+                        if (!/=\?.+\?[BbQq]\?.+\?=/.test(cleanName)) {
+                            cleanName = window._encodeMimeBase64(cleanName);
+                        }
+                        return `${hdr}: "${cleanName}" <${user1}@${redDomain}>`;
+                    }
+                    return `${hdr}: <${user1}@${redDomain}>`;
+                } else {
+                    const redDomain = window._redactDomain(domain2);
+                    return `${hdr}: ${user2}@${redDomain}`;
+                }
+            });
+        };
+        fixAddr('From');
+        fixAddr('Sender');
+    }
+
+    if (redactMsgId) {
+        txt = txt.replace(/(Message-ID:\s*<)([^@<>]+)@([^>]+)>/ig, '$1$2[EID]@$3>');
+    }
+
+    if (mirrorCc) {
+        txt = txt.replace(/^Cc:[^\r\n]*(?:\r?\n[ \t][^\r\n]*)*\r?\n?/igm, '');
+        const toMatch = txt.match(/^To:[^\r\n]*(?:\r?\n[ \t][^\r\n]*)*/im);
+        if (toMatch) {
+            const toBlock = toMatch[0];
+            const ccBlock = toBlock.replace(/^To:/i, 'Cc:');
+            const idx = txt.indexOf(toBlock) + toBlock.length;
+            txt = txt.substring(0, idx) + '\r\n' + ccBlock + txt.substring(idx);
+        }
+    }
+
+    const fullClean = txt + (bodyText ? (sep + bodyText) : '');
+    output.value = fullClean;
+};
+
+window.copyCleanNews = () => {
+    const textarea = document.getElementById('clean-news-output');
+    if (!textarea || !textarea.value) return;
+    navigator.clipboard.writeText(textarea.value);
+};
+
+window.downloadCleanNews = () => {
+    const textarea = document.getElementById('clean-news-output');
+    if (!textarea || !textarea.value) return;
+    const blob = new Blob([textarea.value], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `clean_news_${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+};
+
 window.switchToolsTab = (tab) => {
     window.app.state.toolsActiveTab = tab;
     window.app.updateDashboard();
@@ -2081,6 +2253,9 @@ function renderTools(app, container) {
             <div onclick="window.switchToolsTab('textEncoder')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'textEncoder' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'textEncoder' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
                 <i data-lucide="binary" style="width: 14px; height: 14px;"></i> Text Encoder
             </div>
+            <div onclick="window.switchToolsTab('cleanNews')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'cleanNews' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'cleanNews' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+                <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Clean News
+            </div>
         </div>
         
         <div id="tools-tab-content">
@@ -2391,6 +2566,75 @@ function renderTools(app, container) {
                         <div style="display: flex; flex-direction: column; gap: 10px; flex: 1;">
                             <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">MIME Encoded-Word Format (one per line)</label>
                             <textarea id="text-encoder-output" readonly placeholder="Encoded text in all charsets will appear here..." style="flex: 1; min-height: 400px; font-family: monospace; font-size: 0.8rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); resize: vertical; line-height: 1.6;"></textarea>
+                        </div>
+                    </div>
+                </div>
+            ` : activeTab === 'cleanNews' ? `
+                <div style="display: flex; gap: 24px; padding: 24px; flex-wrap: wrap;">
+                    <div class="card" style="flex: 1 1 420px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <h3 style="font-size: 1.1rem; margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                            <i data-lucide="sparkles" style="color: var(--accent-primary); width: 20px; height: 20px;"></i>
+                            Clean News Cleaner
+                        </h3>
+                        
+                        <p style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5; margin: 0;">Paste raw email / newsletter source code below. This tool strips tracking headers (DKIM, SPF, ARC, Return-Path, X-*), encodes subjects, redacts From/Sender domains ([RDNS]), and formats Message-IDs ([EID]).</p>
+
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Raw News / Email Source</label>
+                            <textarea id="clean-news-input" placeholder="Paste full newsletter text or headers here...&#10;&#10;From: &quot;My News&quot; <info@domain.com>&#10;Subject: Hello World&#10;Message-ID: <12345@domain.com>&#10;Return-Path: <bounce@domain.com>&#10;DKIM-Signature: v=1; a=rsa-sha256; ...&#10;X-Google-Smtp-Source: ...&#10;&#10;Email body content goes here..." style="min-height: 220px; font-family: monospace; font-size: 0.82rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); resize: vertical;"></textarea>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.8rem;">
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
+                                <input type="checkbox" id="clean-news-opt-remove-trackers" checked style="accent-color: var(--accent-primary);">
+                                Strip Tracking/SPF/DKIM/X-
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
+                                <input type="checkbox" id="clean-news-opt-encode-subject" checked style="accent-color: var(--accent-primary);">
+                                MIME Base64 Encode Subject
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
+                                <input type="checkbox" id="clean-news-opt-redact-from" checked style="accent-color: var(--accent-primary);">
+                                Redact From/Sender [RDNS]
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
+                                <input type="checkbox" id="clean-news-opt-redact-msgid" checked style="accent-color: var(--accent-primary);">
+                                Redact Message-ID [EID]
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
+                                <input type="checkbox" id="clean-news-opt-mirror-cc" style="accent-color: var(--accent-primary);">
+                                Mirror CC (Copy To -> Cc)
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
+                                <input type="checkbox" id="clean-news-opt-clear-subject" style="accent-color: var(--accent-primary);">
+                                Clear Subject Content
+                            </label>
+                        </div>
+
+                        <button onclick="window.cleanNewsContent()" style="padding: 14px; background: var(--accent-primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.9rem;">
+                            <i data-lucide="sparkles" style="width: 16px; height: 16px;"></i> Clean News
+                        </button>
+                    </div>
+
+                    <div class="card" style="flex: 1.5 1 500px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                            <h3 style="font-size: 1.1rem; margin: 0; display: flex; align-items: center; gap: 8px;">
+                                <i data-lucide="check-circle" style="color: var(--success); width: 20px; height: 20px;"></i>
+                                Cleaned Output
+                            </h3>
+                            <div style="display: flex; gap: 8px;">
+                                <button onclick="window.copyCleanNews()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 6px; cursor: pointer; border-radius: 6px;">
+                                    <i data-lucide="copy" style="width: 12px; height: 12px;"></i> Copy Clean News
+                                </button>
+                                <button onclick="window.downloadCleanNews()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--accent-primary); border: none; color: white; display: flex; align-items: center; gap: 6px; cursor: pointer; border-radius: 6px;">
+                                    <i data-lucide="download" style="width: 12px; height: 12px;"></i> Download .txt
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 10px; flex: 1;">
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Cleaned Email / Newsletter</label>
+                            <textarea id="clean-news-output" readonly placeholder="Cleaned newsletter source will appear here..." style="flex: 1; min-height: 400px; font-family: monospace; font-size: 0.8rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); resize: vertical; line-height: 1.5;"></textarea>
                         </div>
                     </div>
                 </div>
