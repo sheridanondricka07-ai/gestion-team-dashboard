@@ -2031,6 +2031,14 @@ window.generateEnhancedEmailHtml = () => {
     }
 };
 
+window.saveAdminGeminiKey = (key) => {
+    const cleanKey = key ? key.trim() : '';
+    localStorage.setItem('gemini_ai_api_key', cleanKey);
+    if (window.db) {
+        window.db.ref('state/geminiApiKey').set(cleanKey);
+    }
+};
+
 window.generateAiEmailHtml = async () => {
     const input = document.getElementById('email-enhancer-input')?.value || '';
     const keyInput = document.getElementById('email-enhancer-ai-key');
@@ -2048,15 +2056,29 @@ window.generateAiEmailHtml = async () => {
         apiKey = localStorage.getItem('gemini_ai_api_key') || '';
     }
 
+    if (!apiKey && window.db) {
+        try {
+            const snap = await window.db.ref('state/geminiApiKey').once('value');
+            apiKey = snap.val() || '';
+            if (apiKey) localStorage.setItem('gemini_ai_api_key', apiKey);
+        } catch (e) {}
+    }
+
     if (!apiKey) {
-        const userKey = prompt(
-            'To generate with Real AI, please enter your free Google Gemini API Key:\n\n' +
-            '(Get a 100% free key in 10 seconds at: https://aistudio.google.com/app/apikey)'
-        );
-        if (!userKey || !userKey.trim()) return;
-        apiKey = userKey.trim();
-        localStorage.setItem('gemini_ai_api_key', apiKey);
-        if (keyInput) keyInput.value = apiKey;
+        const isAdmin = app.state.currentUser && app.state.currentUser.role === 'admin';
+        if (isAdmin) {
+            const userKey = prompt(
+                'Please enter your free Google Gemini API Key:\n\n' +
+                '(Get a 100% free key in 10 seconds at: https://aistudio.google.com/app/apikey)'
+            );
+            if (!userKey || !userKey.trim()) return;
+            apiKey = userKey.trim();
+            window.saveAdminGeminiKey(apiKey);
+            if (keyInput) keyInput.value = apiKey;
+        } else {
+            alert('AI Email Reformer is not configured yet. Please ask the administrator to enter their Gemini API key.');
+            return;
+        }
     } else {
         localStorage.setItem('gemini_ai_api_key', apiKey);
     }
@@ -3028,13 +3050,15 @@ function renderTools(app, container) {
                             </button>
                         </div>
 
-                        <div style="display: flex; flex-direction: column; gap: 4px; background: rgba(139,92,246,0.04); border: 1px solid rgba(139,92,246,0.15); padding: 10px 12px; border-radius: 8px; font-size: 0.78rem;">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-weight: 600; color: #a855f7; display: flex; align-items: center; gap: 4px;"><i data-lucide="key" style="width: 12px; height: 12px;"></i> Gemini AI Key (Free & Unlimited):</span>
-                                <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--accent-primary); text-decoration: underline; font-size: 0.72rem;">Get Key Free ↗</a>
+                        ${(app.state.currentUser && app.state.currentUser.role === 'admin') ? `
+                            <div style="display: flex; flex-direction: column; gap: 4px; background: rgba(139,92,246,0.04); border: 1px solid rgba(139,92,246,0.15); padding: 10px 12px; border-radius: 8px; font-size: 0.78rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="font-weight: 600; color: #a855f7; display: flex; align-items: center; gap: 4px;"><i data-lucide="key" style="width: 12px; height: 12px;"></i> Gemini AI Key (Admin Only):</span>
+                                    <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--accent-primary); text-decoration: underline; font-size: 0.72rem;">Get Key Free ↗</a>
+                                </div>
+                                <input type="password" id="email-enhancer-ai-key" placeholder="Paste your free Google Gemini API key here..." value="${localStorage.getItem('gemini_ai_api_key') || ''}" onchange="window.saveAdminGeminiKey(this.value.trim())" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.78rem;">
                             </div>
-                            <input type="password" id="email-enhancer-ai-key" placeholder="Paste your free Google Gemini API key here..." value="${localStorage.getItem('gemini_ai_api_key') || ''}" onchange="localStorage.setItem('gemini_ai_api_key', this.value.trim())" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.78rem;">
-                        </div>
+                        ` : ''}
                     </div>
 
                     <div class="card" style="flex: 1.5 1 500px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
