@@ -2101,19 +2101,36 @@ CRITICAL RULES:
 5. Output ONLY raw HTML code starting with <!DOCTYPE html>. Do NOT include markdown fences, backticks, or extra conversational text.`;
 
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [{ text: `${systemPrompt}\n\nINPUT EMAIL CONTENT TO REDESIGN:\n${input}` }]
-                }]
-            })
-        });
+        const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-pro'];
+        let response = null;
+        let lastErr = null;
 
-        if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            throw new Error(errData.error?.message || `HTTP Status ${response.status}`);
+        for (const m of modelsToTry) {
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{ text: `${systemPrompt}\n\nINPUT EMAIL CONTENT TO REDESIGN:\n${input}` }]
+                        }]
+                    })
+                });
+
+                if (res.ok) {
+                    response = res;
+                    break;
+                } else {
+                    const errData = await res.json().catch(() => ({}));
+                    lastErr = errData.error?.message || `HTTP Status ${res.status}`;
+                }
+            } catch (e) {
+                lastErr = e.message;
+            }
+        }
+
+        if (!response) {
+            throw new Error(lastErr || 'Gemini model generation failed');
         }
 
         const data = await response.json();
