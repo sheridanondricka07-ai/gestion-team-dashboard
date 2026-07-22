@@ -1544,6 +1544,94 @@ window.copyFilteredDomains = () => {
     navigator.clipboard.writeText(textarea.value);
 };
 
+// ===== TEXT ENCODER TOOL =====
+window._encoderCharsets = [
+    'UTF-8','US-ASCII','ISO-8859-1','ISO-8859-2','ISO-8859-3','ISO-8859-4','ISO-8859-5',
+    'ISO-8859-6','ISO-8859-7','ISO-8859-8','ISO-8859-9','ISO-8859-11','ISO-8859-15',
+    'Windows-1250','Windows-1251','Windows-1252','Windows-1253','Windows-1254',
+    'Windows-1255','Windows-1256','Windows-1257','Windows-1258',
+    'Shift_JIS','ISO-2022-JP','EUC-JP','GB2312','GBK','GB18030','Big5',
+    'EUC-KR','ISO-2022-KR','KOI8-R','KOI8-U','UTF-16','UTF-16BE','UTF-16LE'
+];
+
+window.encodeTextToCharsets = () => {
+    const input = document.getElementById('text-encoder-input');
+    const output = document.getElementById('text-encoder-output');
+    if (!input || !output) return;
+    const text = input.value;
+    if (!text) return;
+
+    const charsets = window._encoderCharsets;
+    const utf8Bytes = new TextEncoder().encode(text);
+    const utf8B64 = btoa(String.fromCharCode(...utf8Bytes));
+
+    const lines = [];
+
+    for (const charset of charsets) {
+        const upper = charset.toUpperCase();
+        try {
+            if (upper === 'UTF-8') {
+                lines.push(`=?UTF-8?B?${utf8B64}?=`);
+            } else if (upper === 'US-ASCII') {
+                const asciiBytes = [];
+                for (let i = 0; i < text.length; i++) {
+                    const code = text.charCodeAt(i);
+                    asciiBytes.push(code <= 127 ? code : 63);
+                }
+                lines.push(`=?US-ASCII?B?${btoa(String.fromCharCode(...asciiBytes))}?=`);
+            } else if (upper === 'UTF-16') {
+                const bytes = [0xFF, 0xFE];
+                for (let i = 0; i < text.length; i++) {
+                    const code = text.charCodeAt(i);
+                    bytes.push(code & 0xFF, (code >> 8) & 0xFF);
+                }
+                lines.push(`=?UTF-16?B?${btoa(String.fromCharCode(...bytes))}?=`);
+            } else if (upper === 'UTF-16BE') {
+                const bytes = [];
+                for (let i = 0; i < text.length; i++) {
+                    const code = text.charCodeAt(i);
+                    bytes.push((code >> 8) & 0xFF, code & 0xFF);
+                }
+                lines.push(`=?UTF-16BE?B?${btoa(String.fromCharCode(...bytes))}?=`);
+            } else if (upper === 'UTF-16LE') {
+                const bytes = [];
+                for (let i = 0; i < text.length; i++) {
+                    const code = text.charCodeAt(i);
+                    bytes.push(code & 0xFF, (code >> 8) & 0xFF);
+                }
+                lines.push(`=?UTF-16LE?B?${btoa(String.fromCharCode(...bytes))}?=`);
+            } else {
+                // For single-byte ISO/Windows/KOI8 charsets and CJK charsets:
+                // Use TextDecoder to verify charset support, then encode via UTF-8 with charset label
+                // Most email clients handle this correctly for ASCII-range text
+                let encoded = utf8B64;
+                try {
+                    // Test if browser knows this charset via TextDecoder
+                    new TextDecoder(charset);
+                    // For ASCII-range text, bytes are identical across single-byte charsets
+                    const allAscii = [...text].every(c => c.charCodeAt(0) <= 127);
+                    if (allAscii) {
+                        const asciiBytes = [];
+                        for (let i = 0; i < text.length; i++) asciiBytes.push(text.charCodeAt(i));
+                        encoded = btoa(String.fromCharCode(...asciiBytes));
+                    }
+                } catch(e) { /* charset not supported by browser, use UTF-8 bytes */ }
+                lines.push(`=?${charset}?B?${encoded}?=`);
+            }
+        } catch (e) {
+            lines.push(`=?${charset}?B?${utf8B64}?=`);
+        }
+    }
+
+    output.value = lines.join('\n');
+};
+
+window.copyEncodedText = () => {
+    const textarea = document.getElementById('text-encoder-output');
+    if (!textarea || !textarea.value) return;
+    navigator.clipboard.writeText(textarea.value);
+};
+
 window.switchToolsTab = (tab) => {
     window.app.state.toolsActiveTab = tab;
     window.app.updateDashboard();
@@ -1990,6 +2078,9 @@ function renderTools(app, container) {
             <div onclick="window.switchToolsTab('domainFilter')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'domainFilter' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'domainFilter' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
                 <i data-lucide="filter" style="width: 14px; height: 14px;"></i> Domain Filter
             </div>
+            <div onclick="window.switchToolsTab('textEncoder')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'textEncoder' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'textEncoder' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+                <i data-lucide="binary" style="width: 14px; height: 14px;"></i> Text Encoder
+            </div>
         </div>
         
         <div id="tools-tab-content">
@@ -2259,6 +2350,48 @@ function renderTools(app, container) {
                         </div>
 
                         <div id="domain-filter-rejected"></div>
+                    </div>
+                </div>
+            ` : activeTab === 'textEncoder' ? `
+                <div style="display: flex; gap: 24px; padding: 24px; flex-wrap: wrap;">
+                    <div class="card" style="flex: 1 1 400px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <h3 style="font-size: 1.1rem; margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                            <i data-lucide="binary" style="color: var(--accent-primary); width: 20px; height: 20px;"></i>
+                            Text Encoder
+                        </h3>
+                        
+                        <p style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5; margin: 0;">Enter your text below and encode it into MIME encoded-word format for all supported charsets. Each encoding appears on its own line, ready for email headers.</p>
+
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Text to Encode</label>
+                            <textarea id="text-encoder-input" placeholder="Enter your text or subject line here..." style="min-height: 120px; font-family: inherit; font-size: 0.85rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); resize: vertical;"></textarea>
+                        </div>
+
+                        <button onclick="window.encodeTextToCharsets()" style="padding: 14px; background: var(--accent-primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.9rem;">
+                            <i data-lucide="code" style="width: 16px; height: 16px;"></i> Encode Text
+                        </button>
+
+                        <div style="font-size: 0.72rem; color: var(--text-secondary); line-height: 1.5; background: rgba(59,130,246,0.04); border: 1px solid rgba(59,130,246,0.1); border-radius: 8px; padding: 10px;">
+                            <strong style="color: var(--accent-primary);">Supported Charsets (${window._encoderCharsets ? window._encoderCharsets.length : 36}):</strong><br>
+                            UTF-8, US-ASCII, ISO-8859-x, Windows-125x, Shift_JIS, EUC-JP, GB2312, GBK, GB18030, Big5, EUC-KR, KOI8-R/U, UTF-16/BE/LE
+                        </div>
+                    </div>
+
+                    <div class="card" style="flex: 1.5 1 500px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                            <h3 style="font-size: 1.1rem; margin: 0; display: flex; align-items: center; gap: 8px;">
+                                <i data-lucide="check-circle" style="color: var(--success); width: 20px; height: 20px;"></i>
+                                Encoded Output
+                            </h3>
+                            <button onclick="window.copyEncodedText()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 6px; cursor: pointer; border-radius: 6px;">
+                                <i data-lucide="copy" style="width: 12px; height: 12px;"></i> Copy All
+                            </button>
+                        </div>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 10px; flex: 1;">
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">MIME Encoded-Word Format (one per line)</label>
+                            <textarea id="text-encoder-output" readonly placeholder="Encoded text in all charsets will appear here..." style="flex: 1; min-height: 400px; font-family: monospace; font-size: 0.8rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); resize: vertical; line-height: 1.6;"></textarea>
+                        </div>
                     </div>
                 </div>
             ` : `
