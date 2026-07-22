@@ -1878,131 +1878,139 @@ window.generateSubjectLines = () => {
 window.generateEnhancedEmailHtml = () => {
     const input = document.getElementById('email-enhancer-input')?.value || '';
     const level = document.getElementById('email-enhancer-level')?.value || 'medium';
-    const theme = document.getElementById('email-enhancer-theme')?.value || 'saas';
-    const preheader = document.getElementById('email-enhancer-preheader')?.value || '';
-    const ctaText = document.getElementById('email-enhancer-cta-text')?.value || 'Claim Offer Now →';
-    const ctaUrl = document.getElementById('email-enhancer-cta-url')?.value || 'https://example.com';
-    const ctaColor = document.getElementById('email-enhancer-cta-color')?.value || '#2563eb';
+    const outputEl = document.getElementById('email-enhancer-output');
 
-    const sanitize = true;
-    const addHero = (level === 'medium' || level === 'high');
-    const heroTitle = document.getElementById('email-enhancer-hero-title')?.value || 'Exclusive Special Announcement';
-    const addCallout = (level === 'medium' || level === 'high');
-    const calloutText = document.getElementById('email-enhancer-callout-text')?.value || '⚡ Limited Time Offer: Valid for the next 24 hours only.';
-    
-    const addUrgency = (level === 'high');
-    const urgencyText = document.getElementById('email-enhancer-urgency-text')?.value || '🔥 84% of available spots claimed — Only 16 remaining!';
-
-    const addTestimonial = (level === 'high');
-    const testimonialQuote = document.getElementById('email-enhancer-testimonial-quote')?.value || '"This completely transformed our campaign results within the first 24 hours!"';
-    const testimonialAuthor = document.getElementById('email-enhancer-testimonial-author')?.value || '— Alex M., Verified Customer';
-
-    const addFooter = true;
-
-    let contentHtml = input.trim();
-    if (!contentHtml) {
-        contentHtml = '<p style="margin: 0 0 16px 0; line-height: 1.6;">Hi there,</p><p style="margin: 0 0 16px 0; line-height: 1.6;">We are excited to share our newest updates designed to maximize your conversions and elevate your campaign performance. Take a look at what we have built for you today!</p>';
+    if (!input.trim()) {
+        alert('Please paste your email text or HTML content first.');
+        return;
     }
 
-    if (sanitize) {
-        contentHtml = contentHtml
-            .replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, '')
-            .replace(/<iframe[^>]*>([\s\S]*?)<\/iframe>/gi, '')
-            .replace(/<form[^>]*>([\s\S]*?)<\/form>/gi, '')
-            .replace(/<input[^>]*>/gi, '');
+    const raw = input.trim();
+
+    // 1. Extract CTAs and Links
+    const links = [];
+    const linkRegex = /<a\s+[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+    let match;
+    while ((match = linkRegex.exec(raw)) !== null) {
+        const text = match[2].replace(/<[^>]+>/g, '').trim();
+        if (text) links.push({ url: match[1], text });
     }
 
-    if (!/<[a-z][\s\S]*>/i.test(contentHtml)) {
-        contentHtml = contentHtml.split(/\n+/).map(p => `<p style="margin: 0 0 16px 0; line-height: 1.6;">${p.trim()}</p>`).join('');
-    }
-
-    const themeStyles = {
-        saas: {
-            bg: '#f8fafc',
-            cardBg: '#ffffff',
-            text: '#334155',
-            headingText: '#0f172a',
-            border: '#e2e8f0',
-            accent: ctaColor || '#2563eb',
-            headerBg: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
-            headerTextColor: '#ffffff'
-        },
-        dark: {
-            bg: '#0f172a',
-            cardBg: '#1e293b',
-            text: '#cbd5e1',
-            headingText: '#f8fafc',
-            border: '#334155',
-            accent: ctaColor || '#8b5cf6',
-            headerBg: 'linear-gradient(135deg, #4c1d95 0%, #1e1b4b 100%)',
-            headerTextColor: '#ffffff'
-        },
-        promo: {
-            bg: '#fff7ed',
-            cardBg: '#ffffff',
-            text: '#334155',
-            headingText: '#1e293b',
-            border: '#fed7aa',
-            accent: ctaColor || '#ea580c',
-            headerBg: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
-            headerTextColor: '#ffffff'
-        },
-        minimal: {
-            bg: '#ffffff',
-            cardBg: '#ffffff',
-            text: '#27272a',
-            headingText: '#09090b',
-            border: '#e4e4e7',
-            accent: ctaColor || '#18181b',
-            headerBg: '#09090b',
-            headerTextColor: '#ffffff'
+    if (links.length === 0) {
+        const urlRegex = /(https?:\/\/[^\s<"']+)/gi;
+        let uMatch;
+        while ((uMatch = urlRegex.exec(raw)) !== null) {
+            links.push({ url: uMatch[1], text: 'Click Here to Access →' });
         }
-    };
+    }
 
-    const t = themeStyles[theme] || themeStyles.saas;
+    // 2. Extract Key Data (Prices, Dates, Order Numbers, Reference IDs)
+    const keyData = [];
+    const priceMatch = raw.match(/(\$\d+(?:\.\d{2})?(?:\/\w+)?|\d+\s*(?:USD|EUR|GBP))/gi);
+    if (priceMatch) keyData.push({ label: 'Price / Amount', value: [...new Set(priceMatch)].join(', ') });
 
-    const buttonHtml = ctaText ? `
-        <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="margin: 28px auto;">
+    const dateMatch = raw.match(/(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2}(?:st|nd|rd|th)?|\d{1,2}\/\d{1,2}\/\d{2,4}/gi);
+    if (dateMatch) keyData.push({ label: 'Date / Schedule', value: [...new Set(dateMatch)].join(', ') });
+
+    const refMatch = raw.match(/(?:Order|Invoice|ID|Ticket|Ref|#)\s*#?\s*([A-Z0-9-]{4,20})/gi);
+    if (refMatch) keyData.push({ label: 'Reference Code', value: [...new Set(refMatch)].join(', ') });
+
+    // 3. Extract Clean Paragraphs & Headings
+    let cleanText = raw
+        .replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, '')
+        .replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, '')
+        .replace(/<[^>]+>/g, '\n')
+        .split(/\n+/)
+        .map(s => s.trim())
+        .filter(Boolean);
+
+    const heading = cleanText.length > 0 ? cleanText[0] : 'Special Announcement';
+    const bodyParagraphs = cleanText.length > 1 ? cleanText.slice(1) : cleanText;
+
+    // Theme Config based on Level
+    const themeBg = level === 'high' ? '#fff7ed' : level === 'low' ? '#ffffff' : '#f8fafc';
+    const cardBg = '#ffffff';
+    const borderCol = level === 'high' ? '#fed7aa' : '#e2e8f0';
+    const accentCol = level === 'high' ? '#ea580c' : level === 'low' ? '#09090b' : '#2563eb';
+    const headerBg = level === 'high' ? 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)' : level === 'low' ? '#09090b' : 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)';
+
+    // Highlight Box for Extracted Key Data
+    const dataCardsHtml = keyData.length > 0 ? `
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" role="presentation" style="margin: 20px 0; background: rgba(59,130,246,0.04); border: 1px solid rgba(59,130,246,0.15); border-radius: 8px;">
             <tr>
-                <td align="center" bgcolor="${t.accent}" style="border-radius: 8px;">
-                    <a href="${ctaUrl}" target="_blank" style="font-size: 15px; font-weight: 700; font-family: Arial, sans-serif; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; border: 1px solid ${t.accent}; display: inline-block; text-align: center;">
-                        ${ctaText}
+                <td style="padding: 16px; font-family: Arial, sans-serif;">
+                    ${keyData.map(d => `
+                        <div style="margin-bottom: 6px; font-size: 13px;">
+                            <strong style="color: #64748b; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px;">${d.label}:</strong>
+                            <span style="font-weight: 700; color: #0f172a; margin-left: 6px;">${d.value}</span>
+                        </div>
+                    `).join('')}
+                </td>
+            </tr>
+        </table>
+    ` : '';
+
+    // Bulletproof CTA Buttons
+    const ctasHtml = links.map((l, i) => `
+        <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="margin: ${i === 0 ? '24px' : '12px'} auto;">
+            <tr>
+                <td align="center" bgcolor="${i === 0 ? accentCol : '#f1f5f9'}" style="border-radius: 8px;">
+                    <a href="${l.url}" target="_blank" style="font-size: 15px; font-weight: 700; font-family: Arial, sans-serif; color: ${i === 0 ? '#ffffff' : '#0f172a'}; text-decoration: none; padding: 14px 32px; border-radius: 8px; border: 1px solid ${i === 0 ? accentCol : '#cbd5e1'}; display: inline-block; text-align: center;">
+                        ${l.text || 'Access Offer Now →'}
                     </a>
                 </td>
             </tr>
         </table>
-    ` : '';
+    `).join('');
 
-    const heroHtml = addHero ? `
-        <table border="0" cellpadding="0" cellspacing="0" width="100%" role="presentation" style="background: ${t.headerBg}; border-radius: 8px 8px 0 0;">
+    // Formatted Body Paragraphs
+    const paragraphsHtml = bodyParagraphs.map(p => `<p style="margin: 0 0 16px 0; line-height: 1.65; color: #334155; font-size: 15px;">${p}</p>`).join('');
+
+    // High Level Priority Banner
+    const urgencyHeaderHtml = level === 'high' ? `
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" role="presentation" style="margin-bottom: 20px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px;">
             <tr>
-                <td style="padding: 32px 24px; text-align: center;">
-                    <h1 style="margin: 0; font-size: 22px; font-weight: 700; color: ${t.headerTextColor}; font-family: Arial, sans-serif; line-height: 1.3;">
-                        ${heroTitle}
-                    </h1>
+                <td style="padding: 12px 16px; font-size: 13px; font-weight: 700; color: #991b1b; text-align: center; font-family: Arial, sans-serif;">
+                    ⚡ Priority Notice &bull; Please review the updated details below
                 </td>
             </tr>
         </table>
     ` : '';
 
-    const calloutHtml = addCallout ? `
-        <table border="0" cellpadding="0" cellspacing="0" width="100%" role="presentation" style="margin: 0 0 20px 0; background: rgba(59,130,246,0.06); border-left: 4px solid ${t.accent}; border-radius: 4px;">
-            <tr>
-                <td style="padding: 16px; font-size: 14px; color: ${t.text}; font-family: Arial, sans-serif; line-height: 1.5;">
-                    ${calloutText}
-                </td>
-            </tr>
-        </table>
-    ` : '';
-
+    // Complete Re-architected Email HTML Template
+    const rearchitectedHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Newsletter</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: ${themeBg}; font-family: Arial, sans-serif; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" role="presentation" style="background-color: ${themeBg}; padding: 32px 16px;">
+        <tr>
+            <td align="center">
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" role="presentation" style="max-width: 600px; background-color: ${cardBg}; border: 1px solid ${borderCol}; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);">
                     <tr>
-                        <td style="padding: 32px 28px; color: ${t.text}; font-size: 15px; line-height: 1.6;">
-                            ${urgencyHtml}
-                            ${calloutHtml}
-                            ${contentHtml}
-                            ${buttonHtml}
-                            ${testimonialHtml}
-                            ${footerHtml}
+                        <td style="background: ${headerBg}; padding: 36px 28px; text-align: center;">
+                            <h1 style="margin: 0; font-size: 22px; font-weight: 800; color: #ffffff; font-family: Arial, sans-serif; line-height: 1.35; letter-spacing: -0.2px;">
+                                ${heading}
+                            </h1>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 32px 28px; color: #334155; font-size: 15px; line-height: 1.65;">
+                            ${urgencyHeaderHtml}
+                            ${dataCardsHtml}
+                            ${paragraphsHtml}
+                            ${ctasHtml}
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%" role="presentation" style="margin-top: 36px; border-top: 1px solid ${borderCol};">
+                                <tr>
+                                    <td style="padding: 20px 0 0 0; text-align: center; font-size: 12px; color: #94a3b8; font-family: Arial, sans-serif; line-height: 1.5;">
+                                        <p style="margin: 0 0 6px 0;">You received this email because you are subscribed to our updates.</p>
+                                        <p style="margin: 0;"><a href="#" style="color: #94a3b8; text-decoration: underline;">Unsubscribe</a> &bull; <a href="#" style="color: #94a3b8; text-decoration: underline;">Manage Preferences</a></p>
+                                    </td>
+                                </tr>
+                            </table>
                         </td>
                     </tr>
                 </table>
@@ -2012,14 +2020,13 @@ window.generateEnhancedEmailHtml = () => {
 </body>
 </html>`;
 
-    const outputEl = document.getElementById('email-enhancer-output');
-    if (outputEl) outputEl.value = fullEmailHtml;
+    if (outputEl) outputEl.value = rearchitectedHtml;
 
     const frame = document.getElementById('email-enhancer-preview-iframe');
     if (frame) {
         const doc = frame.contentDocument || frame.contentWindow.document;
         doc.open();
-        doc.write(fullEmailHtml);
+        doc.write(rearchitectedHtml);
         doc.close();
     }
 };
