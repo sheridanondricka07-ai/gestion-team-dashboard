@@ -1890,9 +1890,6 @@ window.generateEnhancedEmailHtml = () => {
     const addCallout = (level === 'medium' || level === 'high');
     const calloutText = document.getElementById('email-enhancer-callout-text')?.value || '⚡ Limited Time Offer: Valid for the next 24 hours only.';
     
-    const addCoupon = (level === 'high');
-    const couponCode = document.getElementById('email-enhancer-coupon-code')?.value || 'SAVE50';
-
     const addUrgency = (level === 'high');
     const urgencyText = document.getElementById('email-enhancer-urgency-text')?.value || '🔥 84% of available spots claimed — Only 16 remaining!';
 
@@ -1998,77 +1995,11 @@ window.generateEnhancedEmailHtml = () => {
         </table>
     ` : '';
 
-    const couponHtml = addCoupon ? `
-        <table border="0" cellpadding="0" cellspacing="0" width="100%" role="presentation" style="margin: 24px 0; border: 2px dashed ${t.accent}; border-radius: 8px; background: rgba(0,0,0,0.02);">
-            <tr>
-                <td style="padding: 20px; text-align: center; font-family: Arial, sans-serif;">
-                    <p style="margin: 0 0 6px 0; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: ${t.accent};">YOUR PROMO CODE</p>
-                    <div style="font-size: 24px; font-weight: 800; letter-spacing: 2px; color: ${t.headingText}; margin: 4px 0;">${couponCode}</div>
-                    <p style="margin: 6px 0 0 0; font-size: 12px; color: #64748b;">Use code at checkout to claim your discount</p>
-                </td>
-            </tr>
-        </table>
-    ` : '';
-
-    const urgencyHtml = addUrgency ? `
-        <table border="0" cellpadding="0" cellspacing="0" width="100%" role="presentation" style="margin: 16px 0; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px;">
-            <tr>
-                <td style="padding: 12px 16px; font-size: 13px; font-weight: 600; color: #991b1b; text-align: center; font-family: Arial, sans-serif;">
-                    ${urgencyText}
-                </td>
-            </tr>
-        </table>
-    ` : '';
-
-    const testimonialHtml = addTestimonial ? `
-        <table border="0" cellpadding="0" cellspacing="0" width="100%" role="presentation" style="margin: 24px 0; background: rgba(0,0,0,0.03); border-radius: 8px;">
-            <tr>
-                <td style="padding: 20px; text-align: center; font-family: Arial, sans-serif;">
-                    <div style="color: #f59e0b; font-size: 18px; margin-bottom: 8px;">★★★★★</div>
-                    <p style="margin: 0 0 8px 0; font-size: 14px; font-style: italic; color: ${t.text}; line-height: 1.5;">${testimonialQuote}</p>
-                    <p style="margin: 0; font-size: 12px; font-weight: 700; color: ${t.headingText};">${testimonialAuthor}</p>
-                </td>
-            </tr>
-        </table>
-    ` : '';
-
-    const preheaderHtml = preheader ? `
-        <div style="display: none; font-size: 1px; color: #333333; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
-            ${preheader} &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
-        </div>
-    ` : '';
-
-    const footerHtml = addFooter ? `
-        <table border="0" cellpadding="0" cellspacing="0" width="100%" role="presentation" style="margin-top: 32px; border-top: 1px solid ${t.border};">
-            <tr>
-                <td style="padding: 20px 0 0 0; text-align: center; font-size: 12px; color: #94a3b8; font-family: Arial, sans-serif; line-height: 1.5;">
-                    <p style="margin: 0 0 8px 0;">You received this email because you are subscribed to our mailing list.</p>
-                    <p style="margin: 0;"><a href="#" style="color: #94a3b8; text-decoration: underline;">Unsubscribe</a> &bull; <a href="#" style="color: #94a3b8; text-decoration: underline;">Manage Preferences</a></p>
-                </td>
-            </tr>
-        </table>
-    ` : '';
-
-    const fullEmailHtml = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Email Campaign</title>
-</head>
-<body style="margin: 0; padding: 0; background-color: ${t.bg}; font-family: Arial, sans-serif; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
-    ${preheaderHtml}
-    <table border="0" cellpadding="0" cellspacing="0" width="100%" role="presentation" style="background-color: ${t.bg}; padding: 24px 12px;">
-        <tr>
-            <td align="center">
-                <table border="0" cellpadding="0" cellspacing="0" width="100%" role="presentation" style="max-width: 600px; background-color: ${t.cardBg}; border: 1px solid ${t.border}; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
-                    ${heroHtml ? `<tr><td>${heroHtml}</td></tr>` : ''}
                     <tr>
                         <td style="padding: 32px 28px; color: ${t.text}; font-size: 15px; line-height: 1.6;">
                             ${urgencyHtml}
                             ${calloutHtml}
                             ${contentHtml}
-                            ${couponHtml}
                             ${buttonHtml}
                             ${testimonialHtml}
                             ${footerHtml}
