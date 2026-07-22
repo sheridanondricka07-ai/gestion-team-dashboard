@@ -1804,6 +1804,215 @@ window.downloadCleanNews = () => {
     URL.revokeObjectURL(url);
 };
 
+// ===== EMAIL HTML ENHANCER TOOL =====
+window.generateEnhancedEmailHtml = () => {
+    const input = document.getElementById('email-enhancer-input')?.value || '';
+    const theme = document.getElementById('email-enhancer-theme')?.value || 'saas';
+    const preheader = document.getElementById('email-enhancer-preheader')?.value || '';
+    const ctaText = document.getElementById('email-enhancer-cta-text')?.value || 'Claim Offer Now →';
+    const ctaUrl = document.getElementById('email-enhancer-cta-url')?.value || 'https://example.com';
+    const ctaColor = document.getElementById('email-enhancer-cta-color')?.value || '#2563eb';
+    
+    const sanitize = document.getElementById('email-enhancer-opt-sanitize')?.checked ?? true;
+    const addHero = document.getElementById('email-enhancer-opt-hero')?.checked ?? false;
+    const heroTitle = document.getElementById('email-enhancer-hero-title')?.value || 'Exclusive Special Announcement';
+    const addCallout = document.getElementById('email-enhancer-opt-callout')?.checked ?? false;
+    const calloutText = document.getElementById('email-enhancer-callout-text')?.value || '⚡ Limited Time Offer: Valid for the next 24 hours only.';
+    const addFooter = document.getElementById('email-enhancer-opt-footer')?.checked ?? true;
+
+    let contentHtml = input.trim();
+    if (!contentHtml) {
+        contentHtml = '<p style="margin: 0 0 16px 0; line-height: 1.6;">Hi there,</p><p style="margin: 0 0 16px 0; line-height: 1.6;">We are excited to share our newest updates designed to maximize your conversions and elevate your campaign performance. Take a look at what we have built for you today!</p>';
+    }
+
+    if (sanitize) {
+        contentHtml = contentHtml
+            .replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, '')
+            .replace(/<iframe[^>]*>([\s\S]*?)<\/iframe>/gi, '')
+            .replace(/<form[^>]*>([\s\S]*?)<\/form>/gi, '')
+            .replace(/<input[^>]*>/gi, '');
+    }
+
+    if (!/<[a-z][\s\S]*>/i.test(contentHtml)) {
+        contentHtml = contentHtml.split(/\n+/).map(p => `<p style="margin: 0 0 16px 0; line-height: 1.6;">${p.trim()}</p>`).join('');
+    }
+
+    const themeStyles = {
+        saas: {
+            bg: '#f8fafc',
+            cardBg: '#ffffff',
+            text: '#334155',
+            headingText: '#0f172a',
+            border: '#e2e8f0',
+            accent: ctaColor || '#2563eb',
+            headerBg: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+            headerTextColor: '#ffffff'
+        },
+        dark: {
+            bg: '#0f172a',
+            cardBg: '#1e293b',
+            text: '#cbd5e1',
+            headingText: '#f8fafc',
+            border: '#334155',
+            accent: ctaColor || '#8b5cf6',
+            headerBg: 'linear-gradient(135deg, #4c1d95 0%, #1e1b4b 100%)',
+            headerTextColor: '#ffffff'
+        },
+        promo: {
+            bg: '#fff7ed',
+            cardBg: '#ffffff',
+            text: '#334155',
+            headingText: '#1e293b',
+            border: '#fed7aa',
+            accent: ctaColor || '#ea580c',
+            headerBg: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
+            headerTextColor: '#ffffff'
+        },
+        minimal: {
+            bg: '#ffffff',
+            cardBg: '#ffffff',
+            text: '#27272a',
+            headingText: '#09090b',
+            border: '#e4e4e7',
+            accent: ctaColor || '#18181b',
+            headerBg: '#09090b',
+            headerTextColor: '#ffffff'
+        }
+    };
+
+    const t = themeStyles[theme] || themeStyles.saas;
+
+    const buttonHtml = ctaText ? `
+        <table border="0" cellpadding="0" cellspacing="0" role="presentation" style="margin: 28px auto;">
+            <tr>
+                <td align="center" bgcolor="${t.accent}" style="border-radius: 8px;">
+                    <a href="${ctaUrl}" target="_blank" style="font-size: 15px; font-weight: 700; font-family: Arial, sans-serif; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; border: 1px solid ${t.accent}; display: inline-block; text-align: center;">
+                        ${ctaText}
+                    </a>
+                </td>
+            </tr>
+        </table>
+    ` : '';
+
+    const heroHtml = addHero ? `
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" role="presentation" style="background: ${t.headerBg}; border-radius: 8px 8px 0 0;">
+            <tr>
+                <td style="padding: 32px 24px; text-align: center;">
+                    <h1 style="margin: 0; font-size: 22px; font-weight: 700; color: ${t.headerTextColor}; font-family: Arial, sans-serif; line-height: 1.3;">
+                        ${heroTitle}
+                    </h1>
+                </td>
+            </tr>
+        </table>
+    ` : '';
+
+    const calloutHtml = addCallout ? `
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" role="presentation" style="margin: 0 0 20px 0; background: rgba(59,130,246,0.06); border-left: 4px solid ${t.accent}; border-radius: 4px;">
+            <tr>
+                <td style="padding: 16px; font-size: 14px; color: ${t.text}; font-family: Arial, sans-serif; line-height: 1.5;">
+                    ${calloutText}
+                </td>
+            </tr>
+        </table>
+    ` : '';
+
+    const preheaderHtml = preheader ? `
+        <div style="display: none; font-size: 1px; color: #333333; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;">
+            ${preheader} &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
+        </div>
+    ` : '';
+
+    const footerHtml = addFooter ? `
+        <table border="0" cellpadding="0" cellspacing="0" width="100%" role="presentation" style="margin-top: 32px; border-top: 1px solid ${t.border};">
+            <tr>
+                <td style="padding: 20px 0 0 0; text-align: center; font-size: 12px; color: #94a3b8; font-family: Arial, sans-serif; line-height: 1.5;">
+                    <p style="margin: 0 0 8px 0;">You received this email because you are subscribed to our mailing list.</p>
+                    <p style="margin: 0;"><a href="#" style="color: #94a3b8; text-decoration: underline;">Unsubscribe</a> &bull; <a href="#" style="color: #94a3b8; text-decoration: underline;">Manage Preferences</a></p>
+                </td>
+            </tr>
+        </table>
+    ` : '';
+
+    const fullEmailHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Campaign</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: ${t.bg}; font-family: Arial, sans-serif; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
+    ${preheaderHtml}
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" role="presentation" style="background-color: ${t.bg}; padding: 24px 12px;">
+        <tr>
+            <td align="center">
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" role="presentation" style="max-width: 600px; background-color: ${t.cardBg}; border: 1px solid ${t.border}; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+                    ${heroHtml ? `<tr><td>${heroHtml}</td></tr>` : ''}
+                    <tr>
+                        <td style="padding: 32px 28px; color: ${t.text}; font-size: 15px; line-height: 1.6;">
+                            ${calloutHtml}
+                            ${contentHtml}
+                            ${buttonHtml}
+                            ${footerHtml}
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`;
+
+    const outputEl = document.getElementById('email-enhancer-output');
+    if (outputEl) outputEl.value = fullEmailHtml;
+
+    const frame = document.getElementById('email-enhancer-preview-iframe');
+    if (frame) {
+        const doc = frame.contentDocument || frame.contentWindow.document;
+        doc.open();
+        doc.write(fullEmailHtml);
+        doc.close();
+    }
+};
+
+window.copyEnhancedEmailHtml = () => {
+    const textarea = document.getElementById('email-enhancer-output');
+    if (!textarea || !textarea.value) return;
+    navigator.clipboard.writeText(textarea.value);
+};
+
+window.downloadEnhancedEmailHtml = () => {
+    const textarea = document.getElementById('email-enhancer-output');
+    if (!textarea || !textarea.value) return;
+    const blob = new Blob([textarea.value], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `email_campaign_${Date.now()}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+};
+
+window.switchEmailEnhancerView = (view) => {
+    const codeView = document.getElementById('email-enhancer-view-code');
+    const prevView = document.getElementById('email-enhancer-view-prev');
+    const tabCode = document.getElementById('email-enhancer-tab-code');
+    const tabPrev = document.getElementById('email-enhancer-tab-prev');
+
+    if (view === 'code') {
+        if (codeView) codeView.style.display = 'flex';
+        if (prevView) prevView.style.display = 'none';
+        if (tabCode) { tabCode.style.background = 'var(--accent-primary)'; tabCode.style.color = '#fff'; }
+        if (tabPrev) { tabPrev.style.background = 'var(--bg-tertiary)'; tabPrev.style.color = 'var(--text-primary)'; }
+    } else {
+        if (codeView) codeView.style.display = 'none';
+        if (prevView) prevView.style.display = 'block';
+        if (tabPrev) { tabPrev.style.background = 'var(--accent-primary)'; tabPrev.style.color = '#fff'; }
+        if (tabCode) { tabCode.style.background = 'var(--bg-tertiary)'; tabCode.style.color = 'var(--text-primary)'; }
+    }
+};
+
 window.switchToolsTab = (tab) => {
     window.app.state.toolsActiveTab = tab;
     window.app.updateDashboard();
@@ -2256,6 +2465,9 @@ function renderTools(app, container) {
             <div onclick="window.switchToolsTab('cleanNews')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'cleanNews' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'cleanNews' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
                 <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Clean News
             </div>
+            <div onclick="window.switchToolsTab('emailEnhancer')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'emailEnhancer' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'emailEnhancer' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+                <i data-lucide="wand-2" style="width: 14px; height: 14px;"></i> Email Enhancer
+            </div>
         </div>
         
         <div id="tools-tab-content">
@@ -2635,6 +2847,116 @@ function renderTools(app, container) {
                         <div style="display: flex; flex-direction: column; gap: 10px; flex: 1;">
                             <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Cleaned Email / Newsletter</label>
                             <textarea id="clean-news-output" readonly placeholder="Cleaned newsletter source will appear here..." style="flex: 1; min-height: 400px; font-family: monospace; font-size: 0.8rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); resize: vertical; line-height: 1.5;"></textarea>
+                        </div>
+                    </div>
+                </div>
+            ` : activeTab === 'emailEnhancer' ? `
+                <div style="display: flex; gap: 24px; padding: 24px; flex-wrap: wrap;">
+                    <div class="card" style="flex: 1 1 420px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <h3 style="font-size: 1.1rem; margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                            <i data-lucide="wand-2" style="color: var(--accent-primary); width: 20px; height: 20px;"></i>
+                            Email HTML Enhancer & Builder
+                        </h3>
+                        
+                        <p style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5; margin: 0;">Turn raw text or basic HTML into high-converting, mobile-responsive, Gmail-optimized HTML email templates with bulletproof CTAs and preheaders.</p>
+
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Email Content (Plain Text or HTML)</label>
+                            <textarea id="email-enhancer-input" placeholder="Paste your email copy or basic HTML here..." style="min-height: 140px; font-family: inherit; font-size: 0.85rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); resize: vertical;"></textarea>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Theme Style</label>
+                                <select id="email-enhancer-theme" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem;">
+                                    <option value="saas">SaaS Modern (Clean Light)</option>
+                                    <option value="dark">Dark Glass (Premium Dark)</option>
+                                    <option value="promo">E-Commerce Promo (Warm)</option>
+                                    <option value="minimal">Minimalist Professional</option>
+                                </select>
+                            </div>
+
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">CTA Button Color</label>
+                                <select id="email-enhancer-cta-color" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem;">
+                                    <option value="#2563eb">Vibrant Blue (#2563eb)</option>
+                                    <option value="#16a34a">High-Convert Green (#16a34a)</option>
+                                    <option value="#ea580c">High-Urgency Orange (#ea580c)</option>
+                                    <option value="#8b5cf6">Purple Accent (#8b5cf6)</option>
+                                    <option value="#09090b">Solid Black (#09090b)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Preheader / Teaser Text (Shown in Gmail Inbox List)</label>
+                            <input type="text" id="email-enhancer-preheader" placeholder="e.g. Open to claim your 50% discount before it expires!" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem;">
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">CTA Button Text</label>
+                                <input type="text" id="email-enhancer-cta-text" value="Claim Offer Now →" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem;">
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">CTA Target URL</label>
+                                <input type="text" id="email-enhancer-cta-url" value="https://example.com" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem;">
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.8rem;">
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
+                                <input type="checkbox" id="email-enhancer-opt-sanitize" checked style="accent-color: var(--accent-primary);">
+                                Inline CSS & Sanitize Tags
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
+                                <input type="checkbox" id="email-enhancer-opt-hero" style="accent-color: var(--accent-primary);">
+                                Add Hero Header Banner
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
+                                <input type="checkbox" id="email-enhancer-opt-callout" style="accent-color: var(--accent-primary);">
+                                Add Urgency Callout Box
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
+                                <input type="checkbox" id="email-enhancer-opt-footer" checked style="accent-color: var(--accent-primary);">
+                                Add Unsubscribe Footer
+                            </label>
+                        </div>
+
+                        <button onclick="window.generateEnhancedEmailHtml()" style="padding: 14px; background: var(--accent-primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.9rem;">
+                            <i data-lucide="wand-2" style="width: 16px; height: 16px;"></i> Build High-Convert Email HTML
+                        </button>
+                    </div>
+
+                    <div class="card" style="flex: 1.5 1 500px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                            <div style="display: flex; gap: 6px; background: var(--bg-primary); padding: 3px; border-radius: 8px; border: 1px solid var(--border-color);">
+                                <button id="email-enhancer-tab-prev" onclick="window.switchEmailEnhancerView('prev')" style="padding: 6px 14px; font-size: 0.8rem; border-radius: 6px; border: none; background: var(--accent-primary); color: white; cursor: pointer; font-weight: 600;">
+                                    Live Preview
+                                </button>
+                                <button id="email-enhancer-tab-code" onclick="window.switchEmailEnhancerView('code')" style="padding: 6px 14px; font-size: 0.8rem; border-radius: 6px; border: none; background: var(--bg-tertiary); color: var(--text-primary); cursor: pointer; font-weight: 600;">
+                                    HTML Code
+                                </button>
+                            </div>
+
+                            <div style="display: flex; gap: 8px;">
+                                <button onclick="window.copyEnhancedEmailHtml()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 6px; cursor: pointer; border-radius: 6px;">
+                                    <i data-lucide="copy" style="width: 12px; height: 12px;"></i> Copy Code
+                                </button>
+                                <button onclick="window.downloadEnhancedEmailHtml()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--accent-primary); border: none; color: white; display: flex; align-items: center; gap: 6px; cursor: pointer; border-radius: 6px;">
+                                    <i data-lucide="download" style="width: 12px; height: 12px;"></i> Download .html
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Visual Preview Panel -->
+                        <div id="email-enhancer-view-prev" style="flex: 1; min-height: 440px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); background: #ffffff;">
+                            <iframe id="email-enhancer-preview-iframe" style="width: 100%; height: 100%; min-height: 440px; border: none;"></iframe>
+                        </div>
+
+                        <!-- HTML Code Panel -->
+                        <div id="email-enhancer-view-code" style="display: none; flex-direction: column; gap: 10px; flex: 1;">
+                            <textarea id="email-enhancer-output" readonly placeholder="Enhanced email HTML code will appear here..." style="flex: 1; min-height: 440px; font-family: monospace; font-size: 0.8rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); resize: vertical; line-height: 1.5;"></textarea>
                         </div>
                     </div>
                 </div>
