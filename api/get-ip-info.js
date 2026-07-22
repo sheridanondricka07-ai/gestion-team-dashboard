@@ -46,7 +46,8 @@ module.exports = async function handler(req, res) {
                 const extractedTexts = [];
                 const sources = [];
                 let attempts = 0;
-                const maxAttempts = 15;
+                const maxAttempts = 30;
+                let buildingText = '';
 
                 while (extractedTexts.length < count && attempts < maxAttempts) {
                     attempts++;
@@ -64,15 +65,25 @@ module.exports = async function handler(req, res) {
 
                         if (!response.ok) continue;
                         const htmlText = await response.text();
+                        const blocks = extractParagraphsFromHtml(htmlText);
 
-                        const paragraphs = extractParagraphsFromHtml(htmlText);
-                        for (const p of paragraphs) {
-                            if (extractedTexts.length < count && !extractedTexts.includes(p)) {
-                                extractedTexts.push(p);
+                        for (const block of blocks) {
+                            if (countWords(block) >= 200) {
+                                if (extractedTexts.length < count) {
+                                    extractedTexts.push(block);
+                                }
+                            } else {
+                                buildingText = buildingText ? (buildingText + ' ' + block) : block;
+                                if (countWords(buildingText) >= 200) {
+                                    if (extractedTexts.length < count) {
+                                        extractedTexts.push(buildingText);
+                                        buildingText = '';
+                                    }
+                                }
                             }
                         }
 
-                        if (paragraphs.length > 0 && !sources.includes(currentDomain)) {
+                        if (blocks.length > 0 && !sources.includes(currentDomain)) {
                             sources.push(currentDomain);
                         }
                     } catch (e) {
@@ -80,8 +91,12 @@ module.exports = async function handler(req, res) {
                     }
                 }
 
+                if (buildingText && countWords(buildingText) >= 150 && extractedTexts.length < count) {
+                    extractedTexts.push(buildingText);
+                }
+
                 if (extractedTexts.length === 0) {
-                    return res.status(500).json({ error: 'Failed to extract valid text from random website attempts.' });
+                    return res.status(500).json({ error: 'Failed to extract text blocks of at least 200 words.' });
                 }
 
                 return res.status(200).json({
@@ -279,6 +294,11 @@ function cleanHtml(html) {
     return clean;
 }
 
+function countWords(str) {
+    if (!str) return 0;
+    return str.trim().split(/\s+/).filter(Boolean).length;
+}
+
 function extractParagraphsFromHtml(html) {
     let clean = html
         .replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, '')
@@ -290,29 +310,37 @@ function extractParagraphsFromHtml(html) {
         .replace(/<svg[^>]*>([\s\S]*?)<\/svg>/gi, '');
 
     const pMatches = clean.match(/<p[^>]*>([\s\S]*?)<\/p>/gi) || [];
-    const paragraphs = [];
+    const rawParagraphs = [];
 
     for (const match of pMatches) {
         const text = cleanHtml(match);
-        if (text.length >= 60 && text.length <= 400 && !/cookie|privacy policy|all rights reserved|javascript/i.test(text)) {
-            paragraphs.push(text);
+        if (text.length >= 30 && !/cookie|privacy policy|all rights reserved|javascript/i.test(text)) {
+            rawParagraphs.push(text);
         }
     }
 
-    if (paragraphs.length === 0) {
+    if (rawParagraphs.length === 0) {
         const fullClean = cleanHtml(clean);
         const sentences = fullClean.split(/(?<=[.!?])\s+/);
-        let currentChunk = '';
         for (const s of sentences) {
-            if ((currentChunk + ' ' + s).length <= 350) {
-                currentChunk = (currentChunk + ' ' + s).trim();
-            } else {
-                if (currentChunk.length >= 60) paragraphs.push(currentChunk);
-                currentChunk = s;
-            }
+            if (s.trim().length >= 20) rawParagraphs.push(s.trim());
         }
-        if (currentChunk.length >= 60 && currentChunk.length <= 400) paragraphs.push(currentChunk);
     }
 
-    return paragraphs;
+    const blocks = [];
+    let currentBlock = '';
+
+    for (const p of rawParagraphs) {
+        currentBlock = currentBlock ? (currentBlock + ' ' + p) : p;
+        if (countWords(currentBlock) >= 200) {
+            blocks.push(currentBlock.trim());
+            currentBlock = '';
+        }
+    }
+
+    if (currentBlock && countWords(currentBlock) >= 150) {
+        blocks.push(currentBlock.trim());
+    }
+
+    return blocks;
 }
