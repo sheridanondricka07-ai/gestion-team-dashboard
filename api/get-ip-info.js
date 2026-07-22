@@ -99,10 +99,13 @@ module.exports = async function handler(req, res) {
                     return res.status(500).json({ error: 'Failed to extract text blocks of at least 200 words.' });
                 }
 
+                // Strip internal semicolons from each text so only separation semicolons remain
+                const cleanExtracted = extractedTexts.map(t => t.replace(/;/g, '').trim());
+
                 return res.status(200).json({
                     source: sources.join(', '),
-                    count: extractedTexts.length,
-                    text: extractedTexts.join(';\n\n')
+                    count: cleanExtracted.length,
+                    text: cleanExtracted.join(';\n\n')
                 });
             }
 
