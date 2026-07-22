@@ -1288,6 +1288,262 @@ window.copyGeneratedTextToClipboard = () => {
     navigator.clipboard.writeText(textarea.value);
 };
 
+// ===== DOMAIN FILTER TOOL =====
+window._domainFilterBadWords = [
+    'porn','xxx','sex','nude','naked','adult','erotic','fetish','milf','dildo','viagra','cialis',
+    'casino','gambl','betting','poker','slot','jackpot','roulette',
+    'scam','fraud','phish','hack','crack','warez','pirate','torrent','malware','spyware','trojan',
+    'spam','spammer','bulk','blast',
+    'drug','cocaine','heroin','meth','weed','cannabis','marijuana',
+    'kill','murder','suicide','terror','bomb','weapon','gun','rifle',
+    'racist','nazi','hate','abuse',
+    'fake','counterfeit','replica','knockoff',
+    'loan','debt','payday','forex','crypto','bitcoin','nft',
+    'diet','weightloss','slimming','acai',
+    'nigerian','prince','inheritance','lottery','winner','congratulation',
+    'unsubscribe','opt-out','optout','blacklist','blocklist',
+    'free-money','getrich','makemoney','earnfast','cashgrab','mlm',
+    'crap','shit','fuck','ass','damn','bitch','bastard','dick','cock','pussy'
+];
+
+window._domainFilterSpamTLDs = [
+    '.xyz','.top','.club','.buzz','.icu','.gq','.ml','.cf','.ga','.tk',
+    '.wang','.bid','.click','.download','.stream','.racing','.win',
+    '.loan','.date','.trade','.review','.cricket','.science','.party',
+    '.accountant','.faith','.webcam','.men','.work','.kim'
+];
+
+window._domainFilterCommonWords = [
+    'the','and','for','are','but','not','you','all','can','had','her','was','one','our','out','day','get','has',
+    'him','his','how','its','may','new','now','old','see','way','who','did','let','say','she','too','use',
+    'able','back','best','big','blue','book','both','boy','came','car','city','come','cool','dark','deep',
+    'door','down','draw','each','east','ever','face','fall','far','fast','feel','find','fire','five','flat',
+    'food','foot','form','four','free','from','full','game','girl','give','glad','gold','gone','good','got',
+    'great','green','grow','half','hand','hard','have','head','help','here','high','hold','home','hope',
+    'hot','idea','just','keep','kind','king','know','land','last','late','lead','left','less','life','like',
+    'line','list','live','long','look','lost','love','luck','made','main','make','many','mark','mind','miss',
+    'more','most','move','much','must','name','near','need','next','nice','nine','none','note','off','once',
+    'only','open','over','page','part','past','path','pick','plan','play','plus','poor','pull','push','put',
+    'rain','real','rest','rich','ride','ring','rise','road','rock','roll','room','rule','run','safe','said',
+    'same','sand','save','seen','self','send','set','ship','show','shut','side','sign','sing','sit','size',
+    'skin','slow','snow','soft','some','song','soon','sort','star','stay','step','stop','such','sure','take',
+    'talk','team','tell','test','text','than','that','them','then','they','this','time','told','took','tree',
+    'true','turn','type','upon','used','very','walk','wall','want','warm','watch','water','week','well',
+    'went','were','west','what','when','wide','wild','will','wind','wish','with','wood','word','work',
+    'year','your','zero','zone',
+    'about','above','after','again','along','begin','being','below','black','board','break','bring',
+    'brown','build','carry','catch','cause','chain','chair','check','child','class','clean','clear',
+    'climb','clock','close','cloud','color','count','could','cover','cross','crowd','dance','death',
+    'doing','doubt','draft','drawn','dream','dress','drink','drive','early','earth','eight','enjoy',
+    'enter','equal','event','every','exact','extra','facts','field','fight','final','first','fixed',
+    'flash','floor','force','found','fresh','front','funny','given','glass','going','grade','grand',
+    'grass','group','guard','guess','guide','happy','heart','heavy','horse','hotel','house','human',
+    'image','inner','issue','joint','judge','large','later','laugh','layer','learn','level','light',
+    'limit','local','loose','lover','lower','lucky','lunch','major','match','maybe','metal','might',
+    'model','money','month','moral','motor','mount','mouth','movie','music','never','night','noise',
+    'north','novel','occur','ocean','offer','often','order','other','outer','owner','paint','paper',
+    'party','peace','phone','photo','piano','piece','pitch','place','plain','plant','plate','point',
+    'pound','power','press','price','prime','print','prize','proof','proud','prove','queen','quick',
+    'quiet','quite','radio','raise','range','rapid','reach','ready','right','river','robin','rough',
+    'round','royal','scene','score','sense','serve','seven','shall','shape','share','sharp','sheet',
+    'shelf','shift','shine','shirt','shock','shoot','short','sight','since','sixth','sixty','sleep',
+    'slide','small','smart','smell','smile','smoke','solid','solve','south','space','spare','speak',
+    'speed','spend','split','sport','staff','stage','stand','start','state','steal','steam','steel',
+    'stick','still','stock','stone','store','storm','story','strip','study','stuff','style','sugar',
+    'suite','super','sweet','swing','table','taste','teach','thick','thing','think','third','those',
+    'three','throw','tight','title','total','touch','tough','tower','track','trade','trail','train',
+    'treat','trend','trial','trick','trust','truth','twice','under','union','unite','until','upper',
+    'upset','urban','usual','valid','value','video','visit','vital','voice','waste','watch','wheel',
+    'where','which','while','white','whole','woman','world','worry','worse','worst','worth','would',
+    'write','wrong','wrote','young',
+    'action','actual','almost','always','amount','animal','answer','appear','arrive','attack',
+    'beauty','become','before','behind','better','beyond','bitter','bottom','bought','branch',
+    'breath','bridge','bright','broken','budget','butter','button','camera','carbon','career',
+    'castle','caught','center','chance','change','charge','choice','choose','circle','city',
+    'coffee','column','combat','corner','couple','course','create','custom','danger','debate',
+    'demand','deputy','desert','design','detail','device','dinner','direct','divide','doctor',
+    'double','driven','during','easily','editor','effect','effort','empire','employ','energy',
+    'engine','enough','escape','except','expect','expert','export','extend','extent','fabric',
+    'factor','fairly','fallen','family','famous','father','favour','fellow','female','figure',
+    'finger','flight','flower','follow','forest','forget','formal','former','foster','freeze',
+    'friend','frozen','future','garden','gather','gender','gentle','global','golden','ground',
+    'growth','health','heaven','height','hidden','honest','impact','import','income','indeed',
+    'injury','inside','island','itself','jersey','junior','justice','launch','leader','league',
+    'lesson','letter','little','living','lovely','manner','market','master','matter','medium',
+    'member','memory','mental','method','middle','miller','minute','mirror','mobile','modern',
+    'moment','monkey','mostly','mother','motion','murder','museum','mutual','myself','narrow',
+    'nation','nature','nearby','nearly','notice','number','office','online','option','origin',
+    'output','parent','partner','patrol','people','period','permit','person','phrase','planet',
+    'player','please','pocket','poetry','police','policy','prefer','pretty','profit','proper',
+    'public','pursue','raised','random','rather','reason','record','reduce','reform','regard',
+    'region','reject','relate','relief','remain','remote','remove','render','repair','repeat',
+    'report','rescue','resist','result','retain','retire','return','reveal','review','reward',
+    'river','rocket','rubber','ruling','runner','safety','salary','sample','saving','scheme',
+    'school','screen','search','season','second','secret','sector','secure','select','senior',
+    'series','settle','severe','shadow','signal','silent','silver','simple','singer','single',
+    'sister','slight','smooth','social','solely','source','spirit','spread','spring','square',
+    'stable','status','steady','strain','strand','stream','street','stress','strict','strike',
+    'string','strong','studio','submit','sudden','suffer','summer','supply','surely','survey',
+    'switch','symbol','system','target','temple','tender','thanks','thirty','threat','ticket',
+    'timber','tongue','toward','travel','twelve','unique','unless','update','useful','valley',
+    'vessel','victim','viewer','virgin','vision','visual','volume','walker','wealth','weekly',
+    'weight','window','winner','winter','wisdom','wonder','wooden','worker','yellow'
+];
+
+window.filterDomains = () => {
+    const input = document.getElementById('domain-filter-input');
+    const output = document.getElementById('domain-filter-output');
+    const statsEl = document.getElementById('domain-filter-stats');
+    if (!input || !output) return;
+
+    const raw = input.value.trim();
+    if (!raw) return;
+
+    const domains = raw.split(/[\n,\s]+/).map(d => d.trim().toLowerCase()).filter(Boolean);
+    const unique = [...new Set(domains)];
+
+    const badWords = window._domainFilterBadWords;
+    const spamTLDs = window._domainFilterSpamTLDs;
+    const commonWords = window._domainFilterCommonWords;
+
+    const passed = [];
+    const rejected = [];
+
+    for (const domain of unique) {
+        const reasons = [];
+
+        // Extract name part (before TLD)
+        const dotIdx = domain.indexOf('.');
+        if (dotIdx <= 0) { rejected.push({ domain, reasons: ['Invalid format'] }); continue; }
+        const name = domain.substring(0, dotIdx);
+        const tld = domain.substring(dotIdx);
+
+        // 1. Spam TLD check
+        if (spamTLDs.some(t => tld === t || tld.endsWith(t))) {
+            reasons.push('Spam TLD (' + tld + ')');
+        }
+
+        // 2. Bad words check
+        for (const bw of badWords) {
+            if (name.includes(bw) || domain.includes(bw)) {
+                reasons.push('Bad word: ' + bw);
+                break;
+            }
+        }
+
+        // 3. Too short name (less than 3 chars)
+        if (name.length < 3) reasons.push('Name too short');
+
+        // 4. Too long name (more than 25 chars)
+        if (name.length > 25) reasons.push('Name too long');
+
+        // 5. Too many numbers (>30% of name)
+        const numCount = (name.match(/[0-9]/g) || []).length;
+        if (numCount > name.length * 0.3) reasons.push('Too many numbers');
+
+        // 6. Starts or ends with number
+        if (/^[0-9]/.test(name) || /[0-9]$/.test(name)) reasons.push('Starts/ends with number');
+
+        // 7. Too many hyphens
+        if ((name.match(/-/g) || []).length > 1) reasons.push('Too many hyphens');
+
+        // 8. Starts or ends with hyphen
+        if (name.startsWith('-') || name.endsWith('-')) reasons.push('Starts/ends with hyphen');
+
+        // 9. No vowels at all = random gibberish
+        if (!/[aeiou]/i.test(name)) reasons.push('No vowels (gibberish)');
+
+        // 10. Too many consecutive consonants (4+)
+        if (/[^aeiou0-9-]{5,}/i.test(name)) reasons.push('Consonant cluster (random)');
+
+        // 11. Same character repeated 3+ times
+        if (/(.)\1{2,}/.test(name)) reasons.push('Repeated characters');
+
+        // 12. Vowel-consonant ratio too extreme
+        const vowels = (name.replace(/[^a-z]/g, '').match(/[aeiou]/g) || []).length;
+        const consonants = (name.replace(/[^a-z]/g, '').match(/[^aeiou]/g) || []).length;
+        const letters = vowels + consonants;
+        if (letters > 4 && vowels / letters < 0.15) reasons.push('Low vowel ratio (gibberish)');
+
+        // 13. Real word check — does the name contain any known common English word (3+ chars)?
+        const nameClean = name.replace(/[^a-z]/g, '');
+        let hasRealWord = false;
+        for (const w of commonWords) {
+            if (w.length >= 3 && nameClean.includes(w)) {
+                hasRealWord = true;
+                break;
+            }
+        }
+        if (!hasRealWord && nameClean.length > 5) reasons.push('No recognizable word found');
+
+        // 14. Double-dot or weird format
+        if (/\.\./.test(domain)) reasons.push('Invalid dots');
+
+        if (reasons.length === 0) {
+            passed.push(domain);
+        } else {
+            rejected.push({ domain, reasons });
+        }
+    }
+
+    output.value = passed.join('\n');
+
+    // Show stats
+    if (statsEl) {
+        statsEl.innerHTML = `
+            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                <span style="color: var(--text-secondary);"><strong>${unique.length}</strong> total</span>
+                <span style="color: var(--success);"><strong>${passed.length}</strong> passed ✓</span>
+                <span style="color: #ef4444;"><strong>${rejected.length}</strong> rejected ✗</span>
+            </div>
+        `;
+    }
+
+    // Store rejected for viewing
+    window._domainFilterRejected = rejected;
+    window._domainFilterShowRejected = false;
+
+    const rejectedContainer = document.getElementById('domain-filter-rejected');
+    if (rejectedContainer) {
+        rejectedContainer.innerHTML = rejected.length > 0 ? `
+            <button onclick="window.toggleRejectedDomains()" style="padding: 8px 14px; font-size: 0.78rem; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: #ef4444; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="eye" style="width: 13px; height: 13px;"></i> Show ${rejected.length} Rejected Domains
+            </button>
+            <div id="rejected-domains-list" style="display: none;"></div>
+        ` : '';
+        if (window.lucide) window.lucide.createIcons();
+    }
+};
+
+window.toggleRejectedDomains = () => {
+    const list = document.getElementById('rejected-domains-list');
+    if (!list) return;
+    const rejected = window._domainFilterRejected || [];
+    window._domainFilterShowRejected = !window._domainFilterShowRejected;
+
+    if (window._domainFilterShowRejected) {
+        list.style.display = 'block';
+        list.innerHTML = `
+            <div style="max-height: 300px; overflow-y: auto; font-size: 0.75rem; margin-top: 8px; border: 1px solid rgba(239,68,68,0.15); border-radius: 8px; background: rgba(239,68,68,0.03); padding: 10px;">
+                ${rejected.map(r => `
+                    <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.03);">
+                        <span style="color: var(--text-primary); font-family: monospace;">${r.domain}</span>
+                        <span style="color: #ef4444; font-size: 0.7rem; text-align: right; max-width: 50%;">${r.reasons.join(', ')}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    } else {
+        list.style.display = 'none';
+    }
+};
+
+window.copyFilteredDomains = () => {
+    const textarea = document.getElementById('domain-filter-output');
+    if (!textarea || !textarea.value) return;
+    navigator.clipboard.writeText(textarea.value);
+};
+
 window.switchToolsTab = (tab) => {
     window.app.state.toolsActiveTab = tab;
     window.app.updateDashboard();
@@ -1731,6 +1987,9 @@ function renderTools(app, container) {
             <div onclick="window.switchToolsTab('domainAge')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'domainAge' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'domainAge' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
                 <i data-lucide="calendar" style="width: 14px; height: 14px;"></i> Domain Age Checker
             </div>
+            <div onclick="window.switchToolsTab('domainFilter')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'domainFilter' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'domainFilter' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+                <i data-lucide="filter" style="width: 14px; height: 14px;"></i> Domain Filter
+            </div>
         </div>
         
         <div id="tools-tab-content">
@@ -1952,6 +2211,54 @@ function renderTools(app, container) {
                             <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Clean Text Version</label>
                             <textarea id="generate-text-result" readonly placeholder="Extracted text will appear here..." style="flex: 1; min-height: 250px; font-family: inherit; font-size: 0.85rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); resize: vertical;"></textarea>
                         </div>
+                    </div>
+                </div>
+            ` : activeTab === 'domainFilter' ? `
+                <div style="display: flex; gap: 24px; padding: 24px; flex-wrap: wrap;">
+                    <div class="card" style="flex: 1 1 400px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <h3 style="font-size: 1.1rem; margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                            <i data-lucide="filter" style="color: var(--accent-primary); width: 20px; height: 20px;"></i>
+                            Domain Filter
+                        </h3>
+                        
+                        <p style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5; margin: 0;">Paste your domain list below. The filter removes gibberish, bad words, spam TLDs, random strings, and keeps only clean real-word domains safe for Gmail campaigns.</p>
+
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Domain List (one per line)</label>
+                            <textarea id="domain-filter-input" placeholder="domain1.com&#10;domain2.com&#10;example.org&#10;xkf8dkw.xyz" style="min-height: 260px; font-family: monospace; font-size: 0.85rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); resize: vertical;"></textarea>
+                        </div>
+
+                        <button onclick="window.filterDomains()" style="padding: 14px; background: var(--accent-primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.9rem;">
+                            <i data-lucide="shield-check" style="width: 16px; height: 16px;"></i> Filter Domains
+                        </button>
+
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.6; background: rgba(59,130,246,0.04); border: 1px solid rgba(59,130,246,0.1); border-radius: 8px; padding: 12px;">
+                            <strong style="color: var(--accent-primary);">Filters Applied:</strong><br>
+                            ✓ Real word detection &nbsp; ✓ Bad/spam word removal<br>
+                            ✓ Spam TLD blocking &nbsp; ✓ Gibberish/random detection<br>
+                            ✓ Number/hyphen rules &nbsp; ✓ Pronounceability check<br>
+                            ✓ Duplicate removal &nbsp; ✓ Gmail-safe optimization
+                        </div>
+                    </div>
+
+                    <div class="card" style="flex: 1.5 1 500px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                            <h3 style="font-size: 1.1rem; margin: 0; display: flex; align-items: center; gap: 8px;">
+                                <i data-lucide="check-circle" style="color: var(--success); width: 20px; height: 20px;"></i>
+                                Clean Domains
+                            </h3>
+                            <button onclick="window.copyFilteredDomains()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 6px; cursor: pointer; border-radius: 6px;">
+                                <i data-lucide="copy" style="width: 12px; height: 12px;"></i> Copy Clean List
+                            </button>
+                        </div>
+
+                        <div id="domain-filter-stats" style="font-size: 0.82rem;"></div>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 10px; flex: 1;">
+                            <textarea id="domain-filter-output" readonly placeholder="Filtered clean domains will appear here..." style="flex: 1; min-height: 200px; font-family: monospace; font-size: 0.85rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); resize: vertical;"></textarea>
+                        </div>
+
+                        <div id="domain-filter-rejected"></div>
                     </div>
                 </div>
             ` : `
