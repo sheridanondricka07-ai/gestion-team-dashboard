@@ -2971,83 +2971,29 @@ function renderTools(app, container) {
                 </div>
             ` : activeTab === 'emailEnhancer' ? `
                 <div style="display: flex; gap: 24px; padding: 24px; flex-wrap: wrap;">
-                    <div class="card" style="flex: 1 1 420px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                    <div class="card" style="flex: 1 1 420px; padding: 24px; display: flex; flex-direction: column; gap: 18px; background: var(--bg-secondary);">
                         <h3 style="font-size: 1.1rem; margin-top: 0; display: flex; align-items: center; gap: 8px;">
                             <i data-lucide="wand-2" style="color: var(--accent-primary); width: 20px; height: 20px;"></i>
                             Email HTML Enhancer & Builder
                         </h3>
                         
-                        <p style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5; margin: 0;">Turn raw text or basic HTML into high-converting, mobile-responsive, Gmail-optimized HTML email templates with bulletproof CTAs and preheaders.</p>
-
-                        <div style="display: flex; flex-direction: column; gap: 8px; background: rgba(59,130,246,0.04); border: 1px solid rgba(59,130,246,0.12); padding: 12px; border-radius: 8px;">
-                            <label style="font-size: 0.78rem; font-weight: 700; color: var(--accent-primary); text-transform: uppercase; letter-spacing: 0.5px;">⚡ High-Convert Presets (1-Click Fill)</label>
-                            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                                <button onclick="window.applyEmailEnhancerPreset('flash_sale')" style="padding: 6px 10px; font-size: 0.75rem; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; font-weight: 500;">🔥 Flash Sale</button>
-                                <button onclick="window.applyEmailEnhancerPreset('launch')" style="padding: 6px 10px; font-size: 0.75rem; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; font-weight: 500;">🚀 Product Launch</button>
-                                <button onclick="window.applyEmailEnhancerPreset('vip_invite')" style="padding: 6px 10px; font-size: 0.75rem; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; font-weight: 500;">✨ VIP Invite</button>
-                                <button onclick="window.applyEmailEnhancerPreset('minimal')" style="padding: 6px 10px; font-size: 0.75rem; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; font-weight: 500;">📰 Clean Digest</button>
-                            </div>
-                        </div>
+                        <p style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5; margin: 0;">Paste your raw text or email copy below and choose an enhancement level to generate clean, high-converting HTML.</p>
 
                         <div style="display: flex; flex-direction: column; gap: 6px;">
                             <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Email Content (Plain Text or HTML)</label>
-                            <textarea id="email-enhancer-input" placeholder="Paste your email copy or basic HTML here..." style="min-height: 120px; font-family: inherit; font-size: 0.85rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); resize: vertical;"></textarea>
+                            <textarea id="email-enhancer-input" placeholder="Paste your email text or basic HTML copy here..." style="min-height: 200px; font-family: inherit; font-size: 0.85rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); resize: vertical; line-height: 1.5;"></textarea>
                         </div>
 
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                            <div style="display: flex; flex-direction: column; gap: 6px;">
-                                <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Theme Style</label>
-                                <select id="email-enhancer-theme" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem;">
-                                    <option value="saas">SaaS Modern (Clean Light)</option>
-                                    <option value="dark">Dark Glass (Premium Dark)</option>
-                                    <option value="promo">E-Commerce Promo (Warm)</option>
-                                    <option value="minimal">Minimalist Professional</option>
-                                </select>
-                            </div>
-
-                            <div style="display: flex; flex-direction: column; gap: 6px;">
-                                <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">CTA Button Color</label>
-                                <select id="email-enhancer-cta-color" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem;">
-                                    <option value="#2563eb">Vibrant Blue (#2563eb)</option>
-                                    <option value="#16a34a">High-Convert Green (#16a34a)</option>
-                                    <option value="#ea580c">High-Urgency Orange (#ea580c)</option>
-                                    <option value="#8b5cf6">Purple Accent (#8b5cf6)</option>
-                                    <option value="#09090b">Solid Black (#09090b)</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Preheader / Teaser Text (Shown in Inbox List)</label>
-                                <button onclick="window.generateSubjectLines()" style="padding: 2px 8px; font-size: 0.72rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--accent-primary); border-radius: 4px; cursor: pointer;">💡 Subject Ideas</button>
-                            </div>
-                            <input type="text" id="email-enhancer-preheader" placeholder="e.g. Open to claim your 50% discount before it expires!" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem;">
-                        </div>
-
-                        <div id="email-enhancer-subjects-list"></div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                            <div style="display: flex; flex-direction: column; gap: 6px;">
-                                <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">CTA Button Text</label>
-                                <input type="text" id="email-enhancer-cta-text" value="Claim Offer Now →" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem;">
-                            </div>
-                            <div style="display: flex; flex-direction: column; gap: 6px;">
-                                <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">CTA Target URL</label>
-                                <input type="text" id="email-enhancer-cta-url" value="https://example.com" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem;">
-                            </div>
-                        </div>
-
-                        <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Conversion Enhancement Level</label>
-                            <select id="email-enhancer-level" onchange="window.generateEnhancedEmailHtml()" style="padding: 11px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem; font-weight: 600;">
-                                <option value="low">Low — Clean Minimal (Simple & Direct)</option>
-                                <option value="medium" selected>Medium — Balanced Conversion (Hero Banner + Callout + CTA)</option>
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Enhancement Level</label>
+                            <select id="email-enhancer-level" style="padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.88rem; font-weight: 600; cursor: pointer;">
+                                <option value="low">Low — Clean Minimal (Simple formatting + CTA button + Footer)</option>
+                                <option value="medium" selected>Medium — Balanced (Hero Banner + Callout Box + CTA button + Footer)</option>
                                 <option value="high">High — Maximum Conversion (Hero + Urgency + Coupon + Testimonial + CTA)</option>
                             </select>
                         </div>
 
-                        <button onclick="window.generateEnhancedEmailHtml()" style="padding: 14px; background: var(--accent-primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.9rem;">
+                        <button onclick="window.generateEnhancedEmailHtml()" style="margin-top: 6px; padding: 14px; background: var(--accent-primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.9rem;">
                             <i data-lucide="wand-2" style="width: 16px; height: 16px;"></i> Build High-Convert Email HTML
                         </button>
                     </div>
