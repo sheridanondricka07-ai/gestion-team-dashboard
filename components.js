@@ -9007,9 +9007,7 @@ function renderWarmupProgress(app, container) {
         return last3.some(r => (parseInt(r.outVal) || 0) > 19000);
     });
 
-    if (!app.state.warmupActiveTab || app.state.warmupActiveTab === 'active') {
-        app.state.warmupActiveTab = active12Groups.length > 0 ? 'active12' : 'active24';
-    }
+    if (!app.state.warmupActiveTab || app.state.warmupActiveTab === 'active') app.state.warmupActiveTab = 'active12';
     let currentGroups = active12Groups;
     if (app.state.warmupActiveTab === 'active24') currentGroups = active24Groups;
     if (app.state.warmupActiveTab === 'archived') currentGroups = archivedGroups;
