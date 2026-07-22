@@ -2031,6 +2031,94 @@ window.generateEnhancedEmailHtml = () => {
     }
 };
 
+window.generateAiEmailHtml = async () => {
+    const input = document.getElementById('email-enhancer-input')?.value || '';
+    const keyInput = document.getElementById('email-enhancer-ai-key');
+    const outputEl = document.getElementById('email-enhancer-output');
+    const btn = document.getElementById('btn-ai-email-generate');
+    const level = document.getElementById('email-enhancer-level')?.value || 'medium';
+
+    if (!input.trim()) {
+        alert('Please paste your email text or HTML copy first.');
+        return;
+    }
+
+    let apiKey = keyInput ? keyInput.value.trim() : '';
+    if (!apiKey) {
+        apiKey = localStorage.getItem('gemini_ai_api_key') || '';
+    }
+
+    if (!apiKey) {
+        const userKey = prompt(
+            'To generate with Real AI, please enter your free Google Gemini API Key:\n\n' +
+            '(Get a 100% free key in 10 seconds at: https://aistudio.google.com/app/apikey)'
+        );
+        if (!userKey || !userKey.trim()) return;
+        apiKey = userKey.trim();
+        localStorage.setItem('gemini_ai_api_key', apiKey);
+        if (keyInput) keyInput.value = apiKey;
+    } else {
+        localStorage.setItem('gemini_ai_api_key', apiKey);
+    }
+
+    const oldText = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i data-lucide="sparkles" class="spin" style="width:16px; height:16px; margin-right:6px; vertical-align:middle;"></i> AI Redesigning & Rewriting HTML...`;
+        if (window.lucide) window.lucide.createIcons();
+    }
+
+    const systemPrompt = `You are an expert HTML email designer and conversion copywriter.
+Your task is to take the user's input email content/text/HTML, completely redesign it, and reform the HTML into an ultra-modern, high-converting, mobile-responsive HTML email template.
+
+CRITICAL RULES:
+1. Preserve ALL original information, names, links, URLs, dates, prices, order numbers, and details.
+2. Elevate and improve the copywriting for maximum engagement and click-through rates.
+3. Build a clean, modern 2026 table-based email architecture (max-width 600px, inline CSS styles, high-contrast bulletproof CTA buttons, header banner, clean line heights, unsubscribe footer).
+4. Conversion Level: ${level.toUpperCase()}.
+5. Output ONLY raw HTML code starting with <!DOCTYPE html>. Do NOT include markdown fences, backticks, or extra conversational text.`;
+
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [{ text: `${systemPrompt}\n\nINPUT EMAIL CONTENT TO REDESIGN:\n${input}` }]
+                }]
+            })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error?.message || `HTTP Status ${response.status}`);
+        }
+
+        const data = await response.json();
+        let aiHtml = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+        aiHtml = aiHtml.replace(/^```html\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+
+        if (outputEl) outputEl.value = aiHtml;
+
+        const frame = document.getElementById('email-enhancer-preview-iframe');
+        if (frame) {
+            const doc = frame.contentDocument || frame.contentWindow.document;
+            doc.open();
+            doc.write(aiHtml);
+            doc.close();
+        }
+    } catch (err) {
+        alert("AI Generation Error: " + err.message + "\n\nPlease verify your Gemini API key.");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = oldText;
+            if (window.lucide) window.lucide.createIcons();
+        }
+    }
+};
+
 window.copyEnhancedEmailHtml = () => {
     const textarea = document.getElementById('email-enhancer-output');
     if (!textarea || !textarea.value) return;
@@ -2931,9 +3019,22 @@ function renderTools(app, container) {
                             </select>
                         </div>
 
-                        <button onclick="window.generateEnhancedEmailHtml()" style="margin-top: 6px; padding: 14px; background: var(--accent-primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.9rem;">
-                            <i data-lucide="wand-2" style="width: 16px; height: 16px;"></i> Build High-Convert Email HTML
-                        </button>
+                        <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 10px; margin-top: 4px;">
+                            <button onclick="window.generateEnhancedEmailHtml()" style="padding: 14px; background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.85rem;">
+                                <i data-lucide="wand-2" style="width: 15px; height: 15px;"></i> Fast Engine
+                            </button>
+                            <button id="btn-ai-email-generate" onclick="window.generateAiEmailHtml()" style="padding: 14px; background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%); color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.85rem; box-shadow: 0 4px 12px rgba(139,92,246,0.3);">
+                                <i data-lucide="sparkles" style="width: 15px; height: 15px;"></i> ✨ AI Reform & Redesign
+                            </button>
+                        </div>
+
+                        <div style="display: flex; flex-direction: column; gap: 4px; background: rgba(139,92,246,0.04); border: 1px solid rgba(139,92,246,0.15); padding: 10px 12px; border-radius: 8px; font-size: 0.78rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-weight: 600; color: #a855f7; display: flex; align-items: center; gap: 4px;"><i data-lucide="key" style="width: 12px; height: 12px;"></i> Gemini AI Key (Free & Unlimited):</span>
+                                <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--accent-primary); text-decoration: underline; font-size: 0.72rem;">Get Key Free ↗</a>
+                            </div>
+                            <input type="password" id="email-enhancer-ai-key" placeholder="Paste your free Google Gemini API key here..." value="${localStorage.getItem('gemini_ai_api_key') || ''}" onchange="localStorage.setItem('gemini_ai_api_key', this.value.trim())" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.78rem;">
+                        </div>
                     </div>
 
                     <div class="card" style="flex: 1.5 1 500px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
