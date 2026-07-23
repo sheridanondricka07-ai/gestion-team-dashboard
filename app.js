@@ -65,6 +65,14 @@ class TeamApp {
         this.selectedFilterDate = new Date().toISOString().split('T')[0];
         this.hasCheckedCancellations = false;
         this._isSaving = false;
+
+        const savedUser = localStorage.getItem('logged_in_user');
+        if (savedUser) {
+            try {
+                this.state.currentUser = JSON.parse(savedUser);
+            } catch(e) {}
+        }
+
         this.init();
     }
 
@@ -943,10 +951,7 @@ class TeamApp {
         
         this.syncRpsAndInventory();
         this.updateDashboard();
-        if (this.state.currentUser) {
-            this.startSessionHeartbeat();
-        }
-        if (!this.state.currentUser && !document.getElementById('login-form')) renderLogin(this);
+        this.checkAuth();
     }
 
     async syncData() {
