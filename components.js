@@ -2179,6 +2179,58 @@ OUTPUT CHECK before returning:
 
 Email HTML to optimize:
 ${input}`;
+    } else if (level === 'concept_break') {
+        promptPayload = `MODE: ConceptBreak
+
+You are a creative director at a direct-response agency. You're given 
+marketing email HTML and asked to redesign it around a genuinely 
+different visual concept — not a re-skin of the existing layout, a new 
+idea for how to present the same offer.
+
+STEP 1 — FIND THE CONCEPT
+Before writing any code, identify one concrete metaphor or object from 
+the brand's own world that could structure the whole email (e.g. for 
+an auto warranty: a repair invoice, a mechanic's inspection ticket, a 
+dashboard warning light. For a moving company: a packing label, a 
+shipping manifest. For a fitness app: a workout log). 
+Reject generic template patterns: no plain gradient hero + button 
+stack, no default 3-column icon grid, no cream-background-with-serif 
+look. The concept must be something a designer chose specifically for 
+this brand, not something that could be swapped onto any other email 
+with a find-and-replace.
+
+STEP 2 — DESIGN WITH THAT CONCEPT
+Rebuild the copy hierarchy, layout structure, and visual language 
+(colors, type, iconography) so they all serve the chosen concept. Pick 
+one part of the email to be the "signature moment" — the single most 
+memorable visual element — and make everything else quieter so that 
+moment stands out. 
+
+Only reword sentences to fit the new concept — keep the same 
+underlying meaning and never invent facts.
+
+DO NOT MODIFY (must appear byte-for-byte identical in the output):
+- Legal/disclaimer paragraph text
+- Company name, address, phone number
+- Unsubscribe link and its href
+- Any href URLs anywhere in the document
+- Any factual claims (coverage items, prices, stats) — you may 
+  restyle or reframe how they're presented, but never change or add 
+  facts not present in the source
+
+TECHNICAL CONSTRAINTS:
+- Inline CSS only (no <style> tags, no JS — most email clients strip both)
+- Assume rendering in Gmail/Apple Mail/webmail-grade clients; note if 
+  any effect (gradients, transforms, custom fonts) may degrade in 
+  older Outlook desktop
+- Use web-safe fonts only (Arial, Helvetica, Georgia, Courier New, 
+  Verdana) — no custom @font-face
+- Keep max-width around 550-600px for email
+
+OUTPUT: Return only the complete HTML, no explanation, no code fences.
+
+Email HTML to redesign:
+${input}`;
     } else {
         promptPayload = `Optimize this marketing email HTML for higher conversion rate.
 
@@ -3219,6 +3271,7 @@ function renderTools(app, container) {
                                     <option value="low">LOW — quick pass</option>
                                     <option value="medium" selected>MEDIUM — guided, still flexible</option>
                                     <option value="high">HIGH — full spec, production-grade</option>
+                                    <option value="concept_break">CONCEPTBREAK — visual concept redesign</option>
                                 </select>
                             </div>
                         </div>
