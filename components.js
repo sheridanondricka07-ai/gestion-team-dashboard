@@ -2149,24 +2149,61 @@ window.generateAiEmailHtml = async () => {
         if (window.lucide) window.lucide.createIcons();
     }
 
-    const systemPrompt = `You are an expert HTML email designer and conversion copywriter optimizing a marketing email's HTML for maximum conversion rate.
+    let promptPayload = '';
+    if (level === 'low') {
+        promptPayload = `Rewrite this email HTML to be more persuasive and increase clicks. \nKeep the HTML structure and legal text intact. Return only the HTML.\n\n${input}`;
+    } else if (level === 'high') {
+        promptPayload = `You are a conversion-rate-optimization specialist rewriting a marketing email's HTML.
 
-STRICT CONSTRAINTS & RULES:
-1. Return ONLY valid, executable HTML starting with <!DOCTYPE html>. Do NOT include any explanations, markdown code fences (no \`\`\`html), or conversational text.
-2. Preserve ALL inline CSS (do not use external <style> tags or JS, as email clients strip them). Max table width: 600px, centered with cell-padding: 0.
-3. Do NOT alter, delete, or modify any legal/disclaimer text, company address, phone numbers, contact info, or unsubscribe links.
-4. Do NOT change, corrupt, or alter any original href URLs, tracking links, image src attributes, or reference IDs.
-5. Conversion Level: ${level.toUpperCase()}.
+OBJECTIVE: Maximize click-through rate on the CTA without misrepresenting the offer.
 
-APPLY THESE SPECIFIC CONVERSION PRINCIPLES:
-1. Headline: Lead with the customer's core pain point or fear, not generic brand filler.
-2. Urgency: Add one clean urgency element (scarcity, deadline, or rate increase) near the top banner.
-3. Social Proof: Include a short social proof line (ratings, testimonial, or customer count) directly before the primary CTA.
-4. Call to Action: Use a single consistent bulletproof button CTA phrase repeated 2-3 times (hero, body, footer).
-5. Friction Reduction: Add a short friction-reducing subtext directly under the primary CTA (e.g. "No credit card required", "Instant 60-second setup").
-6. Scannability: Keep text blocks short, bold key value propositions, and preserve clean white space.`;
+STRUCTURE RULES:
+- Return ONLY valid, complete HTML. No markdown fences, no commentary, no explanation.
+- Preserve all inline CSS (no <style> blocks, no JS — most email clients strip both).
+- Preserve table-based or div-based layout structure; do not introduce new frameworks.
+- Keep total email width and existing color palette unless a change is explicitly justified by principle 3 below.
 
-    const userPrompt = `OPTIMIZE THIS EMAIL CONTENT FOR MAXIMUM CONVERSIONS:\n\n${input}`;
+DO NOT MODIFY:
+- Legal/disclaimer paragraph text
+- Company name, address, phone number
+- Unsubscribe link and its href
+- Any href URLs anywhere in the document
+
+CONVERSION PRINCIPLES TO APPLY:
+1. Headline: lead with the customer's problem, cost, or fear — not the brand name. Use a concrete number or stat if one is available in the source content; do not invent statistics.
+2. Urgency: add exactly one urgency/scarcity element (deadline, rate change, limited availability). Keep it plausible — no fake countdowns unless the platform supports live ones.
+3. Social proof: add one trust signal (rating, customer count, or short testimonial) positioned before the primary CTA. Do not fabricate specific names or exact review counts — use general phrasing if no real data is provided.
+4. CTA consistency: use one clear CTA phrase, repeated at 2-3 points (hero button, mid-body, footer/phone).
+5. Friction reduction: add a short reassurance line under the primary CTA (time required, no obligation, no spam).
+6. Scannability: break dense paragraphs into short lines or bullet/checkmark format.
+7. Visual hierarchy: ensure the CTA button has the highest contrast element on the page.
+
+OUTPUT CHECK before returning:
+- Confirm the legal text, phone number, address, and unsubscribe link are byte-for-byte unchanged.
+- Confirm no href was altered.
+- Confirm the HTML is well-formed (matching tags).
+
+Email HTML to optimize:
+${input}`;
+    } else {
+        promptPayload = `Optimize this marketing email HTML for higher conversion rate.
+
+Apply these principles:
+- Lead with the customer's pain point or benefit, not the brand name.
+- Add one urgency or scarcity element near the top.
+- Include a trust/social proof signal (ratings, customer count, testimonial) before the main CTA.
+- Repeat one consistent CTA phrase 2-3 times.
+- Add short friction-reducing text under the CTA (e.g. "no obligation," "takes 60 seconds").
+
+Rules:
+- Return only valid HTML, no explanation or code fences.
+- Keep inline CSS (no <style> tags or JS — email clients strip them).
+- Do not change the legal/disclaimer text, address, phone number, or unsubscribe link.
+- Do not change any href URLs.
+
+Email HTML:
+${input}`;
+    }
 
     try {
         let aiHtml = '';
@@ -2182,8 +2219,7 @@ APPLY THESE SPECIFIC CONVERSION PRINCIPLES:
                     model: 'llama-3.3-70b-versatile',
                     temperature: 0.3,
                     messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: userPrompt }
+                        { role: 'user', content: promptPayload }
                     ]
                 })
             });
@@ -2205,8 +2241,7 @@ APPLY THESE SPECIFIC CONVERSION PRINCIPLES:
                     model: 'meta-llama/llama-3.3-70b-instruct',
                     temperature: 0.3,
                     messages: [
-                        { role: 'system', content: systemPrompt },
-                        { role: 'user', content: userPrompt }
+                        { role: 'user', content: promptPayload }
                     ]
                 })
             });
@@ -2235,7 +2270,7 @@ APPLY THESE SPECIFIC CONVERSION PRINCIPLES:
                         body: JSON.stringify({
                             generationConfig: { temperature: 0.3 },
                             contents: [{
-                                parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }]
+                                parts: [{ text: promptPayload }]
                             }]
                         })
                     });
@@ -3187,9 +3222,9 @@ function renderTools(app, container) {
                             <div style="display: flex; flex-direction: column; gap: 6px;">
                                 <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Conversion Level</label>
                                 <select id="email-enhancer-level" style="padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem; font-weight: 600; cursor: pointer;">
-                                    <option value="low">Low — Clean Minimal (Simple CTA + Footer)</option>
-                                    <option value="medium" selected>Medium — Balanced (Hero + CTA + Scannable)</option>
-                                    <option value="high">High — Max Conversion (Hero + Pain + Urgency + Proof + Friction-Free CTA)</option>
+                                    <option value="low">LOW — quick pass</option>
+                                    <option value="medium" selected>MEDIUM — guided, still flexible</option>
+                                    <option value="high">HIGH — full spec, production-grade</option>
                                 </select>
                             </div>
                         </div>
