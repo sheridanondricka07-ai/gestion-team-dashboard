@@ -2121,13 +2121,25 @@ window.generateAiEmailHtml = async () => {
         apiKey = await window.getAiApiKey(provider);
     }
 
-    const requiresKey = ['gemini', 'groq'].includes(provider);
-
-    // Automatic Fallback: If a provider requiring an API key has no key configured, fallback to Puter AI (Llama 3.3 70B Zero Key)
-    let activeProvider = provider;
-    if (requiresKey && !apiKey) {
-        console.log(`[AI Enhancer] Key missing for ${provider}. Falling back to zero-key Llama 3.3 70B engine...`);
-        activeProvider = 'puter';
+    if (!apiKey) {
+        const isAdmin = app.state.currentUser && app.state.currentUser.role === 'admin';
+        if (isAdmin) {
+            const userKey = prompt(
+                `Please enter your API Key for ${provider.toUpperCase()}:\n\n` +
+                (provider === 'groq' ? '(Get 100% free key at: https://console.groq.com/keys)' :
+                 provider === 'openrouter' ? '(Get free key at: https://openrouter.ai/keys)' :
+                 '(Get 100% free key at: https://aistudio.google.com/app/apikey)')
+            );
+            if (!userKey || !userKey.trim()) return;
+            apiKey = userKey.trim();
+            window.saveAdminAiKey(provider, apiKey);
+            if (keyInput) keyInput.value = apiKey;
+        } else {
+            alert(`AI Reformer (${provider.toUpperCase()}) is not configured yet. Please ask the administrator to enter the API key.`);
+            return;
+        }
+    } else {
+        window.saveAdminAiKey(provider, apiKey);
     }
 
     const oldText = btn ? btn.innerHTML : '';
@@ -2159,7 +2171,7 @@ APPLY THESE SPECIFIC CONVERSION PRINCIPLES:
     try {
         let aiHtml = '';
 
-        if (activeProvider === 'groq') {
+        if (provider === 'groq') {
             const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -2182,15 +2194,15 @@ APPLY THESE SPECIFIC CONVERSION PRINCIPLES:
             const data = await res.json();
             aiHtml = data.choices?.[0]?.message?.content || '';
 
-        } else if (activeProvider === 'openrouter') {
+        } else if (provider === 'openrouter') {
             const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${apiKey || 'free'}`,
+                    'Authorization': `Bearer ${apiKey}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    model: 'meta-llama/llama-3.3-70b-instruct:free',
+                    model: 'meta-llama/llama-3.3-70b-instruct',
                     temperature: 0.3,
                     messages: [
                         { role: 'system', content: systemPrompt },
@@ -2204,30 +2216,6 @@ APPLY THESE SPECIFIC CONVERSION PRINCIPLES:
             }
             const data = await res.json();
             aiHtml = data.choices?.[0]?.message?.content || '';
-
-        } else if (activeProvider === 'puter') {
-            if (window.puter && window.puter.ai) {
-                const res = await window.puter.ai.chat(`${systemPrompt}\n\n${userPrompt}`);
-                aiHtml = typeof res === 'string' ? res : (res?.toString ? res.toString() : JSON.stringify(res));
-            } else {
-                throw new Error("Puter.js library is loading or blocked by extension.");
-            }
-
-        } else if (activeProvider === 'ollama') {
-            const host = apiKey || 'http://localhost:11434';
-            const res = await fetch(`${host}/api/generate`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    model: 'llama3.3',
-                    prompt: `${systemPrompt}\n\n${userPrompt}`,
-                    stream: false,
-                    options: { temperature: 0.3 }
-                })
-            });
-            if (!res.ok) throw new Error(`Ollama local server connection failed at ${host}`);
-            const data = await res.json();
-            aiHtml = data.response || '';
 
         } else {
             // Default: Google Gemini API
@@ -2285,28 +2273,7 @@ APPLY THESE SPECIFIC CONVERSION PRINCIPLES:
             doc.close();
         }
     } catch (err) {
-        console.warn(`[AI Generation] ${activeProvider} failed (${err.message}), attempting fallback to Puter Llama 3.3...`);
-        try {
-            if (window.puter && window.puter.ai && activeProvider !== 'puter') {
-                const res = await window.puter.ai.chat(`${systemPrompt}\n\n${userPrompt}`);
-                let aiHtml = typeof res === 'string' ? res : (res?.toString ? res.toString() : JSON.stringify(res));
-                aiHtml = aiHtml.replace(/^```html\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
-
-                if (outputEl) outputEl.value = aiHtml;
-
-                const frame = document.getElementById('email-enhancer-preview-iframe');
-                if (frame) {
-                    const doc = frame.contentDocument || frame.contentWindow.document;
-                    doc.open();
-                    doc.write(aiHtml);
-                    doc.close();
-                }
-                return;
-            }
-        } catch (fallbackErr) {
-            console.error("Fallback to Puter Llama failed:", fallbackErr);
-        }
-        alert(`AI Generation Error [${activeProvider.toUpperCase()}]: ` + err.message);
+        alert(`AI Generation Error [${provider.toUpperCase()}]: ` + err.message);
     } finally {
         if (btn) {
             btn.disabled = false;
