@@ -849,7 +849,14 @@ class TeamApp {
 
     mergeCloudData(cloudData) {
         if (!cloudData) return;
-        const currentUser = this.state.currentUser;
+        let currentUser = this.state.currentUser;
+        if (currentUser && cloudData.mailers) {
+            const freshUser = cloudData.mailers.find(m => m && m.id === currentUser.id);
+            if (freshUser) {
+                currentUser = freshUser;
+                localStorage.setItem('logged_in_user', JSON.stringify(freshUser));
+            }
+        }
         const currentView = this.state.currentView; // Preserve local view
         const warmupData = this.state.warmupData; // Preserve local warmupData
         const spamhausHistory = this.state.spamhausHistory; // Preserve local spamhausHistory
@@ -1049,6 +1056,15 @@ class TeamApp {
 
     checkAuth() {
         if (!this.state.currentUser) { 
+            const savedUser = localStorage.getItem('logged_in_user');
+            if (savedUser) {
+                try {
+                    this.state.currentUser = JSON.parse(savedUser);
+                } catch(e) {}
+            }
+        }
+
+        if (!this.state.currentUser) { 
             this.showScreen('login'); 
             renderLogin(this); 
             if (this.sessionInterval) {
@@ -1106,6 +1122,7 @@ class TeamApp {
         const user = this.state.mailers.find(u => u.email.trim().toLowerCase() === cleanEmail && u.password.trim() === cleanPass);
         if (user) {
             this.state.currentUser = user; 
+            localStorage.setItem('logged_in_user', JSON.stringify(user));
             const sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
             localStorage.setItem('active_session_id', sessionId);
             this.checkAuth(); 
@@ -1121,6 +1138,7 @@ class TeamApp {
                 window.db.ref(`state/activeSessions/${this.state.currentUser.id}/${sessionId}`).remove();
             }
         }
+        localStorage.removeItem('logged_in_user');
         localStorage.removeItem('active_session_id');
         if (this.sessionInterval) {
             clearInterval(this.sessionInterval);
