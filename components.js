@@ -4410,6 +4410,12 @@ function renderTeamManagement(app, container) {
                 ${teamMembers.map(member => {
                     const memberSrvs = (servers || []).filter(s => s && s.mailerId === member.id);
                     const memberRps = (rps || []).filter(r => r && r.mailerId === member.id);
+                    
+                    const activeSessions = app.state.activeSessions?.[member.id] || {};
+                    const now = Date.now();
+                    const liveSessions = Object.values(activeSessions).filter(s => now - s.lastActive < 30000); // 30s threshold
+                    const isOnline = liveSessions.length > 0;
+
                     return `
                         <div class="card" style="background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); position: relative;">
                             <div style="position: absolute; top: 12px; right: 12px; display: flex; gap: 8px;">
@@ -4429,7 +4435,7 @@ function renderTeamManagement(app, container) {
                                     <div style="font-size: 0.75rem; color: var(--text-secondary);">${member.email}</div>
                                 </div>
                             </div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px;">
                                 <div style="background: var(--bg-secondary); padding: 8px; border-radius: 8px; text-align: center;">
                                     <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase;">Mailer ID</div>
                                     <div style="font-weight: 700; font-size: 1.1rem; color: var(--accent-primary);">${member.mailer_id || 'N/A'}</div>
@@ -4442,6 +4448,15 @@ function renderTeamManagement(app, container) {
                                     <div style="font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase;">RPs</div>
                                     <div style="font-weight: 700; font-size: 1.1rem;">${memberRps.length}</div>
                                 </div>
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 12px; border-top: 1px dashed var(--border-color); font-size: 0.75rem;">
+                                <span style="display: flex; align-items: center; gap: 6px; color: ${isOnline ? 'var(--success)' : 'var(--text-secondary)'}; font-weight: 600;">
+                                    <span style="width: 8px; height: 8px; border-radius: 50%; background: ${isOnline ? 'var(--success)' : 'var(--text-secondary)'}; display: inline-block;"></span>
+                                    ${isOnline ? 'Online' : 'Offline'}
+                                </span>
+                                <span style="color: var(--text-secondary);">
+                                    Active Devices: <b>${liveSessions.length}</b>
+                                </span>
                             </div>
                         </div>
                     `;

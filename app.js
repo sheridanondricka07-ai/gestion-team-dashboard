@@ -810,6 +810,12 @@ class TeamApp {
                     }
                 });
 
+                window.db.ref('state/activeSessions').on('value', (snapshot) => {
+                    const activeSessions = snapshot.val();
+                    this.state.activeSessions = activeSessions || {};
+                    this.updateDashboard();
+                });
+
                 // 3. Periodic silent background sync every 60 minutes (conserves bandwidth)
                 setInterval(() => {
                     if (this.state.dbConnected && !this.state.syncing && !document.hidden) {
@@ -1042,19 +1048,88 @@ class TeamApp {
     }
 
     checkAuth() {
-        if (!this.state.currentUser) { this.showScreen('login'); renderLogin(this); }
-        else { this.showScreen('dashboard'); this.updateDashboard(); }
+        if (!this.state.currentUser) { 
+            this.showScreen('login'); 
+            renderLogin(this); 
+            if (this.sessionInterval) {
+                clearInterval(this.sessionInterval);
+                this.sessionInterval = null;
+            }
+        } else { 
+            this.showScreen('dashboard'); 
+            this.updateDashboard(); 
+            this.startSessionHeartbeat();
+        }
+    }
+
+    startSessionHeartbeat() {
+        if (this.sessionInterval) clearInterval(this.sessionInterval);
+        if (!this.state.dbConnected || !this.state.currentUser) return;
+
+        let sessionId = localStorage.getItem('active_session_id');
+        if (!sessionId) {
+            sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+            localStorage.setItem('active_session_id', sessionId);
+        }
+
+        const updateHeartbeat = () => {
+            if (!this.state.currentUser) return;
+            const ref = window.db.ref(`state/activeSessions/${this.state.currentUser.id}`);
+            ref.once('value', (snap) => {
+                const sessions = snap.val() || {};
+                // If another session was created, and our local sessionId is not the active one, log out
+                if (Object.keys(sessions).length > 0 && !sessions[sessionId]) {
+                    alert("Logged Out: Your account was logged in from another PC or browser device.");
+                    this.logout();
+                } else {
+                    // Update heartbeat
+                    ref.set({
+                        [sessionId]: {
+                            lastActive: Date.now(),
+                            device: navigator.userAgent.replace(/[\.#\$\[\]]/g, '')
+                        }
+                    });
+                }
+            });
+        };
+
+        // Run immediately
+        updateHeartbeat();
+
+        // Repeat every 10 seconds
+        this.sessionInterval = setInterval(updateHeartbeat, 10000);
     }
 
     login(email, password) {
         const cleanEmail = email.trim().toLowerCase();
         const cleanPass = password.trim();
         const user = this.state.mailers.find(u => u.email.trim().toLowerCase() === cleanEmail && u.password.trim() === cleanPass);
-        if (user) { this.state.currentUser = user; this.checkAuth(); return true; }
+        if (user) {
+            this.state.currentUser = user; 
+            const sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+            localStorage.setItem('active_session_id', sessionId);
+            this.checkAuth(); 
+            return true; 
+        }
         return false;
     }
 
-    logout() { this.state.currentUser = null; this.state.currentView = 'overview'; this.checkAuth(); }
+    logout() { 
+        if (this.state.currentUser && this.state.dbConnected) {
+            const sessionId = localStorage.getItem('active_session_id');
+            if (sessionId) {
+                window.db.ref(`state/activeSessions/${this.state.currentUser.id}/${sessionId}`).remove();
+            }
+        }
+        localStorage.removeItem('active_session_id');
+        if (this.sessionInterval) {
+            clearInterval(this.sessionInterval);
+            this.sessionInterval = null;
+        }
+        this.state.currentUser = null; 
+        this.state.currentView = 'overview'; 
+        this.checkAuth(); 
+    }
     
     toggleServerExpand(serverId) {
         if (this.expandedServers.has(serverId)) {
