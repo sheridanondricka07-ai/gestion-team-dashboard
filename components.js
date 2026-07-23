@@ -2087,13 +2087,6 @@ window.updateAiKeyFieldUI = async () => {
         input.style.display = 'block';
         input.placeholder = 'Paste your OpenRouter API key here...';
         if (quotaEl) quotaEl.innerHTML = '🔄 <b>OpenRouter Limits:</b> Unlimited for paid/free models depending on credits';
-    } else if (provider === 'ollama') {
-        label.innerHTML = '<i data-lucide="server" style="width: 12px; height: 12px;"></i> Ollama Host URL (Local PC):';
-        if (link) link.style.display = 'none';
-        input.style.display = 'block';
-        input.placeholder = 'http://localhost:11434';
-        if (!currentKey) input.value = 'http://localhost:11434';
-        if (quotaEl) quotaEl.innerHTML = '🏠 <b>Ollama Limits:</b> 100% Unlimited Local Hardware (Requires <code>ollama serve</code> running locally)';
     } else {
         label.innerHTML = '<i data-lucide="key" style="width: 12px; height: 12px;"></i> Gemini API Key (Admin Only):';
         if (link) { link.href = 'https://aistudio.google.com/app/apikey'; link.style.display = 'inline'; }
@@ -2252,22 +2245,6 @@ ${input}`;
             }
             const data = await res.json();
             aiHtml = data.choices?.[0]?.message?.content || '';
-
-        } else if (provider === 'ollama') {
-            const host = apiKey || 'http://localhost:11434';
-            const res = await fetch(`${host}/api/generate`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    model: 'llama3.3',
-                    prompt: promptPayload,
-                    stream: false,
-                    options: { temperature: 0.3 }
-                })
-            });
-            if (!res.ok) throw new Error(`Ollama connection failed at ${host}. Please verify that Ollama app is running locally on your PC.`);
-            const data = await res.json();
-            aiHtml = data.response || '';
 
         } else {
             // Default: Google Gemini API (v1beta)
@@ -3233,7 +3210,6 @@ function renderTools(app, container) {
                                     <option value="gemini" selected>Google Gemini 2.0 (Recommended 🎯)</option>
                                     <option value="groq">Groq Cloud (Llama 3.3 Sub-Second ⚡)</option>
                                     <option value="openrouter">OpenRouter Cloud (Free Multi-Model 🔄)</option>
-                                    <option value="ollama">Ollama Local (localhost:11434 🏠)</option>
                                 </select>
                             </div>
 
