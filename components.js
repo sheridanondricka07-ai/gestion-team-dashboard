@@ -2218,11 +2218,11 @@ APPLY THESE SPECIFIC CONVERSION PRINCIPLES:
             aiHtml = data.choices?.[0]?.message?.content || '';
 
         } else {
-            // Default: Google Gemini API
+            // Default: Google Gemini API (v1beta)
             const apiEndpoints = [
                 `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-                `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-                `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key=${apiKey}`
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`
             ];
             let response = null;
             let lastErr = null;
@@ -2253,7 +2253,7 @@ APPLY THESE SPECIFIC CONVERSION PRINCIPLES:
             }
 
             if (!response) {
-                throw new Error(lastErr || 'Gemini model generation failed');
+                throw new Error(lastErr || 'Gemini API key is missing or invalid. Get a free key at https://aistudio.google.com/app/apikey');
             }
 
             const data = await response.json();
@@ -3178,8 +3178,7 @@ function renderTools(app, container) {
                             <div style="display: flex; flex-direction: column; gap: 6px;">
                                 <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">AI Engine Provider</label>
                                 <select id="email-enhancer-provider" onchange="window.updateAiKeyFieldUI()" style="padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem; font-weight: 600; cursor: pointer;">
-                                    <option value="puter" selected>Llama 3.3 70B Cloud (Zero-Key Built-in 🆓)</option>
-                                    <option value="gemini">Google Gemini 2.0 (Recommended 🎯)</option>
+                                    <option value="gemini" selected>Google Gemini 2.0 (Recommended 🎯)</option>
                                     <option value="groq">Groq Cloud (Llama 3.3 Sub-Second ⚡)</option>
                                     <option value="openrouter">OpenRouter Cloud (Free Multi-Model 🔄)</option>
                                 </select>
