@@ -2285,7 +2285,28 @@ APPLY THESE SPECIFIC CONVERSION PRINCIPLES:
             doc.close();
         }
     } catch (err) {
-        alert(`AI Generation Error [${provider.toUpperCase()}]: ` + err.message);
+        console.warn(`[AI Generation] ${activeProvider} failed (${err.message}), attempting fallback to Puter Llama 3.3...`);
+        try {
+            if (window.puter && window.puter.ai && activeProvider !== 'puter') {
+                const res = await window.puter.ai.chat(`${systemPrompt}\n\n${userPrompt}`);
+                let aiHtml = typeof res === 'string' ? res : (res?.toString ? res.toString() : JSON.stringify(res));
+                aiHtml = aiHtml.replace(/^```html\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+
+                if (outputEl) outputEl.value = aiHtml;
+
+                const frame = document.getElementById('email-enhancer-preview-iframe');
+                if (frame) {
+                    const doc = frame.contentDocument || frame.contentWindow.document;
+                    doc.open();
+                    doc.write(aiHtml);
+                    doc.close();
+                }
+                return;
+            }
+        } catch (fallbackErr) {
+            console.error("Fallback to Puter Llama failed:", fallbackErr);
+        }
+        alert(`AI Generation Error [${activeProvider.toUpperCase()}]: ` + err.message);
     } finally {
         if (btn) {
             btn.disabled = false;
