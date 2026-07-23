@@ -1090,31 +1090,10 @@ class TeamApp {
 
         const updateHeartbeat = () => {
             if (!this.state.currentUser) return;
-            const ref = window.db.ref(`state/activeSessions/${this.state.currentUser.id}`);
-            ref.once('value', (snap) => {
-                const sessions = snap.val() || {};
-                const sessionIds = Object.keys(sessions);
-                
-                // If there is another active session
-                if (sessionIds.length > 0 && !sessions[sessionId]) {
-                    const otherSessionId = sessionIds[0];
-                    const otherSession = sessions[otherSessionId];
-                    const isOtherSessionAlive = otherSession && (Date.now() - otherSession.lastActive < 45000); // 45 seconds threshold
-                    
-                    if (isOtherSessionAlive) {
-                        alert("Logged Out: Your account was logged in from another PC or browser device.");
-                        this.logout();
-                        return;
-                    }
-                }
-
-                // If no other alive sessions exist, write/refresh ours
-                ref.set({
-                    [sessionId]: {
-                        lastActive: Date.now(),
-                        device: navigator.userAgent.replace(/[\.#\$\[\]]/g, '')
-                    }
-                });
+            const ref = window.db.ref(`state/activeSessions/${this.state.currentUser.id}/${sessionId}`);
+            ref.set({
+                lastActive: Date.now(),
+                device: navigator.userAgent.replace(/[\.#\$\[\]]/g, '')
             });
         };
 
@@ -1135,13 +1114,10 @@ class TeamApp {
             const sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
             localStorage.setItem('active_session_id', sessionId);
             
-            // Set the session immediately in Firebase to overwrite any previous sessions
             if (this.state.dbConnected) {
-                window.db.ref(`state/activeSessions/${user.id}`).set({
-                    [sessionId]: {
-                        lastActive: Date.now(),
-                        device: navigator.userAgent.replace(/[\.#\$\[\]]/g, '')
-                    }
+                window.db.ref(`state/activeSessions/${user.id}/${sessionId}`).set({
+                    lastActive: Date.now(),
+                    device: navigator.userAgent.replace(/[\.#\$\[\]]/g, '')
                 });
             }
 
