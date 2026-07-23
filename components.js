@@ -2121,27 +2121,13 @@ window.generateAiEmailHtml = async () => {
         apiKey = await window.getAiApiKey(provider);
     }
 
-    const requiresKey = ['gemini', 'groq', 'openrouter'].includes(provider);
+    const requiresKey = ['gemini', 'groq'].includes(provider);
 
+    // Automatic Fallback: If a provider requiring an API key has no key configured, fallback to Puter AI (Llama 3.3 70B Zero Key)
+    let activeProvider = provider;
     if (requiresKey && !apiKey) {
-        const isAdmin = app.state.currentUser && app.state.currentUser.role === 'admin';
-        if (isAdmin) {
-            const userKey = prompt(
-                `Please enter your API Key for ${provider.toUpperCase()}:\n\n` +
-                (provider === 'gemini' ? '(Get key free at: https://aistudio.google.com/app/apikey)' :
-                 provider === 'groq' ? '(Get key free at: https://console.groq.com/keys)' :
-                 '(Get key free at: https://openrouter.ai/keys)')
-            );
-            if (!userKey || !userKey.trim()) return;
-            apiKey = userKey.trim();
-            window.saveAdminAiKey(provider, apiKey);
-            if (keyInput) keyInput.value = apiKey;
-        } else {
-            alert(`AI Reformer (${provider.toUpperCase()}) is not configured yet. Please ask the administrator to set the API key.`);
-            return;
-        }
-    } else if (apiKey) {
-        window.saveAdminAiKey(provider, apiKey);
+        console.log(`[AI Enhancer] Key missing for ${provider}. Falling back to zero-key Llama 3.3 70B engine...`);
+        activeProvider = 'puter';
     }
 
     const oldText = btn ? btn.innerHTML : '';
@@ -2173,7 +2159,7 @@ APPLY THESE SPECIFIC CONVERSION PRINCIPLES:
     try {
         let aiHtml = '';
 
-        if (provider === 'groq') {
+        if (activeProvider === 'groq') {
             const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -2196,7 +2182,7 @@ APPLY THESE SPECIFIC CONVERSION PRINCIPLES:
             const data = await res.json();
             aiHtml = data.choices?.[0]?.message?.content || '';
 
-        } else if (provider === 'openrouter') {
+        } else if (activeProvider === 'openrouter') {
             const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -2219,7 +2205,7 @@ APPLY THESE SPECIFIC CONVERSION PRINCIPLES:
             const data = await res.json();
             aiHtml = data.choices?.[0]?.message?.content || '';
 
-        } else if (provider === 'puter') {
+        } else if (activeProvider === 'puter') {
             if (window.puter && window.puter.ai) {
                 const res = await window.puter.ai.chat(`${systemPrompt}\n\n${userPrompt}`);
                 aiHtml = typeof res === 'string' ? res : (res?.toString ? res.toString() : JSON.stringify(res));
@@ -2227,7 +2213,7 @@ APPLY THESE SPECIFIC CONVERSION PRINCIPLES:
                 throw new Error("Puter.js library is loading or blocked by extension.");
             }
 
-        } else if (provider === 'ollama') {
+        } else if (activeProvider === 'ollama') {
             const host = apiKey || 'http://localhost:11434';
             const res = await fetch(`${host}/api/generate`, {
                 method: 'POST',
