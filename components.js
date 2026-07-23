@@ -2068,6 +2068,7 @@ window.updateAiKeyFieldUI = async () => {
     const label = document.getElementById('email-enhancer-key-label');
     const link = document.getElementById('email-enhancer-key-link');
     const input = document.getElementById('email-enhancer-ai-key');
+    const quotaEl = document.getElementById('email-enhancer-quota-status');
 
     if (!input || !label) return;
 
@@ -2079,26 +2080,26 @@ window.updateAiKeyFieldUI = async () => {
         if (link) { link.href = 'https://console.groq.com/keys'; link.style.display = 'inline'; }
         input.style.display = 'block';
         input.placeholder = 'Paste your free Groq API key here...';
+        if (quotaEl) quotaEl.innerHTML = '⚡ <b>Groq Limits:</b> 14,400 Requests/day free (30 Requests/min, 6,000 Tokens/min limit)';
     } else if (provider === 'openrouter') {
-        label.innerHTML = '<i data-lucide="key" style="width: 12px; height: 12px;"></i> OpenRouter Key (Optional for free models):';
+        label.innerHTML = '<i data-lucide="key" style="width: 12px; height: 12px;"></i> OpenRouter Key (Optional):';
         if (link) { link.href = 'https://openrouter.ai/keys'; link.style.display = 'inline'; }
         input.style.display = 'block';
-        input.placeholder = 'Paste your OpenRouter API key here (or leave blank for free tier)...';
-    } else if (provider === 'puter') {
-        label.innerHTML = '<i data-lucide="check-circle" style="width: 12px; height: 12px; color: var(--success);"></i> Puter AI is Built-in & 100% Free (Zero API key needed!)';
-        if (link) link.style.display = 'none';
-        input.style.display = 'none';
+        input.placeholder = 'Paste your OpenRouter API key here...';
+        if (quotaEl) quotaEl.innerHTML = '🔄 <b>OpenRouter Limits:</b> Unlimited for paid/free models depending on credits';
     } else if (provider === 'ollama') {
-        label.innerHTML = '<i data-lucide="server" style="width: 12px; height: 12px;"></i> Ollama Host URL (Local):';
+        label.innerHTML = '<i data-lucide="server" style="width: 12px; height: 12px;"></i> Ollama Host URL (Local PC):';
         if (link) link.style.display = 'none';
         input.style.display = 'block';
         input.placeholder = 'http://localhost:11434';
         if (!currentKey) input.value = 'http://localhost:11434';
+        if (quotaEl) quotaEl.innerHTML = '🏠 <b>Ollama Limits:</b> 100% Unlimited Local Hardware (Requires <code>ollama serve</code> running locally)';
     } else {
         label.innerHTML = '<i data-lucide="key" style="width: 12px; height: 12px;"></i> Gemini API Key (Admin Only):';
         if (link) { link.href = 'https://aistudio.google.com/app/apikey'; link.style.display = 'inline'; }
         input.style.display = 'block';
         input.placeholder = 'Paste your free Google Gemini API key here...';
+        if (quotaEl) quotaEl.innerHTML = '🎯 <b>Gemini 2.0 Limits:</b> 1,500 Requests/day free (15 Requests/min, 1,000,000 Tokens/min limit)';
     }
     if (window.lucide) window.lucide.createIcons();
 };
@@ -2251,6 +2252,22 @@ ${input}`;
             }
             const data = await res.json();
             aiHtml = data.choices?.[0]?.message?.content || '';
+
+        } else if (provider === 'ollama') {
+            const host = apiKey || 'http://localhost:11434';
+            const res = await fetch(`${host}/api/generate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: 'llama3.3',
+                    prompt: promptPayload,
+                    stream: false,
+                    options: { temperature: 0.3 }
+                })
+            });
+            if (!res.ok) throw new Error(`Ollama connection failed at ${host}. Please verify that Ollama app is running locally on your PC.`);
+            const data = await res.json();
+            aiHtml = data.response || '';
 
         } else {
             // Default: Google Gemini API (v1beta)
@@ -3216,6 +3233,7 @@ function renderTools(app, container) {
                                     <option value="gemini" selected>Google Gemini 2.0 (Recommended 🎯)</option>
                                     <option value="groq">Groq Cloud (Llama 3.3 Sub-Second ⚡)</option>
                                     <option value="openrouter">OpenRouter Cloud (Free Multi-Model 🔄)</option>
+                                    <option value="ollama">Ollama Local (localhost:11434 🏠)</option>
                                 </select>
                             </div>
 
@@ -3227,6 +3245,10 @@ function renderTools(app, container) {
                                     <option value="high">HIGH — full spec, production-grade</option>
                                 </select>
                             </div>
+                        </div>
+
+                        <div id="email-enhancer-quota-status" style="font-size: 0.76rem; color: var(--text-secondary); background: rgba(59,130,246,0.06); border: 1px solid rgba(59,130,246,0.15); border-radius: 6px; padding: 6px 10px;">
+                            🎯 <b>Gemini 2.0 Limits:</b> 1,500 Requests/day free (15 Requests/min limit)
                         </div>
 
                         <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 10px; margin-top: 4px;">
