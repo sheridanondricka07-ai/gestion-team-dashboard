@@ -3171,7 +3171,7 @@ function renderTools(app, container) {
 
                         <div style="display: flex; flex-direction: column; gap: 6px;">
                             <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Email Content (Plain Text or HTML)</label>
-                            <textarea id="email-enhancer-input" placeholder="Paste your email text or basic HTML copy here..." style="min-height: 200px; font-family: inherit; font-size: 0.85rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); resize: vertical; line-height: 1.5;"></textarea>
+                            <textarea id="email-enhancer-input" placeholder="Paste your email text or basic HTML copy here..." style="min-height: 450px; font-family: inherit; font-size: 0.85rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); resize: vertical; line-height: 1.5;"></textarea>
                         </div>
 
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -3215,7 +3215,7 @@ function renderTools(app, container) {
                         ` : ''}
                     </div>
 
-                    <div class="card" style="flex: 1.5 1 500px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                    <div class="card" style="flex: 1.5 1 500px; min-height: 760px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
                         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
                             <div style="display: flex; gap: 6px; background: var(--bg-primary); padding: 3px; border-radius: 8px; border: 1px solid var(--border-color);">
                                 <button id="email-enhancer-tab-prev" onclick="window.switchEmailEnhancerView('prev')" style="padding: 6px 14px; font-size: 0.8rem; border-radius: 6px; border: none; background: var(--accent-primary); color: white; cursor: pointer; font-weight: 600;">
@@ -3237,13 +3237,13 @@ function renderTools(app, container) {
                         </div>
                         
                         <!-- Visual Preview Panel -->
-                        <div id="email-enhancer-view-prev" style="flex: 1; min-height: 440px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); background: #ffffff;">
-                            <iframe id="email-enhancer-preview-iframe" style="width: 100%; height: 100%; min-height: 440px; border: none;"></iframe>
+                        <div id="email-enhancer-view-prev" style="flex: 1; min-height: 700px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); background: #ffffff;">
+                            <iframe id="email-enhancer-preview-iframe" style="width: 100%; height: 100%; min-height: 700px; border: none;"></iframe>
                         </div>
 
                         <!-- HTML Code Panel -->
-                        <div id="email-enhancer-view-code" style="display: none; flex-direction: column; gap: 10px; flex: 1;">
-                            <textarea id="email-enhancer-output" readonly placeholder="Enhanced email HTML code will appear here..." style="flex: 1; min-height: 440px; font-family: monospace; font-size: 0.8rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); resize: vertical; line-height: 1.5;"></textarea>
+                        <div id="email-enhancer-view-code" style="display: none; flex-direction: column; gap: 10px; flex: 1; min-height: 700px;">
+                            <textarea id="email-enhancer-output" readonly placeholder="Enhanced email HTML code will appear here..." style="flex: 1; min-height: 700px; font-family: monospace; font-size: 0.8rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); resize: vertical; line-height: 1.5;"></textarea>
                         </div>
                     </div>
                 </div>
