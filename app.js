@@ -943,6 +943,9 @@ class TeamApp {
         
         this.syncRpsAndInventory();
         this.updateDashboard();
+        if (this.state.currentUser) {
+            this.startSessionHeartbeat();
+        }
         if (!this.state.currentUser && !document.getElementById('login-form')) renderLogin(this);
     }
 

@@ -4413,7 +4413,7 @@ function renderTeamManagement(app, container) {
                     
                     const activeSessions = app.state.activeSessions?.[member.id] || {};
                     const now = Date.now();
-                    const liveSessions = Object.values(activeSessions).filter(s => now - s.lastActive < 30000); // 30s threshold
+                    const liveSessions = Object.values(activeSessions).filter(s => now - s.lastActive < 60000); // 60s threshold
                     const isOnline = liveSessions.length > 0;
 
                     return `
