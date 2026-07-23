@@ -821,7 +821,9 @@ class TeamApp {
                 window.db.ref('state/activeSessions').on('value', (snapshot) => {
                     const activeSessions = snapshot.val();
                     this.state.activeSessions = activeSessions || {};
-                    this.updateDashboard();
+                    if (this.state.currentView === 'team') {
+                        this.updateDashboard();
+                    }
                 });
 
                 // 3. Periodic silent background sync every 60 minutes (conserves bandwidth)
@@ -1225,6 +1227,18 @@ class TeamApp {
                 if (el) {
                     el.value = savedValues[id];
                 }
+            }
+
+            // Restore visual HTML iframe preview if output code exists
+            const outputVal = savedValues['email-enhancer-output'];
+            const frame = document.getElementById('email-enhancer-preview-iframe');
+            if (frame && outputVal) {
+                try {
+                    const doc = frame.contentDocument || frame.contentWindow.document;
+                    doc.open();
+                    doc.write(outputVal);
+                    doc.close();
+                } catch(e) {}
             }
         }
 
