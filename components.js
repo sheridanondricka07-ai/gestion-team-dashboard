@@ -2227,7 +2227,7 @@ TECHNICAL CONSTRAINTS:
   Verdana) — no custom @font-face
 - Keep max-width around 550-600px for email
 
-OUTPUT: Return only the complete HTML, no explanation, no code fences.
+OUTPUT: Return ONLY valid, executable HTML starting with <!DOCTYPE html>. Do NOT include any explanations, introductory step notes, markdown code fences (no ```html), or conversational text.
 
 Email HTML to redesign:
 ${input}`;
@@ -2341,8 +2341,25 @@ ${input}`;
             aiHtml = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
         }
 
-        // Clean markdown code fences if model outputted them
-        aiHtml = aiHtml.replace(/^```html\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+        // Clean markdown code fences and extract valid HTML if model returned conversational preamble
+        if (aiHtml.includes('```')) {
+            const codeBlockMatch = aiHtml.match(/```(?:html)?\s*([\s\S]*?)\s*```/i);
+            if (codeBlockMatch && codeBlockMatch[1]) {
+                aiHtml = codeBlockMatch[1];
+            } else {
+                aiHtml = aiHtml.replace(/```html/gi, '').replace(/```/g, '');
+            }
+        }
+
+        const htmlDocMatch = aiHtml.match(/<!DOCTYPE[\s\S]*?>[\s\S]*<\/html>/i) || 
+                             aiHtml.match(/<html[\s\S]*?>[\s\S]*<\/html>/i) || 
+                             aiHtml.match(/<table[\s\S]*?>[\s\S]*<\/table>/i) ||
+                             aiHtml.match(/<div[\s\S]*?>[\s\S]*<\/div>/i);
+        if (htmlDocMatch) {
+            aiHtml = htmlDocMatch[0];
+        }
+
+        aiHtml = aiHtml.trim();
 
         if (outputEl) outputEl.value = aiHtml;
 
