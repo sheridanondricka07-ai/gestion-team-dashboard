@@ -2390,11 +2390,40 @@ window.copyEnhancedEmailHtml = () => {
 window.downloadEnhancedEmailHtml = () => {
     const textarea = document.getElementById('email-enhancer-output');
     if (!textarea || !textarea.value) return;
-    const blob = new Blob([textarea.value], { type: 'text/html;charset=utf-8' });
+    
+    const htmlContent = textarea.value;
+
+    // Extract title from HTML (<title>, <h1>, or <h2> tag)
+    let titleStr = '';
+    const titleMatch = htmlContent.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || 
+                       htmlContent.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
+                       htmlContent.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i);
+    
+    if (titleMatch && titleMatch[1]) {
+        titleStr = titleMatch[1].replace(/<[^>]+>/g, '').trim();
+    }
+
+    // Convert title into a clean filename slug
+    let cleanTitle = titleStr
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+
+    if (!cleanTitle || cleanTitle.length < 2) {
+        cleanTitle = 'email_campaign';
+    } else if (cleanTitle.length > 40) {
+        cleanTitle = cleanTitle.substring(0, 40).replace(/_+$/, '');
+    }
+
+    // Generate random number (4-6 digits)
+    const randomNum = Math.floor(1000 + Math.random() * 900000);
+    const fileName = `${cleanTitle}_${randomNum}.html`;
+
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `email_campaign_${Date.now()}.html`;
+    a.download = fileName;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
