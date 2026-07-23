@@ -2227,7 +2227,7 @@ TECHNICAL CONSTRAINTS:
   Verdana) — no custom @font-face
 - Keep max-width around 550-600px for email
 
-OUTPUT: Return ONLY valid, executable HTML starting with <!DOCTYPE html>. Do NOT include any explanations, introductory step notes, markdown code fences (no ```html), or conversational text.
+OUTPUT: Return ONLY valid, executable HTML starting with <!DOCTYPE html>. Do NOT include any explanations, introductory step notes, markdown code fences, or conversational text.
 
 Email HTML to redesign:
 ${input}`;
