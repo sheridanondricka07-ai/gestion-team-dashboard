@@ -2031,16 +2031,81 @@ window.generateEnhancedEmailHtml = () => {
     }
 };
 
-window.saveAdminGeminiKey = (key) => {
+window.saveAdminAiKey = (provider, key) => {
     const cleanKey = key ? key.trim() : '';
-    localStorage.setItem('gemini_ai_api_key', cleanKey);
+    const storageKey = `${provider}_ai_api_key`;
+    localStorage.setItem(storageKey, cleanKey);
     if (window.db) {
-        window.db.ref('state/geminiApiKey').set(cleanKey);
+        window.db.ref(`state/aiApiKeys/${provider}`).set(cleanKey);
     }
+};
+
+window.getAiApiKey = async (provider) => {
+    const storageKey = `${provider}_ai_api_key`;
+    let key = localStorage.getItem(storageKey) || '';
+    if (!key && window.db) {
+        try {
+            const snap = await window.db.ref(`state/aiApiKeys/${provider}`).once('value');
+            key = snap.val() || '';
+            if (key) localStorage.setItem(storageKey, key);
+        } catch (e) {}
+    }
+    // Backward compatibility fallback for Gemini
+    if (!key && provider === 'gemini') {
+        key = localStorage.getItem('gemini_ai_api_key') || '';
+        if (!key && window.db) {
+            try {
+                const snap = await window.db.ref('state/geminiApiKey').once('value');
+                key = snap.val() || '';
+            } catch (e) {}
+        }
+    }
+    return key;
+};
+
+window.updateAiKeyFieldUI = async () => {
+    const provider = document.getElementById('email-enhancer-provider')?.value || 'gemini';
+    const label = document.getElementById('email-enhancer-key-label');
+    const link = document.getElementById('email-enhancer-key-link');
+    const input = document.getElementById('email-enhancer-ai-key');
+
+    if (!input || !label) return;
+
+    const currentKey = await window.getAiApiKey(provider);
+    input.value = currentKey;
+
+    if (provider === 'groq') {
+        label.innerHTML = '<i data-lucide="key" style="width: 12px; height: 12px;"></i> Groq API Key (Admin Only):';
+        if (link) { link.href = 'https://console.groq.com/keys'; link.style.display = 'inline'; }
+        input.style.display = 'block';
+        input.placeholder = 'Paste your free Groq API key here...';
+    } else if (provider === 'openrouter') {
+        label.innerHTML = '<i data-lucide="key" style="width: 12px; height: 12px;"></i> OpenRouter Key (Optional for free models):';
+        if (link) { link.href = 'https://openrouter.ai/keys'; link.style.display = 'inline'; }
+        input.style.display = 'block';
+        input.placeholder = 'Paste your OpenRouter API key here (or leave blank for free tier)...';
+    } else if (provider === 'puter') {
+        label.innerHTML = '<i data-lucide="check-circle" style="width: 12px; height: 12px; color: var(--success);"></i> Puter AI is Built-in & 100% Free (Zero API key needed!)';
+        if (link) link.style.display = 'none';
+        input.style.display = 'none';
+    } else if (provider === 'ollama') {
+        label.innerHTML = '<i data-lucide="server" style="width: 12px; height: 12px;"></i> Ollama Host URL (Local):';
+        if (link) link.style.display = 'none';
+        input.style.display = 'block';
+        input.placeholder = 'http://localhost:11434';
+        if (!currentKey) input.value = 'http://localhost:11434';
+    } else {
+        label.innerHTML = '<i data-lucide="key" style="width: 12px; height: 12px;"></i> Gemini API Key (Admin Only):';
+        if (link) { link.href = 'https://aistudio.google.com/app/apikey'; link.style.display = 'inline'; }
+        input.style.display = 'block';
+        input.placeholder = 'Paste your free Google Gemini API key here...';
+    }
+    if (window.lucide) window.lucide.createIcons();
 };
 
 window.generateAiEmailHtml = async () => {
     const input = document.getElementById('email-enhancer-input')?.value || '';
+    const provider = document.getElementById('email-enhancer-provider')?.value || 'gemini';
     const keyInput = document.getElementById('email-enhancer-ai-key');
     const outputEl = document.getElementById('email-enhancer-output');
     const btn = document.getElementById('btn-ai-email-generate');
@@ -2053,93 +2118,175 @@ window.generateAiEmailHtml = async () => {
 
     let apiKey = keyInput ? keyInput.value.trim() : '';
     if (!apiKey) {
-        apiKey = localStorage.getItem('gemini_ai_api_key') || '';
+        apiKey = await window.getAiApiKey(provider);
     }
 
-    if (!apiKey && window.db) {
-        try {
-            const snap = await window.db.ref('state/geminiApiKey').once('value');
-            apiKey = snap.val() || '';
-            if (apiKey) localStorage.setItem('gemini_ai_api_key', apiKey);
-        } catch (e) {}
-    }
+    const requiresKey = ['gemini', 'groq', 'openrouter'].includes(provider);
 
-    if (!apiKey) {
+    if (requiresKey && !apiKey) {
         const isAdmin = app.state.currentUser && app.state.currentUser.role === 'admin';
         if (isAdmin) {
             const userKey = prompt(
-                'Please enter your free Google Gemini API Key:\n\n' +
-                '(Get a 100% free key in 10 seconds at: https://aistudio.google.com/app/apikey)'
+                `Please enter your API Key for ${provider.toUpperCase()}:\n\n` +
+                (provider === 'gemini' ? '(Get key free at: https://aistudio.google.com/app/apikey)' :
+                 provider === 'groq' ? '(Get key free at: https://console.groq.com/keys)' :
+                 '(Get key free at: https://openrouter.ai/keys)')
             );
             if (!userKey || !userKey.trim()) return;
             apiKey = userKey.trim();
-            window.saveAdminGeminiKey(apiKey);
+            window.saveAdminAiKey(provider, apiKey);
             if (keyInput) keyInput.value = apiKey;
         } else {
-            alert('AI Email Reformer is not configured yet. Please ask the administrator to enter their Gemini API key.');
+            alert(`AI Reformer (${provider.toUpperCase()}) is not configured yet. Please ask the administrator to set the API key.`);
             return;
         }
-    } else {
-        localStorage.setItem('gemini_ai_api_key', apiKey);
+    } else if (apiKey) {
+        window.saveAdminAiKey(provider, apiKey);
     }
 
     const oldText = btn ? btn.innerHTML : '';
     if (btn) {
         btn.disabled = true;
-        btn.innerHTML = `<i data-lucide="sparkles" class="spin" style="width:16px; height:16px; margin-right:6px; vertical-align:middle;"></i> AI Redesigning & Rewriting HTML...`;
+        btn.innerHTML = `<i data-lucide="sparkles" class="spin" style="width:16px; height:16px; margin-right:6px; vertical-align:middle;"></i> [${provider.toUpperCase()}] Redesigning HTML...`;
         if (window.lucide) window.lucide.createIcons();
     }
 
-    const systemPrompt = `You are an expert HTML email designer and conversion copywriter.
-Your task is to take the user's input email content/text/HTML, completely redesign it, and reform the HTML into an ultra-modern, high-converting, mobile-responsive HTML email template.
+    const systemPrompt = `You are an expert HTML email designer and conversion copywriter optimizing a marketing email's HTML for maximum conversion rate.
 
-CRITICAL RULES:
-1. Preserve ALL original information, names, links, URLs, dates, prices, order numbers, and details.
-2. Elevate and improve the copywriting for maximum engagement and click-through rates.
-3. Build a clean, modern 2026 table-based email architecture (max-width 600px, inline CSS styles, high-contrast bulletproof CTA buttons, header banner, clean line heights, unsubscribe footer).
-4. Conversion Level: ${level.toUpperCase()}.
-5. Output ONLY raw HTML code starting with <!DOCTYPE html>. Do NOT include markdown fences, backticks, or extra conversational text.`;
+STRICT CONSTRAINTS & RULES:
+1. Return ONLY valid, executable HTML starting with <!DOCTYPE html>. Do NOT include any explanations, markdown code fences (no \`\`\`html), or conversational text.
+2. Preserve ALL inline CSS (do not use external <style> tags or JS, as email clients strip them). Max table width: 600px, centered with cell-padding: 0.
+3. Do NOT alter, delete, or modify any legal/disclaimer text, company address, phone numbers, contact info, or unsubscribe links.
+4. Do NOT change, corrupt, or alter any original href URLs, tracking links, image src attributes, or reference IDs.
+5. Conversion Level: ${level.toUpperCase()}.
+
+APPLY THESE SPECIFIC CONVERSION PRINCIPLES:
+1. Headline: Lead with the customer's core pain point or fear, not generic brand filler.
+2. Urgency: Add one clean urgency element (scarcity, deadline, or rate increase) near the top banner.
+3. Social Proof: Include a short social proof line (ratings, testimonial, or customer count) directly before the primary CTA.
+4. Call to Action: Use a single consistent bulletproof button CTA phrase repeated 2-3 times (hero, body, footer).
+5. Friction Reduction: Add a short friction-reducing subtext directly under the primary CTA (e.g. "No credit card required", "Instant 60-second setup").
+6. Scannability: Keep text blocks short, bold key value propositions, and preserve clean white space.`;
+
+    const userPrompt = `OPTIMIZE THIS EMAIL CONTENT FOR MAXIMUM CONVERSIONS:\n\n${input}`;
 
     try {
-        const apiEndpoints = [
-            `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-            `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key=${apiKey}`
-        ];
-        let response = null;
-        let lastErr = null;
+        let aiHtml = '';
 
-        for (const ep of apiEndpoints) {
-            try {
-                const res = await fetch(ep, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [{ text: `${systemPrompt}\n\nINPUT EMAIL CONTENT TO REDESIGN:\n${input}` }]
-                        }]
-                    })
-                });
-
-                if (res.ok) {
-                    response = res;
-                    break;
-                } else {
-                    const errData = await res.json().catch(() => ({}));
-                    lastErr = errData.error?.message || `HTTP Status ${res.status}`;
-                }
-            } catch (e) {
-                lastErr = e.message;
+        if (provider === 'groq') {
+            const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'llama-3.3-70b-versatile',
+                    temperature: 0.3,
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userPrompt }
+                    ]
+                })
+            });
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error?.message || `Groq API Error ${res.status}`);
             }
+            const data = await res.json();
+            aiHtml = data.choices?.[0]?.message?.content || '';
+
+        } else if (provider === 'openrouter') {
+            const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey || 'free'}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'meta-llama/llama-3.3-70b-instruct:free',
+                    temperature: 0.3,
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: userPrompt }
+                    ]
+                })
+            });
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error?.message || `OpenRouter API Error ${res.status}`);
+            }
+            const data = await res.json();
+            aiHtml = data.choices?.[0]?.message?.content || '';
+
+        } else if (provider === 'puter') {
+            if (window.puter && window.puter.ai) {
+                const res = await window.puter.ai.chat(`${systemPrompt}\n\n${userPrompt}`);
+                aiHtml = typeof res === 'string' ? res : (res?.toString ? res.toString() : JSON.stringify(res));
+            } else {
+                throw new Error("Puter.js library is loading or blocked by extension.");
+            }
+
+        } else if (provider === 'ollama') {
+            const host = apiKey || 'http://localhost:11434';
+            const res = await fetch(`${host}/api/generate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: 'llama3.3',
+                    prompt: `${systemPrompt}\n\n${userPrompt}`,
+                    stream: false,
+                    options: { temperature: 0.3 }
+                })
+            });
+            if (!res.ok) throw new Error(`Ollama local server connection failed at ${host}`);
+            const data = await res.json();
+            aiHtml = data.response || '';
+
+        } else {
+            // Default: Google Gemini API
+            const apiEndpoints = [
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+                `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+                `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro:generateContent?key=${apiKey}`
+            ];
+            let response = null;
+            let lastErr = null;
+
+            for (const ep of apiEndpoints) {
+                try {
+                    const res = await fetch(ep, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            generationConfig: { temperature: 0.3 },
+                            contents: [{
+                                parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }]
+                            }]
+                        })
+                    });
+
+                    if (res.ok) {
+                        response = res;
+                        break;
+                    } else {
+                        const errData = await res.json().catch(() => ({}));
+                        lastErr = errData.error?.message || `HTTP Status ${res.status}`;
+                    }
+                } catch (e) {
+                    lastErr = e.message;
+                }
+            }
+
+            if (!response) {
+                throw new Error(lastErr || 'Gemini model generation failed');
+            }
+
+            const data = await response.json();
+            aiHtml = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
         }
 
-        if (!response) {
-            throw new Error(lastErr || 'Gemini model generation failed');
-        }
-
-        const data = await response.json();
-        let aiHtml = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
+        // Clean markdown code fences if model outputted them
         aiHtml = aiHtml.replace(/^```html\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
 
         if (outputEl) outputEl.value = aiHtml;
@@ -2152,7 +2299,7 @@ CRITICAL RULES:
             doc.close();
         }
     } catch (err) {
-        alert("AI Generation Error: " + err.message + "\n\nPlease verify your Gemini API key.");
+        alert(`AI Generation Error [${provider.toUpperCase()}]: ` + err.message);
     } finally {
         if (btn) {
             btn.disabled = false;
@@ -3053,13 +3200,26 @@ function renderTools(app, container) {
                             <textarea id="email-enhancer-input" placeholder="Paste your email text or basic HTML copy here..." style="min-height: 200px; font-family: inherit; font-size: 0.85rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); resize: vertical; line-height: 1.5;"></textarea>
                         </div>
 
-                        <div style="display: flex; flex-direction: column; gap: 8px;">
-                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Enhancement Level</label>
-                            <select id="email-enhancer-level" style="padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.88rem; font-weight: 600; cursor: pointer;">
-                                <option value="low">Low — Clean Minimal (Simple formatting + CTA button + Footer)</option>
-                                <option value="medium" selected>Medium — Balanced (Hero Banner + Callout Box + CTA button + Footer)</option>
-                                <option value="high">High — Maximum Conversion (Hero + Urgency + Coupon + Testimonial + CTA)</option>
-                            </select>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">AI Engine Provider</label>
+                                <select id="email-enhancer-provider" onchange="window.updateAiKeyFieldUI()" style="padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem; font-weight: 600; cursor: pointer;">
+                                    <option value="gemini" selected>Google Gemini 2.0 (Recommended 🎯)</option>
+                                    <option value="groq">Groq (Sub-Second Fast ⚡)</option>
+                                    <option value="openrouter">OpenRouter (Free Multi-Model 🔄)</option>
+                                    <option value="puter">Puter AI (Built-in Zero Key 🆓)</option>
+                                    <option value="ollama">Ollama Local (localhost:11434 🏠)</option>
+                                </select>
+                            </div>
+
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">Conversion Level</label>
+                                <select id="email-enhancer-level" style="padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem; font-weight: 600; cursor: pointer;">
+                                    <option value="low">Low — Clean Minimal (Simple CTA + Footer)</option>
+                                    <option value="medium" selected>Medium — Balanced (Hero + CTA + Scannable)</option>
+                                    <option value="high">High — Max Conversion (Hero + Pain + Urgency + Proof + Friction-Free CTA)</option>
+                                </select>
+                            </div>
                         </div>
 
                         <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 10px; margin-top: 4px;">
@@ -3072,12 +3232,12 @@ function renderTools(app, container) {
                         </div>
 
                         ${(app.state.currentUser && app.state.currentUser.role === 'admin') ? `
-                            <div style="display: flex; flex-direction: column; gap: 4px; background: rgba(139,92,246,0.04); border: 1px solid rgba(139,92,246,0.15); padding: 10px 12px; border-radius: 8px; font-size: 0.78rem;">
+                            <div id="email-enhancer-key-container" style="display: flex; flex-direction: column; gap: 4px; background: rgba(139,92,246,0.04); border: 1px solid rgba(139,92,246,0.15); padding: 10px 12px; border-radius: 8px; font-size: 0.78rem;">
                                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <span style="font-weight: 600; color: #a855f7; display: flex; align-items: center; gap: 4px;"><i data-lucide="key" style="width: 12px; height: 12px;"></i> Gemini AI Key (Admin Only):</span>
-                                    <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--accent-primary); text-decoration: underline; font-size: 0.72rem;">Get Key Free ↗</a>
+                                    <span id="email-enhancer-key-label" style="font-weight: 600; color: #a855f7; display: flex; align-items: center; gap: 4px;"><i data-lucide="key" style="width: 12px; height: 12px;"></i> Gemini API Key (Admin Only):</span>
+                                    <a id="email-enhancer-key-link" href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--accent-primary); text-decoration: underline; font-size: 0.72rem;">Get Key Free ↗</a>
                                 </div>
-                                <input type="password" id="email-enhancer-ai-key" placeholder="Paste your free Google Gemini API key here..." value="${localStorage.getItem('gemini_ai_api_key') || ''}" onchange="window.saveAdminGeminiKey(this.value.trim())" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.78rem;">
+                                <input type="password" id="email-enhancer-ai-key" placeholder="Paste your free API key here..." value="${localStorage.getItem('gemini_ai_api_key') || ''}" onchange="window.saveAdminAiKey(document.getElementById('email-enhancer-provider').value, this.value.trim())" style="padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.78rem;">
                             </div>
                         ` : ''}
                     </div>
