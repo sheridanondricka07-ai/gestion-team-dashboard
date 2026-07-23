@@ -1201,9 +1201,38 @@ class TeamApp {
 
     updateDashboard() {
         if (!this.state.currentUser) return;
+
+        // Save active form inputs before re-rendering view
+        const container = document.getElementById('view-container');
+        const savedValues = {};
+        if (container) {
+            const inputs = container.querySelectorAll('textarea, input[type="text"], input[type="password"], select');
+            inputs.forEach(el => {
+                if (el.id) {
+                    savedValues[el.id] = el.value;
+                }
+            });
+        }
+
         renderSidebar(this);
         renderTopBar(this);
         renderView(this);
+
+        // Restore values
+        if (container) {
+            for (const id in savedValues) {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.value = savedValues[id];
+                }
+            }
+        }
+
+        // If in AI enhancer, refresh key inputs
+        if (this.state.currentView === 'ai-agent') {
+            window.updateAiKeyFieldUI();
+        }
+
         if (window.lucide) window.lucide.createIcons();
     }
 
