@@ -870,6 +870,8 @@ class TeamApp {
         const currentView = this.state.currentView; // Preserve local view
         const warmupData = this.state.warmupData; // Preserve local warmupData
         const spamhausHistory = this.state.spamhausHistory; // Preserve local spamhausHistory
+        const toolsActiveTab = this.state.toolsActiveTab; // Preserve local tools sub-tab
+        const warmupActiveTab = this.state.warmupActiveTab; // Preserve local warmup sub-tab
         
         // Preserve local UI filters during Firebase sync
         const rpFilterServer = this.state.rpFilterServer || ['all'];
@@ -887,6 +889,8 @@ class TeamApp {
             currentUser, 
             currentView, 
             dbConnected: true,
+            toolsActiveTab,
+            warmupActiveTab,
             rpFilterServer,
             rpFilterSpfType,
             rpFilterRpType,
@@ -1011,6 +1015,8 @@ class TeamApp {
                 delete toSave.dbConnected;
                 delete toSave.warmupData;
                 delete toSave.spamhausHistory;
+                delete toSave.toolsActiveTab;
+                delete toSave.warmupActiveTab;
                 delete toSave.rpFilterServer;
                 delete toSave.rpFilterSpfType;
                 delete toSave.rpFilterRpType;
@@ -1022,6 +1028,8 @@ class TeamApp {
                 await window.db.ref('state').set(toSave);
             } else {
                 const toSave = { ...this.state };
+                delete toSave.toolsActiveTab;
+                delete toSave.warmupActiveTab;
                 delete toSave.rpFilterServer;
                 delete toSave.rpFilterSpfType;
                 delete toSave.rpFilterRpType;
