@@ -1632,6 +1632,175 @@ window.copyEncodedText = () => {
     navigator.clipboard.writeText(textarea.value);
 };
 
+// ===== IP ENCODER TOOL =====
+window.encodeIpFormats = () => {
+    const input = document.getElementById('ip-encoder-input');
+    const container = document.getElementById('ip-encoder-output-list');
+    if (!input || !container) return;
+
+    const rawInput = input.value.trim();
+    if (!rawInput) {
+        container.innerHTML = '<div style="color: var(--text-secondary); text-align: center; padding: 40px; font-size: 0.85rem;">Enter an IPv4 address to view all encoded link formats.</div>';
+        return;
+    }
+
+    const ipMatch = rawInput.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/);
+    if (!ipMatch) {
+        container.innerHTML = '<div style="color: var(--error); text-align: center; padding: 20px; font-size: 0.85rem;">Invalid IPv4 address. Please enter a valid IP (e.g. 185.101.22.48).</div>';
+        return;
+    }
+
+    const ip = ipMatch[0];
+    const parts = ip.split('.').map(Number);
+    if (parts.some(p => p < 0 || p > 255)) {
+        container.innerHTML = '<div style="color: var(--error); text-align: center; padding: 20px; font-size: 0.85rem;">Invalid IP octet value out of range (0-255).</div>';
+        return;
+    }
+
+    const [a, b, c, d] = parts;
+
+    // Numerical conversions
+    const dword = (a * 16777216) + (b * 65536) + (c * 256) + d;
+    const hexFull = '0x' + parts.map(p => p.toString(16).padStart(2, '0')).join('');
+    const octalFull = '0' + dword.toString(8);
+
+    // Dword variations
+    const dwordHex = '0x' + dword.toString(16);
+    const dwordOctal = '0' + dword.toString(8);
+
+    // Per-octet encodings
+    const hexOctets = parts.map(p => '0x' + p.toString(16)).join('.');
+    const octalOctets = parts.map(p => '0' + p.toString(8)).join('.');
+    const hexPadded = parts.map(p => '0x' + p.toString(16).padStart(2, '0')).join('.');
+    const octalPadded = parts.map(p => '0' + p.toString(8).padStart(4, '0')).join('.');
+
+    // Mixed Encodings (Hex, Octal, Decimal combinations)
+    const mixed1 = `0x${a.toString(16)}.${b}.${c}.${d}`;
+    const mixed2 = `${a}.0x${b.toString(16)}.${c}.${d}`;
+    const mixed3 = `${a}.${b}.0${c.toString(8)}.${d}`;
+    const mixed4 = `0${a.toString(8)}.0x${b.toString(16)}.${c}.${d}`;
+    const mixed5 = `0x${a.toString(16)}.0${b.toString(8)}.0x${c.toString(16)}.0${d.toString(8)}`;
+
+    // Shortened notation (Class A/B/C shortforms)
+    const shortB = `${a}.${b}.${(c * 256) + d}`;
+    const shortA = `${a}.${(b * 65536) + (c * 256) + d}`;
+    const shortBHex = `0x${a.toString(16)}.0x${b.toString(16)}.0x${((c * 256) + d).toString(16)}`;
+
+    // URL / Percent Encodings
+    const percentEncoded = parts.map(p => '%' + p.toString(16).padStart(2, '0')).join('.');
+    const percentFull = '%' + parts.map(p => p.toString(16).padStart(2, '0')).join('%');
+    const percentDword = '%' + dword.toString(16).match(/.{1,2}/g).join('%');
+
+    // IPv4-mapped IPv6 formats
+    const ipv6Mapped = `[::ffff:${ip}]`;
+    const ipv6MappedHex = `[::ffff:${parts.map(p => p.toString(16).padStart(2, '0')).slice(0,2).join('')}:${parts.map(p => p.toString(16).padStart(2, '0')).slice(2,4).join('')}]`;
+    const ipv6Full = `[0000:0000:0000:0000:0000:ffff:${parts.map(p => p.toString(16).padStart(2, '0')).slice(0,2).join('')}:${parts.map(p => p.toString(16).padStart(2, '0')).slice(2,4).join('')}]`;
+
+    // HTML Entity formats
+    const htmlDecimal = ip.split('').map(ch => '&#' + ch.charCodeAt(0) + ';').join('');
+    const htmlHex = ip.split('').map(ch => '&#x' + ch.charCodeAt(0).toString(16) + ';').join('');
+
+    const categories = [
+        {
+            title: 'Standard & Numerical Formats',
+            icon: 'hash',
+            formats: [
+                { label: 'Standard IPv4', val: ip, desc: 'Dotted Decimal standard' },
+                { label: 'Dword (Decimal Integer)', val: dword.toString(), desc: 'Single 32-bit decimal integer' },
+                { label: 'Full Hexadecimal', val: hexFull, desc: '32-bit Hex integer' },
+                { label: 'Dword Hex', val: dwordHex, desc: '0x prefixed Dword' },
+                { label: 'Full Octal', val: octalFull, desc: 'Single 32-bit Octal integer' },
+                { label: 'Dword Octal', val: dwordOctal, desc: '0 prefixed Octal Dword' }
+            ]
+        },
+        {
+            title: 'Octal & Hexadecimal Per-Octet',
+            icon: 'code-2',
+            formats: [
+                { label: 'Hexadecimal Octets', val: hexOctets, desc: 'Each byte in Hex (0x format)' },
+                { label: 'Padded Hex Octets', val: hexPadded, desc: 'Zero-padded 2-digit Hex bytes' },
+                { label: 'Octal Octets', val: octalOctets, desc: 'Each byte in Octal (0 format)' },
+                { label: 'Padded Octal Octets', val: octalPadded, desc: 'Zero-padded 4-digit Octal bytes' }
+            ]
+        },
+        {
+            title: 'Mixed & Shortened Notations',
+            icon: 'shuffle',
+            formats: [
+                { label: 'Class B Short (3 Parts)', val: shortB, desc: 'First 2 octets + combined 16-bit tail' },
+                { label: 'Class A Short (2 Parts)', val: shortA, desc: '1st octet + combined 24-bit tail' },
+                { label: 'Class B Short Hex', val: shortBHex, desc: 'Hexadecimal Class B shortform' },
+                { label: 'Mixed Hex / Decimal #1', val: mixed1, desc: '1st byte Hex, rest Decimal' },
+                { label: 'Mixed Hex / Decimal #2', val: mixed2, desc: '2nd byte Hex, rest Decimal' },
+                { label: 'Mixed Octal / Decimal', val: mixed3, desc: '3rd byte Octal, rest Decimal' },
+                { label: 'Mixed Octal / Hex', val: mixed4, desc: 'Octal 1st, Hex 2nd, Decimal tail' },
+                { label: 'Alternate Hex & Octal', val: mixed5, desc: 'Alternating Hex and Octal bytes' }
+            ]
+        },
+        {
+            title: 'URL & Percent Encoded Formats',
+            icon: 'link',
+            formats: [
+                { label: 'Percent Octets', val: percentEncoded, desc: '%xx per octet with dots' },
+                { label: 'Full Percent Encoding', val: percentFull, desc: '%xx for all octets and dots' },
+                { label: 'Percent Dword Hex', val: percentDword, desc: '%xx formatted 32-bit Hex' }
+            ]
+        },
+        {
+            title: 'IPv6 Mapped & HTML Entity Formats',
+            icon: 'globe',
+            formats: [
+                { label: 'IPv4-Mapped IPv6', val: ipv6Mapped, desc: 'Standard IPv6 mapped format' },
+                { label: 'IPv6 Mapped Hex', val: ipv6MappedHex, desc: 'IPv6 dual 16-bit Hex notation' },
+                { label: 'IPv6 Full Expanded', val: ipv6Full, desc: 'Full 128-bit IPv6 representation' },
+                { label: 'HTML Entity Decimal', val: htmlDecimal, desc: 'Decimal HTML character entities' },
+                { label: 'HTML Entity Hex', val: htmlHex, desc: 'Hex HTML character entities' }
+            ]
+        }
+    ];
+
+    let html = '';
+
+    categories.forEach(cat => {
+        html += `
+            <div style="background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                        <i data-lucide="${cat.icon}" style="width: 16px; height: 16px; color: var(--accent-primary);"></i>
+                        ${cat.title}
+                    </div>
+                    <span style="font-size: 0.72rem; color: var(--text-secondary);">${cat.formats.length} formats</span>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px;">
+                    ${cat.formats.map(fmt => `
+                        <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);">${fmt.label}</span>
+                                <button onclick="navigator.clipboard.writeText('${fmt.val.replace(/'/g, "\\'")}')" title="Copy format value" style="padding: 3px 8px; font-size: 0.7rem; background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2); color: var(--accent-primary); border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                                    <i data-lucide="copy" style="width: 10px; height: 10px;"></i> Copy
+                                </button>
+                            </div>
+                            <div style="font-family: monospace; font-size: 0.82rem; color: var(--accent-primary); word-break: break-all; font-weight: 600; background: rgba(0,0,0,0.15); padding: 6px 8px; border-radius: 4px;">
+                                ${fmt.val}
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
+                                <span style="font-size: 0.68rem; color: var(--text-secondary);">${fmt.desc}</span>
+                                <button onclick="navigator.clipboard.writeText('http://${fmt.val.replace(/'/g, "\\'")}')" title="Copy full http:// link" style="padding: 2px 6px; font-size: 0.65rem; background: transparent; border: none; color: var(--text-secondary); cursor: pointer; text-decoration: underline;">
+                                    Copy http:// link
+                                </button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+    if (window.lucide) window.lucide.createIcons();
+};
+
 // ===== CLEAN NEWS TOOL =====
 window._cleanNewsRemovePatterns = [
     /^Return-Path:/i,
@@ -2898,6 +3067,9 @@ function renderTools(app, container) {
             <div onclick="window.switchToolsTab('textEncoder')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'textEncoder' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'textEncoder' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
                 <i data-lucide="binary" style="width: 14px; height: 14px;"></i> Text Encoder
             </div>
+            <div onclick="window.switchToolsTab('ipEncoder')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'ipEncoder' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'ipEncoder' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+                <i data-lucide="network" style="width: 14px; height: 14px;"></i> IP Encoder
+            </div>
             <div onclick="window.switchToolsTab('cleanNews')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'cleanNews' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'cleanNews' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
                 <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Clean News
             </div>
@@ -3215,6 +3387,46 @@ function renderTools(app, container) {
                             <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">MIME Encoded-Word Format (one per line)</label>
                             <textarea id="text-encoder-output" readonly placeholder="Encoded text in all charsets will appear here..." style="flex: 1; min-height: 400px; font-family: monospace; font-size: 0.8rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); resize: vertical; line-height: 1.6;"></textarea>
                         </div>
+                    </div>
+                </div>
+            ` : activeTab === 'ipEncoder' ? `
+                <div style="display: flex; gap: 24px; padding: 24px; flex-wrap: wrap;">
+                    <div class="card" style="flex: 1 1 380px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <h3 style="font-size: 1.1rem; margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                            <i data-lucide="network" style="color: var(--accent-primary); width: 20px; height: 20px;"></i>
+                            IPv4 Address Encoder
+                        </h3>
+                        
+                        <p style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5; margin: 0;">Enter an IPv4 address to convert it into all valid alternative numerical, octal, hexadecimal, mixed, Dword, and percent-encoded link formats suitable for HTML/email links.</p>
+
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">IPv4 Address</label>
+                            <div style="display: flex; gap: 8px;">
+                                <input type="text" id="ip-encoder-input" placeholder="e.g. 185.101.22.48" value="185.101.22.48" onkeyup="if(event.key==='Enter') window.encodeIpFormats()" style="flex: 1; font-family: monospace; font-size: 0.9rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                                <button onclick="window.encodeIpFormats()" style="padding: 0 18px; background: var(--accent-primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.88rem; white-space: nowrap;">
+                                    <i data-lucide="zap" style="width: 16px; height: 16px;"></i> Encode
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5; background: rgba(59,130,246,0.04); border: 1px solid rgba(59,130,246,0.1); border-radius: 8px; padding: 12px;">
+                            <strong style="color: var(--accent-primary);">💡 Useful Tip:</strong><br>
+                            Modern web browsers and HTTP clients automatically resolve Dword, Hexadecimal, Octal, and mixed-notation IP addresses in URLs (e.g., <code>http://3110409776</code> or <code>http://0xb9.0x65.0x16.0x30</code>).
+                        </div>
+                    </div>
+
+                    <div class="card" style="flex: 2 1 600px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                            <h3 style="font-size: 1.1rem; margin: 0; display: flex; align-items: center; gap: 8px;">
+                                <i data-lucide="layers" style="color: var(--success); width: 20px; height: 20px;"></i>
+                                Encoded IP Formats
+                            </h3>
+                        </div>
+                        
+                        <div id="ip-encoder-output-list" style="display: flex; flex-direction: column; gap: 16px; flex: 1;">
+                            <div style="color: var(--text-secondary); text-align: center; padding: 40px; font-size: 0.85rem;">Click "Encode" to generate all IP link formats.</div>
+                        </div>
+                        ${setTimeout(() => { if (window.encodeIpFormats) window.encodeIpFormats(); }, 50) ? '' : ''}
                     </div>
                 </div>
             ` : activeTab === 'cleanNews' ? `
@@ -9846,10 +10058,6 @@ function renderWarmupProgress(app, container) {
                                 
                                 // Filter records to only include those matching the current IP
                                 const recordsForCurrentIp = g.records.filter(r => r.ip === latest.ip);
-                                const last3 = g.records.slice(0, 3).map(r => r.outVal);
-                                const repOut = g.repOut;
-                                const totalOutAllTime = recordsForCurrentIp.reduce((sum, r) => sum + (parseInt(r.outVal) || 0), 0);
-                                
                                 let durationDays = 1;
                                 let startDateStr = 'Unknown';
                                 let totalDrops = recordsForCurrentIp.length;
@@ -9858,14 +10066,28 @@ function renderWarmupProgress(app, container) {
                                   const safeIpKey = (g.ip || 'unknown').replace(/[\.\:\/]/g, '_');
                                   const statKey = `${safeDomainName}_${g.server}_${safeIpKey}`;
                                   
+                                  let firstTs = null;
                                   if (app.state.warmupStats && app.state.warmupStats[statKey]) {
                                       const stats = app.state.warmupStats[statKey];
                                       totalDrops = stats.totalDrops || totalDrops;
                                       if (stats.firstDropTimestamp) {
-                                          const msDiff = Date.now() - stats.firstDropTimestamp;
-                                          durationDays = Math.max(1, Math.ceil(msDiff / (1000 * 60 * 60 * 24)));
-                                          startDateStr = new Date(stats.firstDropTimestamp).toLocaleDateString();
+                                          firstTs = stats.firstDropTimestamp;
                                       }
+                                  }
+
+                                  // Fallback: If warmupStats is missing or has no firstDropTimestamp, find oldest timestamp directly from records
+                                  if (!firstTs && recordsForCurrentIp.length > 0) {
+                                      firstTs = recordsForCurrentIp.reduce((oldest, r) => {
+                                          let ts = Number(r.timestamp) || 0;
+                                          if (ts > 0 && ts < 1e11) ts *= 1000;
+                                          return (!oldest || ts < oldest) ? ts : oldest;
+                                      }, 0);
+                                  }
+
+                                  if (firstTs) {
+                                      const msDiff = Date.now() - firstTs;
+                                      durationDays = Math.max(1, Math.ceil(msDiff / (1000 * 60 * 60 * 24)));
+                                      startDateStr = new Date(firstTs).toLocaleDateString();
                                   }
                                 
                                 const rec = window.getWarmupRecommendation ? window.getWarmupRecommendation(totalOutAllTime, repOut, intel) : null;
