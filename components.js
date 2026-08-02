@@ -10126,6 +10126,7 @@ function renderWarmupProgress(app, container) {
                                 
                                 // Filter records to only include those matching the current IP
                                 const recordsForCurrentIp = g.records.filter(r => r.ip === latest.ip);
+                                const repOut = g.repOut || 0;
                                 const totalOutAllTime = recordsForCurrentIp.reduce((sum, r) => sum + (parseInt(r.outVal) || 0), 0);
                                 let durationDays = 1;
                                 let startDateStr = 'Unknown';
