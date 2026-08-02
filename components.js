@@ -1633,6 +1633,20 @@ window.copyEncodedText = () => {
 };
 
 // ===== IP ENCODER TOOL =====
+window._ipProto = 'http://';
+
+window.copyAllIpFormats = () => {
+    const items = document.querySelectorAll('.ip-format-val');
+    if (!items || items.length === 0) return;
+    const proto = window._ipProto || 'http://';
+    const lines = Array.from(items).map(el => {
+        const val = el.innerText.trim();
+        return `${proto}${val}`;
+    });
+    navigator.clipboard.writeText(lines.join('\n'));
+    alert(`Copied ${lines.length} IP link formats to clipboard!`);
+};
+
 window.encodeIpFormats = () => {
     const input = document.getElementById('ip-encoder-input');
     const container = document.getElementById('ip-encoder-output-list');
@@ -1646,18 +1660,19 @@ window.encodeIpFormats = () => {
 
     const ipMatch = rawInput.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/);
     if (!ipMatch) {
-        container.innerHTML = '<div style="color: var(--error); text-align: center; padding: 20px; font-size: 0.85rem;">Invalid IPv4 address. Please enter a valid IP (e.g. 185.101.22.48).</div>';
+        container.innerHTML = '<div style="color: var(--error); text-align: center; padding: 20px; font-size: 0.85rem; background: rgba(239,68,68,0.1); border-radius: 8px; border: 1px solid rgba(239,68,68,0.2);">⚠️ Invalid IPv4 address format. Please enter a valid IP (e.g. 185.101.22.48).</div>';
         return;
     }
 
     const ip = ipMatch[0];
     const parts = ip.split('.').map(Number);
     if (parts.some(p => p < 0 || p > 255)) {
-        container.innerHTML = '<div style="color: var(--error); text-align: center; padding: 20px; font-size: 0.85rem;">Invalid IP octet value out of range (0-255).</div>';
+        container.innerHTML = '<div style="color: var(--error); text-align: center; padding: 20px; font-size: 0.85rem; background: rgba(239,68,68,0.1); border-radius: 8px; border: 1px solid rgba(239,68,68,0.2);">⚠️ Invalid IP octet out of range (0-255).</div>';
         return;
     }
 
     const [a, b, c, d] = parts;
+    const proto = window._ipProto || 'http://';
 
     // Numerical conversions
     const dword = (a * 16777216) + (b * 65536) + (c * 256) + d;
@@ -1674,24 +1689,24 @@ window.encodeIpFormats = () => {
     const hexPadded = parts.map(p => '0x' + p.toString(16).padStart(2, '0')).join('.');
     const octalPadded = parts.map(p => '0' + p.toString(8).padStart(4, '0')).join('.');
 
-    // Mixed Encodings (Hex, Octal, Decimal combinations)
+    // Mixed Encodings
     const mixed1 = `0x${a.toString(16)}.${b}.${c}.${d}`;
     const mixed2 = `${a}.0x${b.toString(16)}.${c}.${d}`;
     const mixed3 = `${a}.${b}.0${c.toString(8)}.${d}`;
     const mixed4 = `0${a.toString(8)}.0x${b.toString(16)}.${c}.${d}`;
     const mixed5 = `0x${a.toString(16)}.0${b.toString(8)}.0x${c.toString(16)}.0${d.toString(8)}`;
 
-    // Shortened notation (Class A/B/C shortforms)
+    // Shortened notation
     const shortB = `${a}.${b}.${(c * 256) + d}`;
     const shortA = `${a}.${(b * 65536) + (c * 256) + d}`;
     const shortBHex = `0x${a.toString(16)}.0x${b.toString(16)}.0x${((c * 256) + d).toString(16)}`;
 
-    // URL / Percent Encodings
+    // Percent Encodings
     const percentEncoded = parts.map(p => '%' + p.toString(16).padStart(2, '0')).join('.');
     const percentFull = '%' + parts.map(p => p.toString(16).padStart(2, '0')).join('%');
     const percentDword = '%' + dword.toString(16).match(/.{1,2}/g).join('%');
 
-    // IPv4-mapped IPv6 formats
+    // IPv6 Mapped
     const ipv6Mapped = `[::ffff:${ip}]`;
     const ipv6MappedHex = `[::ffff:${parts.map(p => p.toString(16).padStart(2, '0')).slice(0,2).join('')}:${parts.map(p => p.toString(16).padStart(2, '0')).slice(2,4).join('')}]`;
     const ipv6Full = `[0000:0000:0000:0000:0000:ffff:${parts.map(p => p.toString(16).padStart(2, '0')).slice(0,2).join('')}:${parts.map(p => p.toString(16).padStart(2, '0')).slice(2,4).join('')}]`;
@@ -1703,6 +1718,7 @@ window.encodeIpFormats = () => {
     const categories = [
         {
             title: 'Standard & Numerical Formats',
+            badgeColor: '#3b82f6',
             icon: 'hash',
             formats: [
                 { label: 'Standard IPv4', val: ip, desc: 'Dotted Decimal standard' },
@@ -1715,6 +1731,7 @@ window.encodeIpFormats = () => {
         },
         {
             title: 'Octal & Hexadecimal Per-Octet',
+            badgeColor: '#8b5cf6',
             icon: 'code-2',
             formats: [
                 { label: 'Hexadecimal Octets', val: hexOctets, desc: 'Each byte in Hex (0x format)' },
@@ -1725,10 +1742,11 @@ window.encodeIpFormats = () => {
         },
         {
             title: 'Mixed & Shortened Notations',
+            badgeColor: '#10b981',
             icon: 'shuffle',
             formats: [
-                { label: 'Class B Short (3 Parts)', val: shortB, desc: 'First 2 octets + combined 16-bit tail' },
-                { label: 'Class A Short (2 Parts)', val: shortA, desc: '1st octet + combined 24-bit tail' },
+                { label: 'Class B Short (3 Parts)', val: shortB, desc: '1st 2 bytes + 16-bit combined tail' },
+                { label: 'Class A Short (2 Parts)', val: shortA, desc: '1st byte + 24-bit combined tail' },
                 { label: 'Class B Short Hex', val: shortBHex, desc: 'Hexadecimal Class B shortform' },
                 { label: 'Mixed Hex / Decimal #1', val: mixed1, desc: '1st byte Hex, rest Decimal' },
                 { label: 'Mixed Hex / Decimal #2', val: mixed2, desc: '2nd byte Hex, rest Decimal' },
@@ -1739,6 +1757,7 @@ window.encodeIpFormats = () => {
         },
         {
             title: 'URL & Percent Encoded Formats',
+            badgeColor: '#f59e0b',
             icon: 'link',
             formats: [
                 { label: 'Percent Octets', val: percentEncoded, desc: '%xx per octet with dots' },
@@ -1748,6 +1767,7 @@ window.encodeIpFormats = () => {
         },
         {
             title: 'IPv6 Mapped & HTML Entity Formats',
+            badgeColor: '#ec4899',
             icon: 'globe',
             formats: [
                 { label: 'IPv4-Mapped IPv6', val: ipv6Mapped, desc: 'Standard IPv6 mapped format' },
@@ -1763,33 +1783,44 @@ window.encodeIpFormats = () => {
 
     categories.forEach(cat => {
         html += `
-            <div style="background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
-                <div style="display: flex; align-items: center; justify-content: space-between;">
-                    <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
-                        <i data-lucide="${cat.icon}" style="width: 16px; height: 16px; color: var(--accent-primary);"></i>
+            <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 10px;">
+                    <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary); display: flex; align-items: center; gap: 10px;">
+                        <span style="width: 28px; height: 28px; border-radius: 6px; background: ${cat.badgeColor}1a; color: ${cat.badgeColor}; display: inline-flex; align-items: center; justify-content: center; border: 1px solid ${cat.badgeColor}33;">
+                            <i data-lucide="${cat.icon}" style="width: 15px; height: 15px;"></i>
+                        </span>
                         ${cat.title}
                     </div>
-                    <span style="font-size: 0.72rem; color: var(--text-secondary);">${cat.formats.length} formats</span>
+                    <span style="font-size: 0.72rem; padding: 3px 8px; border-radius: 12px; background: ${cat.badgeColor}15; color: ${cat.badgeColor}; font-weight: 600; border: 1px solid ${cat.badgeColor}30;">
+                        ${cat.formats.length} formats
+                    </span>
                 </div>
 
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px;">
                     ${cat.formats.map(fmt => `
-                        <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;">
+                        <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; transition: border-color 0.2s;">
+                            
                             <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);">${fmt.label}</span>
-                                <button onclick="navigator.clipboard.writeText('${fmt.val.replace(/'/g, "\\'")}')" title="Copy format value" style="padding: 3px 8px; font-size: 0.7rem; background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2); color: var(--accent-primary); border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-                                    <i data-lucide="copy" style="width: 10px; height: 10px;"></i> Copy
+                                <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-primary);">${fmt.label}</span>
+                                <span style="font-size: 0.68rem; color: var(--text-secondary); opacity: 0.8;">${fmt.desc}</span>
+                            </div>
+
+                            <div style="display: flex; align-items: center; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 8px; padding: 6px 10px; gap: 8px;">
+                                <span class="ip-format-val" style="font-family: 'JetBrains Mono', Consolas, monospace; font-size: 0.88rem; color: #60a5fa; font-weight: 700; word-break: break-all; flex: 1;">
+                                    ${fmt.val}
+                                </span>
+                            </div>
+
+                            <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 2px;">
+                                <button onclick="navigator.clipboard.writeText('${fmt.val.replace(/'/g, "\\'")}')" title="Copy raw IP string" style="padding: 4px 10px; font-size: 0.72rem; font-weight: 600; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all 0.15s;">
+                                    <i data-lucide="copy" style="width: 12px; height: 12px;"></i> Copy Raw
+                                </button>
+                                
+                                <button onclick="navigator.clipboard.writeText('${proto}${fmt.val.replace(/'/g, "\\'")}')" title="Copy full URL link" style="padding: 4px 10px; font-size: 0.72rem; font-weight: 600; background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); color: #3b82f6; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all 0.15s;">
+                                    <i data-lucide="external-link" style="width: 12px; height: 12px;"></i> Copy Link (${proto.replace('://','')})
                                 </button>
                             </div>
-                            <div style="font-family: monospace; font-size: 0.82rem; color: var(--accent-primary); word-break: break-all; font-weight: 600; background: rgba(0,0,0,0.15); padding: 6px 8px; border-radius: 4px;">
-                                ${fmt.val}
-                            </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
-                                <span style="font-size: 0.68rem; color: var(--text-secondary);">${fmt.desc}</span>
-                                <button onclick="navigator.clipboard.writeText('http://${fmt.val.replace(/'/g, "\\'")}')" title="Copy full http:// link" style="padding: 2px 6px; font-size: 0.65rem; background: transparent; border: none; color: var(--text-secondary); cursor: pointer; text-decoration: underline;">
-                                    Copy http:// link
-                                </button>
-                            </div>
+
                         </div>
                     `).join('')}
                 </div>
@@ -3390,41 +3421,78 @@ function renderTools(app, container) {
                     </div>
                 </div>
             ` : activeTab === 'ipEncoder' ? `
-                <div style="display: flex; gap: 24px; padding: 24px; flex-wrap: wrap;">
-                    <div class="card" style="flex: 1 1 380px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
-                        <h3 style="font-size: 1.1rem; margin-top: 0; display: flex; align-items: center; gap: 8px;">
-                            <i data-lucide="network" style="color: var(--accent-primary); width: 20px; height: 20px;"></i>
-                            IPv4 Address Encoder
-                        </h3>
-                        
-                        <p style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5; margin: 0;">Enter an IPv4 address to convert it into all valid alternative numerical, octal, hexadecimal, mixed, Dword, and percent-encoded link formats suitable for HTML/email links.</p>
+                <div style="display: flex; flex-direction: column; gap: 20px; padding: 24px; max-width: 1400px; margin: 0 auto; width: 100%;">
+                    
+                    <!-- Top Controls & Input Header Card -->
+                    <div class="card" style="padding: 24px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); display: flex; flex-direction: column; gap: 18px;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+                            <div>
+                                <h3 style="font-size: 1.25rem; margin: 0; display: flex; align-items: center; gap: 10px; color: var(--text-primary); font-weight: 700;">
+                                    <span style="width: 36px; height: 36px; border-radius: 8px; background: rgba(59,130,246,0.12); display: inline-flex; align-items: center; justify-content: center; color: var(--accent-primary); border: 1px solid rgba(59,130,246,0.25);">
+                                        <i data-lucide="network" style="width: 20px; height: 20px;"></i>
+                                    </span>
+                                    IPv4 Address Encoder & Link Generator
+                                </h3>
+                                <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 6px 0 0 0; line-height: 1.4;">
+                                    Convert IPv4 addresses into 25+ standard, octal, hexadecimal, Dword, shortened, and percent-encoded URL representations for email HTML links.
+                                </p>
+                            </div>
 
-                        <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">IPv4 Address</label>
-                            <div style="display: flex; gap: 8px;">
-                                <input type="text" id="ip-encoder-input" placeholder="e.g. 185.101.22.48" value="185.101.22.48" onkeyup="if(event.key==='Enter') window.encodeIpFormats()" style="flex: 1; font-family: monospace; font-size: 0.9rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
-                                <button onclick="window.encodeIpFormats()" style="padding: 0 18px; background: var(--accent-primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.88rem; white-space: nowrap;">
-                                    <i data-lucide="zap" style="width: 16px; height: 16px;"></i> Encode
+                            <!-- Protocol Toggle -->
+                            <div style="display: flex; align-items: center; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 3px;">
+                                <button id="ip-proto-http" onclick="window._ipProto='http://'; this.style.background='var(--accent-primary)'; this.style.color='#fff'; document.getElementById('ip-proto-https').style.background='transparent'; document.getElementById('ip-proto-https').style.color='var(--text-secondary)'; window.encodeIpFormats();" style="padding: 6px 14px; font-size: 0.78rem; font-weight: 600; background: var(--accent-primary); color: white; border: none; border-radius: 6px; cursor: pointer; transition: all 0.2s;">
+                                    http://
+                                </button>
+                                <button id="ip-proto-https" onclick="window._ipProto='https://'; this.style.background='var(--accent-primary)'; this.style.color='#fff'; document.getElementById('ip-proto-http').style.background='transparent'; document.getElementById('ip-proto-http').style.color='var(--text-secondary)'; window.encodeIpFormats();" style="padding: 6px 14px; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-secondary); border: none; border-radius: 6px; cursor: pointer; transition: all 0.2s;">
+                                    https://
                                 </button>
                             </div>
                         </div>
 
-                        <div style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5; background: rgba(59,130,246,0.04); border: 1px solid rgba(59,130,246,0.1); border-radius: 8px; padding: 12px;">
-                            <strong style="color: var(--accent-primary);">💡 Useful Tip:</strong><br>
-                            Modern web browsers and HTTP clients automatically resolve Dword, Hexadecimal, Octal, and mixed-notation IP addresses in URLs (e.g., <code>http://3110409776</code> or <code>http://0xb9.0x65.0x16.0x30</code>).
+                        <!-- Input Row -->
+                        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                            <div style="position: relative; flex: 1 1 360px;">
+                                <i data-lucide="globe" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--text-secondary);"></i>
+                                <input type="text" id="ip-encoder-input" placeholder="e.g. 185.101.22.48" value="185.101.22.48" onkeyup="if(event.key==='Enter') window.encodeIpFormats()" style="width: 100%; box-sizing: border-box; font-family: monospace; font-size: 0.95rem; font-weight: 600; padding: 12px 14px 12px 42px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); transition: border-color 0.2s; outline: none;">
+                            </div>
+
+                            <button onclick="window.encodeIpFormats()" style="padding: 12px 24px; background: var(--accent-primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 0.9rem; transition: all 0.2s; box-shadow: 0 4px 12px rgba(59,130,246,0.25);">
+                                <i data-lucide="zap" style="width: 18px; height: 18px;"></i> Convert IP
+                            </button>
+                        </div>
+
+                        <!-- Quick Presets & Tips -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; border-top: 1px solid var(--border-color); padding-top: 14px; font-size: 0.78rem;">
+                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                <span style="color: var(--text-secondary); font-weight: 600;">Sample IPs:</span>
+                                <button onclick="document.getElementById('ip-encoder-input').value='185.101.22.48'; window.encodeIpFormats();" style="padding: 3px 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; font-family: monospace; font-size: 0.76rem;">185.101.22.48</button>
+                                <button onclick="document.getElementById('ip-encoder-input').value='104.21.55.2'; window.encodeIpFormats();" style="padding: 3px 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; font-family: monospace; font-size: 0.76rem;">104.21.55.2</button>
+                                <button onclick="document.getElementById('ip-encoder-input').value='1.1.1.1'; window.encodeIpFormats();" style="padding: 3px 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; font-family: monospace; font-size: 0.76rem;">1.1.1.1</button>
+                                <button onclick="document.getElementById('ip-encoder-input').value='127.0.0.1'; window.encodeIpFormats();" style="padding: 3px 10px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; font-family: monospace; font-size: 0.76rem;">127.0.0.1</button>
+                            </div>
+                            
+                            <span style="color: var(--text-secondary); display: flex; align-items: center; gap: 6px;">
+                                <i data-lucide="info" style="width: 14px; height: 14px; color: var(--accent-primary);"></i>
+                                Browsers automatically resolve Dword, Hex, Octal & shortform IP URLs.
+                            </span>
                         </div>
                     </div>
 
-                    <div class="card" style="flex: 2 1 600px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
-                            <h3 style="font-size: 1.1rem; margin: 0; display: flex; align-items: center; gap: 8px;">
+                    <!-- Output Formats List -->
+                    <div class="card" style="padding: 24px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; display: flex; flex-direction: column; gap: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
+                            <h3 style="font-size: 1.1rem; margin: 0; display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--text-primary);">
                                 <i data-lucide="layers" style="color: var(--success); width: 20px; height: 20px;"></i>
-                                Encoded IP Formats
+                                All Generated Formats
                             </h3>
+
+                            <button onclick="window.copyAllIpFormats()" style="padding: 6px 14px; font-size: 0.8rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-weight: 600; transition: all 0.2s;">
+                                <i data-lucide="copy" style="width: 14px; height: 14px; color: var(--accent-primary);"></i> Copy All Formats
+                            </button>
                         </div>
                         
-                        <div id="ip-encoder-output-list" style="display: flex; flex-direction: column; gap: 16px; flex: 1;">
-                            <div style="color: var(--text-secondary); text-align: center; padding: 40px; font-size: 0.85rem;">Click "Encode" to generate all IP link formats.</div>
+                        <div id="ip-encoder-output-list" style="display: flex; flex-direction: column; gap: 20px;">
+                            <div style="color: var(--text-secondary); text-align: center; padding: 40px; font-size: 0.85rem;">Click "Convert IP" to generate all IP link formats.</div>
                         </div>
                         ${setTimeout(() => { if (window.encodeIpFormats) window.encodeIpFormats(); }, 50) ? '' : ''}
                     </div>
