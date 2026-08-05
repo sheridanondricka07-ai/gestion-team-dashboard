@@ -344,6 +344,7 @@ function getLevelBand(val) {
               if (!warmupStats[statKey].processedMessages[r.messageId]) {
                   warmupStats[statKey].processedMessages[r.messageId] = r.timestamp || Date.now();
                   warmupStats[statKey].totalDrops = (warmupStats[statKey].totalDrops || 0) + 1;
+                  warmupStats[statKey].totalOutAllTime = (warmupStats[statKey].totalOutAllTime || 0) + (parseInt(r.outVal, 10) || 0);
                   statsUpdated = true;
                   
                   // Prune old processed messages (older than 48 hours) to keep Firebase size small
@@ -726,6 +727,7 @@ export default async function handler(req, res) {
             }
             if (newRecords && newRecords[r.messageId]) {
                   warmupStats[statKey].totalDrops++;
+                  warmupStats[statKey].totalOutAllTime = (warmupStats[statKey].totalOutAllTime || 0) + (parseInt(r.outVal, 10) || 0);
                   statsUpdated = true;
                   
                   // Streak Logic for Upgrades

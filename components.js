@@ -10127,7 +10127,7 @@ function renderWarmupProgress(app, container) {
                                 // Filter records to only include those matching the current IP
                                 const recordsForCurrentIp = g.records.filter(r => r.ip === latest.ip);
                                 const repOut = g.repOut || 0;
-                                const totalOutAllTime = recordsForCurrentIp.reduce((sum, r) => sum + (parseInt(r.outVal) || 0), 0);
+                                let totalOutAllTime = recordsForCurrentIp.reduce((sum, r) => sum + (parseInt(r.outVal) || 0), 0);
                                 let durationDays = 1;
                                 let startDateStr = 'Unknown';
                                 let totalDrops = recordsForCurrentIp.length;
@@ -10140,6 +10140,9 @@ function renderWarmupProgress(app, container) {
                                   if (app.state.warmupStats && app.state.warmupStats[statKey]) {
                                       const stats = app.state.warmupStats[statKey];
                                       totalDrops = stats.totalDrops || totalDrops;
+                                      if (stats.totalOutAllTime) {
+                                          totalOutAllTime = stats.totalOutAllTime;
+                                      }
                                       if (stats.firstDropTimestamp) {
                                           firstTs = stats.firstDropTimestamp;
                                       }
