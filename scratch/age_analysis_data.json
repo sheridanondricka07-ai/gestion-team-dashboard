@@ -1,0 +1,47 @@
+{
+  "generatedAt": "2026-07-09T14:49:47.409Z",
+  "brackets": [
+    {
+      "bracket": "New (0-30d)",
+      "ipsTotal": 36,
+      "ipsListed": 3,
+      "listingRate": 8.33,
+      "uniqueDomainsCount": 36
+    },
+    {
+      "bracket": "Young (31-90d)",
+      "ipsTotal": 0,
+      "ipsListed": 0,
+      "listingRate": 0,
+      "uniqueDomainsCount": 0
+    },
+    {
+      "bracket": "Medium (91-180d)",
+      "ipsTotal": 88,
+      "ipsListed": 29,
+      "listingRate": 32.95,
+      "uniqueDomainsCount": 87
+    },
+    {
+      "bracket": "Mature (181-365d)",
+      "ipsTotal": 238,
+      "ipsListed": 44,
+      "listingRate": 18.49,
+      "uniqueDomainsCount": 236
+    },
+    {
+      "bracket": "Established (1y+)",
+      "ipsTotal": 6,
+      "ipsListed": 0,
+      "listingRate": 0,
+      "uniqueDomainsCount": 2
+    },
+    {
+      "bracket": "Unknown",
+      "ipsTotal": 99,
+      "ipsListed": 16,
+      "listingRate": 16.16,
+      "uniqueDomainsCount": 89
+    }
+  ]
+}

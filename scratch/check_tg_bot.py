@@ -2,7 +2,7 @@ import json
 import urllib.request
 import ssl
 
-BOT_TOKEN = "8277348945:AAGd4UVlLqxKiQUF4wdVMTs_VonGoMfEgfk"
+BOT_TOKEN = "8829852967:AAG5a8dvHMWPinQ4A7Ly7RfPpcKRpSnPxUQ"
 CHAT_ID = "-1002633168986"
 
 ctx = ssl.create_default_context()

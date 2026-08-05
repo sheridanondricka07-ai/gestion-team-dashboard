@@ -1,5 +1,5 @@
 async function run() {
-    const token = '8277348945:AAGd4UVlLqxKiQUF4wdVMTs_VonGoMfEgfk';
+    const token = '8829852967:AAG5a8dvHMWPinQ4A7Ly7RfPpcKRpSnPxUQ';
     const url = `https://api.telegram.org/bot${token}/getUpdates`;
     try {
         console.log("Fetching Telegram updates...");

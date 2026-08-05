@@ -1,11 +1,8 @@
-const db = require('../api/db.js');
-
-async function main() {
-    const snap = await db.ref('warmupData').once('value');
-    const data = snap.val() || {};
-    const records = Object.values(data).filter(r => r.domain && r.domain.toLowerCase() === 'cuatrotorres.mx');
-    records.sort((a,b) => b.timestamp - a.timestamp);
-    console.log(records.slice(0, 5));
-    process.exit(0);
-}
-main();
+const https = require('https');
+https.get('https://gestion-team-c-01-default-rtdb.firebaseio.com/state/drops.json?orderBy="$key"&limitToFirst=3', res => {
+    let data = '';
+    res.on('data', chunk => data += chunk);
+    res.on('end', () => {
+        console.log(data);
+    });
+});

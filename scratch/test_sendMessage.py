@@ -3,7 +3,7 @@ import urllib.request
 import urllib.parse
 import ssl
 
-ORIGINAL_BOT_TOKEN = "8277348945:AAGd4UVlLqxKiQUF4wdVMTs_VonGoMfEgfk"
+ORIGINAL_BOT_TOKEN = "8829852967:AAG5a8dvHMWPinQ4A7Ly7RfPpcKRpSnPxUQ"
 CHAT_ID = "-1003727758817"
 
 ctx = ssl.create_default_context()

@@ -16,8 +16,8 @@ const STRATEGY = {
     '7000': { drops: 7, next: 10000 },
     '10000': { drops: 5, next: 15000 },
     '15000-19000': { drops: 25, next: 21000 },
-    '21000': { drops: 2, next: 26000 },
-    '26000': { drops: 3, next: 50000 },
+    '21000': { drops: 2, next: 27000 },
+    '27000': { drops: 3, next: 50000 },
     '50000': { drops: 1, next: 50000 }
 };
 
@@ -118,7 +118,7 @@ code = code.replace(oldNextTargetRegex, "");
 // 4. In the downgrade logic, use the new strategy instead of LEVELS
 const oldDowngradeRegex = /const LEVELS = \[50, 100, 200, 300, 500, 760, 1000, 1500, 2000, 3000, 5000, 7000, 8000, 10000, 15000, 19000, 21000, 26000, 30000\];\s*const currentIdx = LEVELS\.indexOf\(latestVal\);\s*let prevTarget = latestVal;\s*if \(currentIdx > 0\) \{\s*prevTarget = LEVELS\[currentIdx - 1\];\s*\} else if \(currentIdx === -1\) \{\s*const found = \[\.\.\.LEVELS\]\.reverse\(\)\.find\(l => l < latestVal\);\s*prevTarget = found \|\| LEVELS\[0\];\s*\}/g;
 
-const newDowngradeRepl = `const ORDERED_TARGETS = [50, 100, 200, 300, 500, 1000, 2000, 4000, 7000, 10000, 15000, 19000, 21000, 26000, 50000];
+const newDowngradeRepl = `const ORDERED_TARGETS = [50, 100, 200, 300, 500, 1000, 2000, 4000, 7000, 10000, 15000, 19000, 21000, 27000, 50000];
                       const currentIdx = ORDERED_TARGETS.indexOf(latestVal);
                       let prevTarget = latestVal;
                       if (currentIdx > 0) {

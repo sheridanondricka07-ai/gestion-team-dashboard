@@ -2,7 +2,7 @@ import json
 import urllib.request
 import ssl
 
-BOT_TOKEN = "8827415405:AAH-sAnTE7rz_i4XSTFG6tjBX0g0BYPyn6E"
+BOT_TOKEN = "8829852967:AAG5a8dvHMWPinQ4A7Ly7RfPpcKRpSnPxUQ"
 WEBHOOK_URL = "https://gestion-team-dashboard.vercel.app/api/sync-telegram-warmup"
 
 ctx = ssl.create_default_context()
