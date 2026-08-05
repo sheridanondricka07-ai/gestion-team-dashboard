@@ -9743,7 +9743,8 @@ function renderWarmupProgress(app, container) {
     const totalInactive = inactiveGroups.length;
     const totalLogs = rawRecords.length;
     const maxOut = rawRecords.reduce((max, r) => r.outVal > max ? r.outVal : max, 0);
-    const totalSentAllTime = rawRecords
+    const totalSent24h = rawRecords
+        .filter(r => r.timestamp >= twentyFourHoursAgo)
         .reduce((sum, r) => sum + (parseInt(r.outVal) || 0), 0);
     const maxOut24h = rawRecords
         .filter(r => r.timestamp >= twentyFourHoursAgo)
@@ -9890,8 +9891,8 @@ function renderWarmupProgress(app, container) {
                             <i data-lucide="bar-chart-2" style="width: 18px; height: 18px;"></i>
                         </div>
                         <div>
-                            <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; white-space: nowrap;">Total Sent (OUT) All Time</div>
-                            <div style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-top: 2px;">${totalSentAllTime.toLocaleString()}</div>
+                            <div style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; white-space: nowrap;">Total Sent (OUT) Last 24h</div>
+                            <div style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-top: 2px;">${totalSent24h.toLocaleString()}</div>
                         </div>
                     </div>
                 </div>
