@@ -10926,7 +10926,7 @@ window.downloadWarmup24hReport = () => {
 
     const PLAN = [209, 411, 1582, 3215, 4506, 7301, 10575, 13489, 16574, 18814, 18814, 18814, 18814, 30000];
 
-    let csvContent = "\ufeffIP Address,Domain,User,Send Size,Current PMTA Command,Succeed (Last 3 Drops >=95% of IN),Next Tier Command,Test After Command\n";
+    let csvContent = "\ufeffIP Address,Domain,User,Send Size,Current PMTA Command,Succeed (Last 3 Drops >=95% of IN),Next Tier Command,Test After Command,PMTA Command\n";
 
     active24Groups.forEach(g => {
         const latest = g.records[0];
@@ -10958,6 +10958,7 @@ window.downloadWarmup24hReport = () => {
 
         let nextCommand = "";
         let nextTestCommand = "";
+        let pmtaCommand = "";
         if (succeed === "YES") {
             const sendSizeNum = parseInt(sendSize, 10) || 0;
             let nextTierVal = sendSizeNum;
@@ -11007,9 +11008,21 @@ window.downloadWarmup24hReport = () => {
             
             const testAfterVal = Math.round((nextTierVal / 2) + 3);
             nextTestCommand = `update ${g.server} test_after for ${targetIdentifier} to ${testAfterVal}`;
+
+            let pmtaWaitVal;
+            if (nextTierVal < 4000) {
+                pmtaWaitVal = 20;
+            } else if (nextTierVal <= 8000) {
+                pmtaWaitVal = 25;
+            } else if (nextTierVal <= 15000) {
+                pmtaWaitVal = 35;
+            } else {
+                pmtaWaitVal = 45;
+            }
+            pmtaCommand = `update ${g.server} pmta for ${targetIdentifier} to ${pmtaWaitVal}`;
         }
 
-        csvContent += `"${ip}","${domain}","${user}",${sendSize},"${currentPmtaCommand}","${succeed}","${nextCommand}","${nextTestCommand}"\n`;
+        csvContent += `"${ip}","${domain}","${user}",${sendSize},"${currentPmtaCommand}","${succeed}","${nextCommand}","${nextTestCommand}","${pmtaCommand}"\n`;
     });
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
