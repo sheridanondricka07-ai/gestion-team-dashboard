@@ -10926,7 +10926,7 @@ window.downloadWarmup24hReport = () => {
 
     const PLAN = [209, 411, 1582, 3215, 4506, 7301, 10575, 13489, 16574, 18814, 18814, 18814, 18814, 30000];
 
-    let csvContent = "\ufeffIP Address,Domain,User,Send Size,Succeed (Last 3 Drops >=95% of IN),Next Tier Command,Test After Command\n";
+    let csvContent = "\ufeffIP Address,Domain,User,Send Size,Current PMTA Command,Succeed (Last 3 Drops >=95% of IN),Next Tier Command,Test After Command\n";
 
     active24Groups.forEach(g => {
         const latest = g.records[0];
@@ -10936,6 +10936,9 @@ window.downloadWarmup24hReport = () => {
         const domain = g.domain || '---';
         const user = latest.user || 'Unknown';
         const sendSize = latest.inVal || 0;
+
+        const currentTargetIdentifier = (domain.toLowerCase() === '[rdns]' || domain.toLowerCase() === 'rdns' || !domain || domain === '---') ? ip : domain;
+        const currentPmtaCommand = `update ${g.server} send_size for ${currentTargetIdentifier} to ${sendSize}`;
 
         // Check if last 3 drops succeeded (outVal >= inVal * 0.95)
         let succeed = "NO";
@@ -11006,7 +11009,7 @@ window.downloadWarmup24hReport = () => {
             nextTestCommand = `update ${g.server} test_after for ${targetIdentifier} to ${testAfterVal}`;
         }
 
-        csvContent += `"${ip}","${domain}","${user}",${sendSize},"${succeed}","${nextCommand}","${nextTestCommand}"\n`;
+        csvContent += `"${ip}","${domain}","${user}",${sendSize},"${currentPmtaCommand}","${succeed}","${nextCommand}","${nextTestCommand}"\n`;
     });
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
