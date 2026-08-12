@@ -10132,7 +10132,7 @@ function renderWarmupProgress(app, container) {
                                 let startDateStr = 'Unknown';
                                 let totalDrops = recordsForCurrentIp.length;
                                   
-                                  const safeDomainName = (g.domain || g.ip || 'unknown').replace(/[\.\#\$\[\]\/]/g, '_');
+                                  const safeDomainName = (latest.domain || g.ip || 'unknown').replace(/[\.\#\$\[\]\/]/g, '_');
                                   const safeIpKey = (g.ip || 'unknown').replace(/[\.\:\/]/g, '_');
                                   const statKey = `${safeDomainName}_${g.server}_${safeIpKey}`;
                                   
