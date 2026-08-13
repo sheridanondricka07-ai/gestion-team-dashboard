@@ -9515,9 +9515,12 @@ function renderWarmupProgress(app, container) {
     if (app.state.warmupMaxSize === undefined) app.state.warmupMaxSize = '';
     if (app.state.warmupTypeFilter === undefined) app.state.warmupTypeFilter = 'all';
 
-    // Trigger background fetch once per view switch to keep it fresh automatically
-    if (!window._hasFetchedWarmupThisSession) {
-        window._hasFetchedWarmupThisSession = true;
+    // Refresh warmup data periodically (not just once per session) so long-lived tabs
+    // don't go stale - warmupData is excluded from the main Firebase listener
+    // (see mergeCloudData in app.js), so this is the only thing that keeps it current.
+    const WARMUP_REFRESH_INTERVAL_MS = 3 * 60 * 1000;
+    if (!window._lastWarmupFetchTime || (Date.now() - window._lastWarmupFetchTime) > WARMUP_REFRESH_INTERVAL_MS) {
+        window._lastWarmupFetchTime = Date.now();
         (async () => {
             try {
                 // Fetch the initial state from Firebase first
