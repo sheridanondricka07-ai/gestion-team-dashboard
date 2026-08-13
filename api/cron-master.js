@@ -431,12 +431,14 @@ export default async function handler(req, res) {
 
                     const connection = await imap.connect(config);
                     const boxes = ['INBOX', '[Gmail]/Spam'];
-                    const timeWindow = new Date(Date.now() - 4 * 60 * 60 * 1000);
+                    const timeWindow = new Date(Date.now() - 12 * 60 * 60 * 1000);
 
                     for (const boxName of boxes) {
                         try {
                             await connection.openBox(boxName);
-                            const searchCriteria = [['SINCE', new Date()]];
+                            // Use timeWindow (not "today") for SINCE so the 12h lookback
+                            // still works correctly when it crosses midnight.
+                            const searchCriteria = [['SINCE', timeWindow]];
                             const messages = await connection.search(searchCriteria, { bodies: ['HEADER'], markSeen: false });
                             const sorted = messages.sort((a, b) => b.attributes.uid - a.attributes.uid);
 
@@ -507,31 +509,19 @@ export default async function handler(req, res) {
                 const formattedDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
                 if (foundIpsCount === 0) {
-                    // Update database to fill all as DOWN using per-IP PATCH
-                    const statuses = await getFirebaseData('state/statuses') || {};
-                    const today = new Date().toISOString().split('T')[0];
-                    const statusUpdates = {};
-                    targetIps.forEach(ip => {
-                        const safeIp = ip.replace(/\./g, '_');
-                        const current = (statuses[safeIp] && statuses[safeIp][today]) || 'none';
-                        if (current === 'none' || current === 'down') {
-                            statusUpdates[`${safeIp}/${today}`] = 'down';
-                        }
-                    });
-                    if (Object.keys(statusUpdates).length > 0) {
-                        await updateFirebaseData('state/statuses', statusUpdates);
-                    }
+                    // No matches at all: leave today's cell empty for every IP instead of
+                    // writing 'down' - an empty cell means "no data", not "confirmed down".
 
                     // Send Telegram Warning
                     const telegramMessage = `⚠️ <b>Daily Gmail IP Delivery Sync: IPs Not Found</b>\n` +
                                             `📅 <b>Date:</b> ${formattedDate}\n` +
                                             `⏰ <b>Time:</b> 10:30 AM (Morocco Time)\n\n` +
-                                            `🔴 <b>No IPs Found:</b> No delivery data or IP headers were matched in your recent emails (last 4 hours).\n` +
-                                            `<i>All target IPs have been marked as DOWN in the dashboard. Please verify test email delivery.</i>`;
+                                            `🔴 <b>No IPs Found:</b> No delivery data or IP headers were matched in your recent emails (last 12 hours).\n` +
+                                            `<i>Today's cells were left empty (no status written). Please verify test email delivery.</i>`;
                     await sendTelegram(telegramMessage, 17);
 
                     results.gmailStatusSyncTriggered = true;
-                    results.gmailStatusStats = { totalChecked: targetIps.length, rdnsCount: 0, rpTestCount: 0, spamCount: 0, downCount: targetIps.length };
+                    results.gmailStatusStats = { totalChecked: targetIps.length, rdnsCount: 0, rpTestCount: 0, spamCount: 0, notFoundCount: targetIps.length };
                 } else {
                     // Resolve PTR domains from vmtaResults
                     const vmtaResults = await getFirebaseData('state/vmtaResults') || {};
@@ -547,7 +537,7 @@ export default async function handler(req, res) {
                     let rdnsCount = 0;
                     let rpTestCount = 0;
                     let spamCount = 0;
-                    let downCount = 0;
+                    let notFoundCount = 0;
 
                     targetIps.forEach(ip => {
                         const safeIp = ip.replace(/\./g, '_');
@@ -584,18 +574,16 @@ export default async function handler(req, res) {
                                 statuses[safeIp][today] = newStatusId;
                             }
                         } else {
-                            // Only overwrite to 'down' if there is no active success/spam delivery status today
-                            const current = statuses[safeIp][today] || 'none';
-                            if (current === 'none' || current === 'down') {
-                                statuses[safeIp][today] = 'down';
-                            }
+                            // No matching email for this IP: leave the cell empty (no write)
+                            // instead of marking it 'down'. Don't touch a pre-existing value
+                            // (e.g. from an earlier manual sync today).
+                            notFoundCount++;
                         }
 
                         // Final counts
                         const finalStatus = statuses[safeIp][today];
                         if (finalStatus === 'rdns') rdnsCount++;
                         else if (finalStatus === 'spam') spamCount++;
-                        else if (finalStatus === 'down') downCount++;
                     });
 
                     // Write each IP's status for today using PATCH (prevents race conditions with client saveState)
@@ -618,12 +606,12 @@ export default async function handler(req, res) {
                                             `• <b>Total Checked:</b> <code>${targetIps.length}</code> IPs\n` +
                                             `• 🟢 <b>RDNS (Inbox):</b> <code>${rdnsCount}</code> IPs\n` +
                                             `• 🔴 <b>SPAM:</b> <code>${spamCount}</code> IPs\n` +
-                                            `• 🟠 <b>Not Received (DOWN):</b> <code>${downCount}</code> IPs\n\n` +
-                                            `⚙️ <i>All IP statuses successfully updated and filled in the dashboard.</i>`;
+                                            `• ⚪ <b>Not Found (left empty):</b> <code>${notFoundCount}</code> IPs\n\n` +
+                                            `⚙️ <i>IP statuses updated in the dashboard; unmatched IPs were left empty.</i>`;
                     await sendTelegram(telegramMessage, 17);
 
                     results.gmailStatusSyncTriggered = true;
-                    results.gmailStatusStats = { totalChecked: targetIps.length, rdnsCount, spamCount, downCount };
+                    results.gmailStatusStats = { totalChecked: targetIps.length, rdnsCount, spamCount, notFoundCount };
                 }
             }
         } catch (e) {
