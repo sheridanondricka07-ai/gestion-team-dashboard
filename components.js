@@ -3859,6 +3859,89 @@ function getWarmupActiveIpsPerServer(app) {
     return result;
 }
 
+function getWarmupRpTypeCountsPerServer(app) {
+    const warmupData = app.state.warmupData || {};
+    const rawRecords = Object.values(warmupData);
+    const rpInventory = app.state.rpInventory || [];
+    const servers = app.state.servers || [];
+
+    const domainMatches = (d1, d2) => {
+        if (!d1 || !d2) return false;
+        const clean = d => d.trim().toLowerCase().replace(/\.$/, '');
+        const c1 = clean(d1);
+        const c2 = clean(d2);
+        return c1 === c2 || c1.endsWith('.' + c2) || c2.endsWith('.' + c1);
+    };
+
+    // Group by resolved domain + server, same as Warmup Progress
+    const grouped = {};
+    rawRecords.forEach(r => {
+        if (!r.server) return;
+        const rawDomain = (r.domain || '').trim();
+        const isRdnsPlaceholder = rawDomain.toLowerCase() === '[rdns]' || rawDomain.toLowerCase() === 'rdns';
+        const resolvedDomain = (!rawDomain || isRdnsPlaceholder) ? (getRdns(r.ip, app.state) || 'Unknown') : rawDomain;
+        const key = `${resolvedDomain}::${r.server}`;
+        if (!grouped[key]) {
+            grouped[key] = { domain: resolvedDomain, server: r.server, ip: r.ip, isRdns: !rawDomain || isRdnsPlaceholder };
+        }
+    });
+
+    const result = {};
+    Object.values(grouped).forEach(g => {
+        if (!result[g.server]) result[g.server] = { rpIntern: 0, rpExtern: 0, switchCount: 0, rdnsCount: 0 };
+
+        let isSwitch = false;
+        if (!g.isRdns) {
+            const srv = servers.find(s => s.name && s.name.toLowerCase() === (g.server || '').toLowerCase());
+            if (srv && g.domain && g.ip) {
+                const ipRdns = getRdns(g.ip, app.state);
+                if (!domainMatches(g.domain, ipRdns)) {
+                    const otherIps = srv.allIps || [];
+                    for (const otherIp of otherIps) {
+                        if (otherIp !== g.ip) {
+                            const otherRdns = getRdns(otherIp, app.state);
+                            if (domainMatches(g.domain, otherRdns)) {
+                                isSwitch = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let isRpIntern = false;
+        let isRpExtern = false;
+        if (!g.isRdns && !isSwitch) {
+            const invEntry = rpInventory.find(item => item.rpDomain && item.rpDomain.trim().toLowerCase() === g.domain.trim().toLowerCase());
+            let rpType = '';
+            if (invEntry) {
+                rpType = (invEntry.rpType || '').toLowerCase().trim();
+                if (!rpType) {
+                    const domInc = (invEntry.domainIncluded || '').toLowerCase().trim();
+                    const rpDom = (invEntry.rpDomain || '').toLowerCase().trim();
+                    if (domInc && rpDom) {
+                        rpType = (domInc === rpDom) ? 'intern' : 'extern';
+                    }
+                }
+            }
+            if (!rpType && window._spfCache) {
+                const cached = window._spfCache[g.domain.trim().toLowerCase()];
+                if (cached && cached.found) rpType = cached.rpType;
+            }
+            if (rpType === 'intern') isRpIntern = true;
+            else if (rpType === 'extern') isRpExtern = true;
+        }
+
+        if (g.isRdns) result[g.server].rdnsCount++;
+        else if (isSwitch) result[g.server].switchCount++;
+        else if (isRpIntern) result[g.server].rpIntern++;
+        else if (isRpExtern) result[g.server].rpExtern++;
+    });
+
+    return result;
+}
+
 function renderOverview(app, container) {
     const { rps, servers, currentUser, drops, mailers } = app.state;
     const isAdmin = currentUser.role === 'admin';
@@ -4523,6 +4606,7 @@ function renderManagement(app, container) {
     const role = currentUser.role;
     const isAdmin = role === 'admin';
     const warmupCounts = getWarmupActiveIpsPerServer(app);
+    const warmupRpTypeCounts = getWarmupRpTypeCountsPerServer(app);
     const activeMailers = (mailers || []).filter(m => m && m.role === 'mailer');
     const query = (app.state.searchQuery || '').toLowerCase();
     
@@ -4621,13 +4705,15 @@ function renderManagement(app, container) {
                                     const cancelStyle = isCancel ? 'border-color: #f97316; background: rgba(249, 115, 22, 0.04);' : '';
                                     const activeWarmupIps = warmupCounts[srv.name] || 0;
                                     const totalSrvIps = (srv.allIps || []).length;
+                                    const rpCounts = warmupRpTypeCounts[srv.name] || { rpIntern: 0, rpExtern: 0, switchCount: 0, rdnsCount: 0 };
+                                    const hasAnyRpData = (rpCounts.rpIntern + rpCounts.rpExtern + rpCounts.switchCount + rpCounts.rdnsCount) > 0;
                                     return `
                                         <div class="server-container draggable-item" ${isAdmin ? 'draggable="true" ondragstart="handleDragStart(event, \'srv\', \'' + srv.id + '\')"' : ''} style="display: block; padding: 0; margin-bottom: 8px; border-radius: 8px; overflow: hidden; ${cancelStyle}">
                                             <div class="server-header" onclick="app.toggleServerExpand('${srv.id}')" style="cursor: pointer; background: ${isCancel ? 'rgba(249, 115, 22, 0.08)' : 'rgba(255,255,255,0.03)'};">
-                                                <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+                                                <div style="display: flex; align-items: center; gap: 8px; flex: 1; flex-wrap: wrap;">
                                                     <i data-lucide="chevron-${isExpanded ? 'down' : 'right'}" style="width: 14px; color: ${isCancel ? '#f97316' : 'var(--text-secondary)'};"></i>
-                                                    <span style="font-weight: 600; font-size: 0.85rem; color: ${isCancel ? '#f97316' : 'inherit'};">${srv.name} <span style="color: ${isCancel ? 'rgba(249, 115, 22, 0.8)' : 'var(--text-secondary)'}; font-weight: 400; font-size: 0.75rem;">(${srvRps.length} RPs)</span></span>
-                                                    <span onclick="event.stopPropagation(); toggleServerWarmupType('${srv.id}')" 
+                                                    <span style="font-weight: 600; font-size: 0.85rem; color: ${isCancel ? '#f97316' : 'inherit'};">${srv.name}</span>
+                                                    <span onclick="event.stopPropagation(); toggleServerWarmupType('${srv.id}')"
                                                           style="cursor: pointer; font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; margin-left: 8px;
                                                                  background: ${(srv.warmupType === 'RP' || srv.warmupType === 'Domain RP') ? 'rgba(139, 92, 246, 0.12)' : (srv.warmupType === 'Switch' ? 'rgba(249, 115, 22, 0.12)' : 'rgba(16, 185, 129, 0.12)')};
                                                                  color: ${(srv.warmupType === 'RP' || srv.warmupType === 'Domain RP') ? '#a78bfa' : (srv.warmupType === 'Switch' ? '#f97316' : '#34d399')};
@@ -4636,6 +4722,14 @@ function renderManagement(app, container) {
                                                         ${srv.warmupType === 'Domain RP' ? 'RP' : (srv.warmupType || 'RDNS')}
                                                     </span>
                                                     ${totalSrvIps > 0 ? `<span style="font-size: 0.6rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: ${activeWarmupIps > 0 ? 'rgba(245, 158, 11, 0.12)' : 'rgba(107, 114, 128, 0.08)'}; color: ${activeWarmupIps > 0 ? '#f59e0b' : '#6b7280'}; border: 1px solid ${activeWarmupIps > 0 ? 'rgba(245, 158, 11, 0.25)' : 'rgba(107, 114, 128, 0.15)'};" title="${activeWarmupIps} of ${totalSrvIps} IPs active in warmup (last 24h)">${activeWarmupIps > 0 ? '🔥' : '💤'} ${activeWarmupIps}/${totalSrvIps} IPs</span>` : ''}
+                                                    ${hasAnyRpData ? `
+                                                        <span style="display: inline-flex; align-items: center; gap: 3px;" title="Warmup breakdown by domain type">
+                                                            <span style="font-size: 0.6rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: rgba(16, 185, 129, 0.12); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.25);" title="RP Intern">In ${rpCounts.rpIntern}</span>
+                                                            <span style="font-size: 0.6rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: rgba(245, 158, 11, 0.12); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.25);" title="RP Extern">Ex ${rpCounts.rpExtern}</span>
+                                                            <span style="font-size: 0.6rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: rgba(139, 92, 246, 0.12); color: #a78bfa; border: 1px solid rgba(139, 92, 246, 0.25);" title="Switch">Sw ${rpCounts.switchCount}</span>
+                                                            ${rpCounts.rdnsCount > 0 ? `<span style="font-size: 0.6rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: rgba(59, 130, 246, 0.12); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.25);" title="RDNS">R ${rpCounts.rdnsCount}</span>` : ''}
+                                                        </span>
+                                                    ` : ''}
                                                 </div>
                                                 <div style="display: flex; gap: 4px; align-items: center;" onclick="event.stopPropagation()">
                                                     <span class="action-icon" onclick="copyServerRps('${srv.id}', this)" title="Copy all RPs in this server">
