@@ -627,13 +627,22 @@ export default async function handler(req, res) {
                 }];
             }
         } else {
-            // Polling mode: Fetch updates from Telegram Bot API
-            const tgUrl = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates`;
+            // Polling mode: Fetch updates from Telegram Bot API.
+            // IMPORTANT: getUpdates must be called with an offset, otherwise Telegram keeps
+            // returning the same (oldest, capped at 100) batch of pending updates forever -
+            // newer messages never get reached and the pending queue only grows.
+            const savedOffset = await getFirebaseData('state/telegramUpdateOffset');
+            const offset = typeof savedOffset === 'number' ? savedOffset : 0;
+            const tgUrl = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${offset}&limit=100`;
             const tgResp = await fetch(tgUrl);
             const tgData = await tgResp.json();
-            
+
             if (tgData.ok) {
                 results = tgData.result || [];
+                if (results.length > 0) {
+                    const lastUpdateId = results[results.length - 1].update_id;
+                    await putFirebaseData('state/telegramUpdateOffset', lastUpdateId + 1);
+                }
             } else {
                 console.warn('Telegram API getUpdates returned error:', tgData.description);
                 // Return empty results instead of crashing if getUpdates is disabled by webhook
