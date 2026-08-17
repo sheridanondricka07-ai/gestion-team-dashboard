@@ -10232,16 +10232,32 @@ function renderWarmupProgress(app, container) {
                                   const safeDomainName = ((latest && latest.domain) || g.domain || g.ip || 'unknown').replace(/[\.\#\$\[\]\/]/g, '_');
                                   const safeIpKey = (g.ip || 'unknown').replace(/[\.\:\/]/g, '_');
                                   const statKey = `${safeDomainName}_${g.server}_${safeIpKey}`;
-                                  
+
+                                  let matchedStats = app.state.warmupStats && app.state.warmupStats[statKey] ? [app.state.warmupStats[statKey]] : [];
+
+                                  // Placeholder groups (no loaded records, e.g. "Inactive") don't have a real
+                                  // domain to build the exact statKey, so the lookup above misses even when
+                                  // this IP genuinely has old history that just fell outside the loaded window.
+                                  // Fall back to EVERY stat entry for this server+ip regardless of domain,
+                                  // since the same IP can rotate across multiple domains over time, each with
+                                  // its own statKey.
+                                  if (matchedStats.length === 0 && !latest && app.state.warmupStats) {
+                                      const suffix = `_${g.server}_${safeIpKey}`;
+                                      matchedStats = Object.keys(app.state.warmupStats)
+                                          .filter(k => k.endsWith(suffix))
+                                          .map(k => app.state.warmupStats[k]);
+                                  }
+
                                   let firstTs = null;
-                                  if (app.state.warmupStats && app.state.warmupStats[statKey]) {
-                                      const stats = app.state.warmupStats[statKey];
-                                      totalDrops = stats.totalDrops || totalDrops;
-                                      if (stats.totalOutAllTime) {
-                                          totalOutAllTime = stats.totalOutAllTime;
+                                  if (matchedStats.length > 0) {
+                                      totalDrops = matchedStats.reduce((sum, s) => sum + (s.totalDrops || 0), 0) || totalDrops;
+                                      const sumOut = matchedStats.reduce((sum, s) => sum + (s.totalOutAllTime || 0), 0);
+                                      if (sumOut) {
+                                          totalOutAllTime = sumOut;
                                       }
-                                      if (stats.firstDropTimestamp) {
-                                          firstTs = stats.firstDropTimestamp;
+                                      const firstTimestamps = matchedStats.map(s => s.firstDropTimestamp).filter(Boolean);
+                                      if (firstTimestamps.length > 0) {
+                                          firstTs = Math.min(...firstTimestamps);
                                       }
                                   }
 
