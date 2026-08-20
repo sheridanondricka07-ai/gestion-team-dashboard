@@ -186,6 +186,9 @@ function renderTopBar(app) {
                 <button onclick="window.app.bulkAutoDetectRPSpf()" ${app.state.rpAutoDetecting ? 'disabled' : ''} style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: #8B5CF6; border: none; color: white;">
                     ${app.state.rpAutoDetecting ? '<i data-lucide="loader" class="spin" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Detecting ' + (app.state.rpAutoDetectProgress ? app.state.rpAutoDetectProgress.current + '/' + app.state.rpAutoDetectProgress.total : '...') : '<i data-lucide="scan" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Auto-Detect All'}
                 </button>
+                <button onclick="window.app.autoDetectRpServersFromWarmup()" ${app.state.rpSrvDetecting ? 'disabled' : ''} style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: #10b981; border: none; color: white;" title="Fill missing SRV from real Warmup Progress (Telegram) sending history">
+                    ${app.state.rpSrvDetecting ? '<i data-lucide="loader" class="spin" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Detecting...' : '<i data-lucide="server" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Detect SRV'}
+                </button>
                 <button onclick="showImportRPInventoryModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary);"><i data-lucide="upload" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Bulk Import</button>
                 <button onclick="showAddRPInventoryItemModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto;"><i data-lucide="plus" style="width:12px; vertical-align:middle; margin-right:4px;"></i> New RP</button>
             ` : ''}

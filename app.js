@@ -1804,6 +1804,55 @@ class TeamApp {
         this.updateDashboard();
         alert(`Auto-detect complete!\n${filled} of ${items.length} RPs filled.`);
     }
+
+    async autoDetectRpServersFromWarmup() {
+        const items = (this.state.rpInventory || []).filter(i => i.rpDomain && (!i.srv || i.srv === ''));
+        if (items.length === 0) {
+            alert('All RPs already have SRV filled.');
+            return;
+        }
+
+        this.state.rpSrvDetecting = true;
+        this.updateDashboard();
+
+        // warmupData is lazily loaded elsewhere (Warmup Progress view) - fetch it here if empty
+        if (!this.state.warmupData || Object.keys(this.state.warmupData).length === 0) {
+            try {
+                const snapshot = await window.db.ref('warmupData').orderByKey().limitToLast(2000).once('value');
+                this.state.warmupData = snapshot.val() || {};
+            } catch (e) {
+                console.error('Failed to load warmup data for SRV detection:', e);
+            }
+        }
+
+        // Build domain -> most recent server from real Telegram warmup sending history
+        const domainServerMap = {};
+        Object.values(this.state.warmupData || {}).forEach(r => {
+            if (!r || !r.domain || !r.server) return;
+            const clean = r.domain.trim().toLowerCase();
+            if (!clean || clean === '[rdns]' || clean === 'rdns') return;
+            const ts = Number(r.timestamp) || 0;
+            if (!domainServerMap[clean] || ts > domainServerMap[clean].ts) {
+                domainServerMap[clean] = { server: r.server, ts };
+            }
+        });
+
+        let filled = 0;
+        items.forEach(item => {
+            const match = domainServerMap[item.rpDomain.trim().toLowerCase()];
+            if (match) {
+                item.srv = match.server;
+                filled++;
+            }
+        });
+
+        this.state.rpSrvDetecting = false;
+        if (filled > 0) {
+            await this.saveNode('rpInventory');
+        }
+        this.updateDashboard();
+        alert(`Detected ${filled} of ${items.length} missing SRV values from Warmup Progress data.`);
+    }
 }
 
 // App is instantiated in window.onload at the top of the file
