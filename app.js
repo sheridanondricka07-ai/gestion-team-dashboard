@@ -1893,17 +1893,35 @@ class TeamApp {
         });
 
         let filled = 0;
+        let rpsUpdated = false;
         items.forEach(item => {
             const match = domainServerMap[item.rpDomain.trim().toLowerCase()];
             if (match) {
                 item.srv = match.server;
                 filled++;
+
+                // Keep the rps assignment list (used by Management, "available" filter, etc.)
+                // in sync too - setting item.srv alone left this domain still showing as
+                // unassigned/"stock" everywhere that reads rps instead of rpInventory.srv.
+                const attachedServer = (this.state.servers || []).find(s => s.name === match.server);
+                if (attachedServer) {
+                    const rpInRps = (this.state.rps || []).find(r => (r.domain || '').trim().toLowerCase() === item.rpDomain.trim().toLowerCase());
+                    if (rpInRps) {
+                        rpInRps.serverId = attachedServer.id;
+                        rpInRps.mailerId = attachedServer.mailerId || null;
+                        rpInRps.status = 'active';
+                        rpsUpdated = true;
+                    }
+                }
             }
         });
 
         this.state.rpSrvDetecting = false;
         if (filled > 0) {
             await this.saveNode('rpInventory');
+        }
+        if (rpsUpdated) {
+            await this.saveNode('rps');
         }
         this.updateDashboard();
         alert(`Detected ${filled} of ${items.length} missing SRV values from the last 15 days of Warmup Progress data.`);
