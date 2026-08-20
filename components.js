@@ -190,6 +190,7 @@ function renderTopBar(app) {
                     ${app.state.rpSrvDetecting ? '<i data-lucide="loader" class="spin" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Detecting...' : '<i data-lucide="server" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Detect SRV'}
                 </button>
                 <button onclick="showImportRPInventoryModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary);"><i data-lucide="upload" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Bulk Import</button>
+                <button onclick="showBulkDeleteRPModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid #ef4444; color: #ef4444;"><i data-lucide="trash-2" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Bulk Delete</button>
                 <button onclick="showAddRPInventoryItemModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto;"><i data-lucide="plus" style="width:12px; vertical-align:middle; margin-right:4px;"></i> New RP</button>
             ` : ''}
             ${app.state.currentUser.role === 'admin' && app.state.currentView === 'team' ? `
@@ -9149,6 +9150,73 @@ window.deleteRPInventoryItemPrompt = (id, domain) => {
         window.app.deleteRPInventoryItem(id).then(() => {
             window.app.updateDashboard();
         });
+    }
+};
+
+window.showBulkDeleteRPModal = () => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+        <div class="modal" style="max-width: 500px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: #ef4444;">Bulk Delete RPs</h3>
+                <span style="cursor: pointer; font-size: 1.2rem;" onclick="this.closest('.modal-overlay').remove()">&times;</span>
+            </div>
+            <p style="margin: 0 0 12px; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4;">
+                Paste <b>Domain included</b> values, one per line. Every RP whose "Domain included" matches a line will be permanently deleted.
+            </p>
+            <textarea id="bulk-delete-rp-textarea" rows="10" placeholder="domain-one.com&#10;domain-two.com&#10;domain-three.com" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-tertiary); color: var(--text-primary); font-family: monospace; font-size: 0.8rem; resize: vertical;"></textarea>
+            <div id="bulk-delete-rp-status" style="margin-top: 12px; font-size: 0.8rem; font-weight: 500;"></div>
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px;">
+                <button onclick="this.closest('.modal-overlay').remove()" class="btn-secondary" style="width: auto;">Cancel</button>
+                <button id="bulk-delete-rp-confirm-btn" onclick="window.confirmBulkDeleteRP(this)" style="width: auto; background: #ef4444; border: none; color: white; padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                    <i data-lucide="trash-2" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Delete All
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    if (window.lucide) window.lucide.createIcons();
+    document.getElementById('bulk-delete-rp-textarea').focus();
+};
+
+window.confirmBulkDeleteRP = async (btn) => {
+    const textarea = document.getElementById('bulk-delete-rp-textarea');
+    const statusDiv = document.getElementById('bulk-delete-rp-status');
+    const lines = textarea.value.split('\n').map(l => l.trim()).filter(Boolean);
+
+    if (lines.length === 0) {
+        statusDiv.style.color = '#ef4444';
+        statusDiv.textContent = 'Paste at least one domain first.';
+        return;
+    }
+
+    if (!confirm(`Delete ${lines.length} RP(s) matching these Domain Included values? This cannot be undone.`)) {
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader" class="spin" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Deleting...';
+    if (window.lucide) window.lucide.createIcons();
+
+    const result = await window.app.bulkDeleteRpInventoryByDomainIncluded(textarea.value);
+
+    statusDiv.style.color = result.deletedCount > 0 ? 'var(--success)' : '#ef4444';
+    let msg = `Deleted ${result.deletedCount} of ${lines.length} RP(s).`;
+    if (result.notFound.length > 0) {
+        msg += ` Not found: ${result.notFound.join(', ')}`;
+    }
+    statusDiv.textContent = msg;
+
+    btn.disabled = false;
+    btn.innerHTML = '<i data-lucide="trash-2" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Delete All';
+    if (window.lucide) window.lucide.createIcons();
+
+    if (result.notFound.length === 0) {
+        setTimeout(() => {
+            const overlay = btn.closest('.modal-overlay');
+            if (overlay) overlay.remove();
+        }, 1500);
     }
 };
 

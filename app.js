@@ -1628,6 +1628,37 @@ class TeamApp {
         this.updateDashboard();
     }
 
+    async bulkDeleteRpInventoryByDomainIncluded(rawText) {
+        const wanted = new Set(
+            (rawText || '')
+                .split('\n')
+                .map(l => l.trim().toLowerCase())
+                .filter(Boolean)
+        );
+        if (wanted.size === 0) {
+            return { deletedCount: 0, notFound: [] };
+        }
+
+        const items = this.state.rpInventory || [];
+        const toDelete = items.filter(item => wanted.has((item.domainIncluded || '').trim().toLowerCase()));
+        const deletedDomainsIncluded = new Set(toDelete.map(item => (item.domainIncluded || '').trim().toLowerCase()));
+        const notFound = [...wanted].filter(d => !deletedDomainsIncluded.has(d));
+
+        if (toDelete.length > 0) {
+            const deletedIds = new Set(toDelete.map(item => item.id));
+            const deletedRpDomains = new Set(toDelete.map(item => (item.rpDomain || '').trim().toLowerCase()).filter(Boolean));
+
+            this.state.rps = (this.state.rps || []).filter(rp => !deletedRpDomains.has((rp.domain || '').trim().toLowerCase()));
+            this.state.rpInventory = items.filter(item => !deletedIds.has(item.id));
+
+            await this.saveNode('rps');
+            await this.saveNode('rpInventory');
+            this.updateDashboard();
+        }
+
+        return { deletedCount: toDelete.length, notFound };
+    }
+
     async updateRPInventoryItem(id, updates) {
         if (!this.state.rpInventory) return;
         const idx = this.state.rpInventory.findIndex(item => item.id === id);
