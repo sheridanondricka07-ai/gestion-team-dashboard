@@ -423,19 +423,66 @@ export default async function handler(req, res) {
                 const rpDomain = (item.rpDomain || '').trim();
                 if (!rpDomain) return;
 
-                const attachedServer = servers.find(s => s.name === item.srv);
-                const serverIps = attachedServer ? (attachedServer.allIps || [attachedServer.mainIp || attachedServer.ip]).filter(Boolean) : [];
+                const getServerIps = () => {
+                    const attachedServer = servers.find(s => s.name === item.srv);
+                    return attachedServer ? (attachedServer.allIps || [attachedServer.mainIp || attachedServer.ip]).filter(Boolean) : [];
+                };
 
                 const spfRecord = await getSpfRecord(rpDomain);
-                const verification = verifySpfRecord(
+                let verification = verifySpfRecord(
                     spfRecord,
                     item.spfType || 'Include',
                     item.domainIncluded,
                     item.subdomainIncluded,
                     item.rpType || 'extern',
-                    serverIps,
+                    getServerIps(),
                     rpDomain
                 );
+
+                let autoCorrected = false;
+
+                // Self-heal: domainIncluded/subdomainIncluded can go stale (the included
+                // domain's own SPF changes, or the RP's SPF drops that include:/a: entry).
+                // Before giving up, re-run detection against the RP's *current* SPF to see
+                // if there's a still-valid path we're just not pointed at anymore.
+                if (verification.ok === false) {
+                    try {
+                        const redetected = await autoDetectRp(item, servers);
+                        if (redetected) {
+                            item.domainIncluded = redetected.domainIncluded || item.domainIncluded;
+                            item.subdomainIncluded = redetected.subdomainIncluded || item.subdomainIncluded;
+                            item.srv = redetected.server || item.srv;
+                            item.spfType = redetected.spfType || item.spfType;
+                            item.rpType = redetected.rpType || item.rpType;
+
+                            const reVerification = verifySpfRecord(
+                                spfRecord,
+                                item.spfType,
+                                item.domainIncluded,
+                                item.subdomainIncluded,
+                                item.rpType,
+                                getServerIps(),
+                                rpDomain
+                            );
+                            if (reVerification.ok !== false) {
+                                verification = reVerification;
+                                autoCorrected = true;
+
+                                const attachedServer = servers.find(s => s.name === item.srv);
+                                if (attachedServer) {
+                                    const rpInRps = rps.find(r => (r.domain || '').trim().toLowerCase() === rpDomain.toLowerCase());
+                                    if (rpInRps) {
+                                        rpInRps.serverId = attachedServer.id;
+                                        rpInRps.mailerId = attachedServer.mailerId || null;
+                                        rpInRps.status = 'active';
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        // Keep the original failed verification if re-detection errors out
+                    }
+                }
 
                 if (verification.ok === 'warning') {
                     item.spfStatus = 'WARNING';
@@ -453,7 +500,8 @@ export default async function handler(req, res) {
                     subdomainIncluded: item.subdomainIncluded,
                     spfStatus: item.spfStatus,
                     spfStatusDetail: item.spfStatusDetail,
-                    spfCheckedAt: item.spfCheckedAt
+                    spfCheckedAt: item.spfCheckedAt,
+                    autoCorrected
                 });
             }));
 
@@ -477,7 +525,8 @@ export default async function handler(req, res) {
             total: results.length,
             ok: results.filter(r => r.spfStatus === 'OK').length,
             warning: results.filter(r => r.spfStatus === 'WARNING').length,
-            error: results.filter(r => r.spfStatus === 'ERROR').length
+            error: results.filter(r => r.spfStatus === 'ERROR').length,
+            autoCorrected: results.filter(r => r.autoCorrected).length
         };
 
         try {
@@ -486,9 +535,16 @@ export default async function handler(req, res) {
 
             const errors = results.filter(r => r.spfStatus === 'ERROR');
             const warnings = results.filter(r => r.spfStatus === 'WARNING');
+            const corrected = results.filter(r => r.autoCorrected);
 
             let report = `<b>🔍 RPs SPF Check</b>\n`;
             report += `Status: ${errors.length > 0 ? '⚠️ ISSUES DETECTED' : '✅ ALL CLEAR'}\n\n`;
+
+            if (corrected.length > 0) {
+                report += `<b>🔧 Auto-Corrected (stale Domain Included re-detected):</b>\n`;
+                report += corrected.map(c => `• <b>${c.rpDomain}</b> -> now: ${c.domainIncluded}`).join('\n');
+                report += `\n\n`;
+            }
 
             if (errors.length > 0) {
                 report += `<b>❌ Attention Required (SPF Errors):</b>\n`;
@@ -503,6 +559,9 @@ export default async function handler(req, res) {
 
             report += `<b>📊 Summary:</b>\n`;
             report += `✅ Total OK: ${summary.ok}\n`;
+            if (summary.autoCorrected > 0) {
+                report += `🔧 Auto-Corrected: ${summary.autoCorrected}\n`;
+            }
             if (summary.warning > 0) {
                 report += `⚠️ Total Could be OK: ${summary.warning}\n`;
             }
