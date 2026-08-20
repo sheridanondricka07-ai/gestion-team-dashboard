@@ -1,40 +1,6 @@
 const DB_URL = "https://gestion-team-c-01-default-rtdb.firebaseio.com";
 const BOT_TOKEN = "8829852967:AAG5a8dvHMWPinQ4A7Ly7RfPpcKRpSnPxUQ";
 const UPGRADE_BOT_TOKEN = "8975320309:AAFQmIeTKMbxQMv4c8_UHSczUYYZ9mcJ8FA";
-import { promises as dns } from 'dns';
-
-function ipInCidr(ip, cidr) {
-    const [range, bitsStr] = cidr.split('/');
-    if (!bitsStr) {
-        return ip === range;
-    }
-    const bits = parseInt(bitsStr, 10);
-    if (isNaN(bits)) return ip === range;
-
-    const ipParts = ip.split('.').map(Number);
-    const rangeParts = range.split('.').map(Number);
-
-    if (ipParts.length !== 4 || rangeParts.length !== 4) return false;
-
-    const ipNum = ((ipParts[0] * 256 + ipParts[1]) * 256 + ipParts[2]) * 256 + ipParts[3];
-    const rangeNum = ((rangeParts[0] * 256 + rangeParts[1]) * 256 + rangeParts[2]) * 256 + rangeParts[3];
-    const mask = bits === 0 ? 0 : (0xFFFFFFFF << (32 - bits));
-
-    return (ipNum & mask) === (rangeNum & mask);
-}
-
-async function getSpfRecord(domain) {
-    try {
-        const records = await dns.resolveTxt(domain);
-        const spfRecords = records
-            .map(chunks => chunks.join(''))
-            .filter(record => record.toLowerCase().startsWith('v=spf1'));
-        if (spfRecords.length === 0) return null;
-        return spfRecords[0];
-    } catch (err) {
-        return null;
-    }
-}
 
 async function detectAndAddNewRp(domain, ip, serverName) {
     if (!domain || domain.toLowerCase() === '[rdns]' || domain.toLowerCase() === 'rdns') {
@@ -52,26 +18,13 @@ async function detectAndAddNewRp(domain, ip, serverName) {
         const exists = rpInventory.some(item => (item.rpDomain || '').toLowerCase().trim() === cleanDom);
         if (exists) return;
 
-        // Determine RP Type (intern or extern) by checking SPF
-        let rpType = 'extern';
-        const spf = await getSpfRecord(cleanDom);
-        if (spf) {
-            const terms = spf.toLowerCase().split(/\s+/);
-            let hasDirectIp = false;
-            for (let term of terms) {
-                if (['+', '-', '~', '?'].includes(term[0])) term = term.slice(1);
-                if (term.startsWith('ip4:')) {
-                    const cidr = term.substring(4);
-                    if (ipInCidr(ip, cidr)) {
-                        hasDirectIp = true;
-                        break;
-                    }
-                }
-            }
-            if (hasDirectIp) {
-                rpType = 'intern';
-            }
-        }
+        // This function always sets domainIncluded/subdomainIncluded equal to the RP's own
+        // domain below (it doesn't resolve include: chains to a different domain), so per the
+        // domainIncluded === rpDomain -> intern rule, rpType must always be 'intern' here.
+        // (A separate, fragile "does this domain's SPF literally contain ip4:<the triggering
+        // IP>" check used to decide this instead, which could default to 'extern' on a DNS
+        // hiccup even though domainIncluded was already identical to rpDomain - inconsistent.)
+        const rpType = 'intern';
 
         // Add to rpInventory
         const nextId = rpInventory.reduce((max, item) => Math.max(max, parseInt(item.id, 10) || 0), 0) + 1;
