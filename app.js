@@ -1815,23 +1815,31 @@ class TeamApp {
         this.state.rpSrvDetecting = true;
         this.updateDashboard();
 
-        // warmupData is lazily loaded elsewhere (Warmup Progress view) - fetch it here if empty
-        if (!this.state.warmupData || Object.keys(this.state.warmupData).length === 0) {
-            try {
-                const snapshot = await window.db.ref('warmupData').orderByKey().limitToLast(2000).once('value');
-                this.state.warmupData = snapshot.val() || {};
-            } catch (e) {
-                console.error('Failed to load warmup data for SRV detection:', e);
-            }
+        // The app's normal warmupData cache is capped at the last 2000 records GLOBALLY
+        // (across every domain/server), which at current volume can cover well under a day.
+        // SRV detection needs a real 15-day window regardless of volume, so fetch the full
+        // warmupData node fresh here (not the capped cache) and filter by timestamp ourselves -
+        // there's no Firebase index on timestamp to query the range server-side.
+        let warmupRecords = {};
+        try {
+            const snapshot = await window.db.ref('warmupData').once('value');
+            warmupRecords = snapshot.val() || {};
+        } catch (e) {
+            console.error('Failed to load warmup data for SRV detection:', e);
+            warmupRecords = this.state.warmupData || {};
         }
 
-        // Build domain -> most recent server from real Telegram warmup sending history
+        const fifteenDaysAgo = Date.now() - (15 * 24 * 60 * 60 * 1000);
+
+        // Build domain -> most recent server from real Telegram warmup sending history,
+        // last 15 days only.
         const domainServerMap = {};
-        Object.values(this.state.warmupData || {}).forEach(r => {
+        Object.values(warmupRecords).forEach(r => {
             if (!r || !r.domain || !r.server) return;
+            const ts = Number(r.timestamp) || 0;
+            if (ts < fifteenDaysAgo) return;
             const clean = r.domain.trim().toLowerCase();
             if (!clean || clean === '[rdns]' || clean === 'rdns') return;
-            const ts = Number(r.timestamp) || 0;
             if (!domainServerMap[clean] || ts > domainServerMap[clean].ts) {
                 domainServerMap[clean] = { server: r.server, ts };
             }
@@ -1851,7 +1859,7 @@ class TeamApp {
             await this.saveNode('rpInventory');
         }
         this.updateDashboard();
-        alert(`Detected ${filled} of ${items.length} missing SRV values from Warmup Progress data.`);
+        alert(`Detected ${filled} of ${items.length} missing SRV values from the last 15 days of Warmup Progress data.`);
     }
 }
 
