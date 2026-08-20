@@ -1659,6 +1659,22 @@ class TeamApp {
         return { deletedCount: toDelete.length, notFound };
     }
 
+    async deleteRpInventoryByIds(ids) {
+        const idSet = new Set(ids || []);
+        const items = this.state.rpInventory || [];
+        const toDelete = items.filter(item => idSet.has(item.id));
+        if (toDelete.length === 0) return 0;
+
+        const deletedRpDomains = new Set(toDelete.map(item => (item.rpDomain || '').trim().toLowerCase()).filter(Boolean));
+        this.state.rps = (this.state.rps || []).filter(rp => !deletedRpDomains.has((rp.domain || '').trim().toLowerCase()));
+        this.state.rpInventory = items.filter(item => !idSet.has(item.id));
+
+        await this.saveNode('rps');
+        await this.saveNode('rpInventory');
+        this.updateDashboard();
+        return toDelete.length;
+    }
+
     async updateRPInventoryItem(id, updates) {
         if (!this.state.rpInventory) return;
         const idx = this.state.rpInventory.findIndex(item => item.id === id);

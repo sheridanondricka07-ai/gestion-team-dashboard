@@ -8270,6 +8270,13 @@ function _renderRPsInventory(app, container) {
     }
     window._lastFilteredRPs = filteredItems;
 
+    // "Domains Deleted": extern RPs whose configured Domain Included is no longer
+    // present in that RP's live SPF (its own include:/a: chain dropped it, or the
+    // included domain lost its SPF entirely) - i.e. Check SPF's self-heal already
+    // tried and found no valid path, so this needs manual attention.
+    const deletedDomainItems = items.filter(item => item.rpType === 'extern' && item.spfStatus === 'ERROR');
+    window._lastDeletedDomainRPs = deletedDomainItems;
+
     const serverNames = (app.state.servers || []).map(s => s.name).filter(Boolean);
     const uniqueServerNames = [...new Set(serverNames)].sort();
 
@@ -8500,9 +8507,70 @@ function _renderRPsInventory(app, container) {
                 <div id="rp-tab-generator" class="tab ${window._activeRPTab === 'generator' ? 'active' : ''}" onclick="window.switchRPTab('generator')" style="padding: 14px 4px; font-size: 0.82rem; font-weight: 700; cursor: pointer; border-bottom: 2px solid ${window._activeRPTab === 'generator' ? 'var(--accent-primary)' : 'transparent'}; color: ${window._activeRPTab === 'generator' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 6px;">
                     <i data-lucide="zap" style="width: 14px;"></i> Generate Records
                 </div>
+                <div id="rp-tab-deleted" class="tab ${window._activeRPTab === 'deleted' ? 'active' : ''}" onclick="window.switchRPTab('deleted')" style="padding: 14px 4px; font-size: 0.82rem; font-weight: 700; cursor: pointer; border-bottom: 2px solid ${window._activeRPTab === 'deleted' ? '#ef4444' : 'transparent'}; color: ${window._activeRPTab === 'deleted' ? '#ef4444' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 6px;">
+                    <i data-lucide="unlink" style="width: 14px;"></i> Domains Deleted (${deletedDomainItems.length})
+                </div>
             </div>
 
-            ${window._activeRPTab !== 'generator' ? `
+            ${window._activeRPTab === 'deleted' ? `
+            <div class="card" style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-lg);">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 24px; border-bottom: 1px solid var(--border-color);">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(239, 68, 68, 0.12); display: flex; align-items: center; justify-content: center;">
+                            <i data-lucide="unlink" style="width: 18px; color: #ef4444;"></i>
+                        </div>
+                        <div>
+                            <h3 style="margin: 0; font-weight: 700; font-size: 1.05rem; color: var(--text-primary);">Domains Deleted</h3>
+                            <p style="margin: 4px 0 0; font-size: 0.75rem; color: var(--text-secondary);">Extern RPs whose Domain Included is no longer found in that RP's SPF (Check SPF already tried to auto-fix these and couldn't).</p>
+                        </div>
+                    </div>
+                    ${isAdmin && deletedDomainItems.length > 0 ? `
+                        <button onclick="window.deleteAllDomainDeletedRPs(this)" style="width: auto; background: #ef4444; border: none; color: white; padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.8rem;">
+                            <i data-lucide="trash-2" style="width: 14px;"></i> Delete All (${deletedDomainItems.length})
+                        </button>
+                    ` : ''}
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="rp-table" style="width: 100%;">
+                        <thead>
+                            <tr>
+                                <th>RPs</th>
+                                <th>Domain included</th>
+                                <th>SubDomain included</th>
+                                <th>TYPE</th>
+                                <th>Reason</th>
+                                ${isAdmin ? `<th style="text-align: right;">Actions</th>` : ''}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${deletedDomainItems.map(item => `
+                                <tr>
+                                    <td style="font-weight: 600;">${item.rpDomain}</td>
+                                    <td>${item.domainIncluded || '<span style="color: var(--text-secondary); opacity: 0.5;">---</span>'}</td>
+                                    <td>${item.subdomainIncluded || '<span style="color: var(--text-secondary); opacity: 0.5;">---</span>'}</td>
+                                    <td>${item.spfType || '---'}</td>
+                                    <td style="color: #ef4444; font-size: 0.75rem;">${item.spfStatusDetail || 'Invalid SPF'}</td>
+                                    ${isAdmin ? `
+                                    <td style="text-align: right;">
+                                        <button class="btn-action-delete" onclick="deleteRPInventoryItemPrompt('${item.id}', '${item.rpDomain}')">
+                                            <i data-lucide="trash-2" style="width: 14px;"></i>
+                                        </button>
+                                    </td>
+                                    ` : ''}
+                                </tr>
+                            `).join('')}
+                            ${deletedDomainItems.length === 0 ? `
+                                <tr>
+                                    <td colspan="${isAdmin ? 6 : 5}" style="padding: 60px; text-align: center; color: var(--text-secondary);">
+                                        None right now - every extern RP's Domain Included is still valid in its SPF.
+                                    </td>
+                                </tr>
+                            ` : ''}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            ` : window._activeRPTab !== 'generator' ? `
             ${isSpfRunning ? `
                 <div id="rp-spf-progress-container" class="card" style="padding: 16px 20px; background: var(--bg-secondary); border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px; animation: fadeIn 0.3s ease; margin-bottom: 16px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; font-weight: 600;">
@@ -9143,6 +9211,22 @@ window.toggleRPSentState = (id, state) => {
     window.app.updateRPInventoryItem(id, { alreadySent: state }).then(() => {
         window.app.updateDashboard();
     });
+};
+
+window.deleteAllDomainDeletedRPs = async (btn) => {
+    const items = window._lastDeletedDomainRPs || [];
+    if (items.length === 0) return;
+
+    if (!confirm(`Delete all ${items.length} RP(s) whose Domain Included is no longer in their SPF? This cannot be undone.`)) {
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader" class="spin" style="width:14px;"></i> Deleting...';
+    if (window.lucide) window.lucide.createIcons();
+
+    await window.app.deleteRpInventoryByIds(items.map(item => item.id));
+    window.app.updateDashboard();
 };
 
 window.deleteRPInventoryItemPrompt = (id, domain) => {
