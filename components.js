@@ -8877,6 +8877,16 @@ function _renderRPsInventory(app, container) {
                                 <button onclick="document.querySelectorAll('.gen-srv-btn').forEach(btn => btn.classList.remove('selected')); window.updateGenSelectedServers();" style="flex: 1; padding: 6px 12px; font-size: 0.72rem; font-weight: 600; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='var(--border-color)', this.style.color='var(--text-primary)'" onmouseout="this.style.background='var(--bg-tertiary)', this.style.color='var(--text-secondary)'">Deselect All</button>
                             </div>
                         </div>
+
+                        <!-- Manual IPs (optional, overrides server selection) -->
+                        <div style="display: flex; flex-direction: column; gap: 8px; grid-column: span 2;">
+                            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
+                                <i data-lucide="edit-3" style="width: 12px; color: var(--accent-primary);"></i> Manual IPs
+                                <span style="font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--text-secondary); margin-left: 4px;">(optional — if filled, overrides the server selection above)</span>
+                            </label>
+                            <textarea id="gen-manual-ips-input" placeholder="Paste IPs manually (one per line, comma or space separated)...\ne.g.:\n192.0.2.1\n192.0.2.2" style="min-height: 90px; padding: 12px; background: rgba(10, 12, 16, 0.5); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.8rem; resize: vertical; outline: none; line-height: 1.5; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent-primary)'" onblur="this.style.borderColor='var(--border-color)'">${window._genRecordsState && window._genRecordsState.manualIps ? window._genRecordsState.manualIps : ''}</textarea>
+                            <button onclick="document.getElementById('gen-manual-ips-input').value=''; if (!window._genRecordsState) window._genRecordsState = {}; window._genRecordsState.manualIps = '';" style="align-self: flex-start; padding: 6px 12px; font-size: 0.72rem; font-weight: 600; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.background='var(--border-color)', this.style.color='var(--text-primary)'" onmouseout="this.style.background='var(--bg-tertiary)', this.style.color='var(--text-secondary)'">Clear</button>
+                        </div>
                     </div>
 
                     <!-- Generate Button -->
@@ -8928,6 +8938,18 @@ function _renderRPsInventory(app, container) {
         genRpInput.addEventListener('blur', (e) => {
             if (!window._genRecordsState) window._genRecordsState = {};
             window._genRecordsState.rpInput = e.target.value;
+        });
+    }
+
+    const genManualIpsInput = document.getElementById('gen-manual-ips-input');
+    if (genManualIpsInput) {
+        genManualIpsInput.addEventListener('input', (e) => {
+            if (!window._genRecordsState) window._genRecordsState = {};
+            window._genRecordsState.manualIps = e.target.value;
+        });
+        genManualIpsInput.addEventListener('blur', (e) => {
+            if (!window._genRecordsState) window._genRecordsState = {};
+            window._genRecordsState.manualIps = e.target.value;
         });
     }
 
@@ -9064,25 +9086,35 @@ window.generateDNSRecords = () => {
         return;
     }
 
+    const manualIpsInput = document.getElementById('gen-manual-ips-input');
+    const manualIpsRaw = manualIpsInput ? manualIpsInput.value.split(/[\n,;\s]+/).map(ip => ip.trim()).filter(Boolean) : [];
+    const usingManualIps = manualIpsRaw.length > 0;
+
     const selectedServerNames = (window._genRecordsState && window._genRecordsState.selectedServers) ? window._genRecordsState.selectedServers : [];
-    if (selectedServerNames.length === 0) {
-        alert('Please select at least one server.');
+    if (!usingManualIps && selectedServerNames.length === 0) {
+        alert('Please select at least one server, or enter IPs manually.');
         return;
     }
 
-    const servers = window.app.state.servers || [];
-    const allIps = [];
-    selectedServerNames.forEach(srvName => {
-        const srv = servers.find(s => s.name === srvName);
-        if (srv && srv.allIps) {
-            srv.allIps.forEach(ip => {
-                if (!allIps.includes(ip)) allIps.push(ip);
-            });
-        }
-    });
+    let allIps = [];
+    if (usingManualIps) {
+        manualIpsRaw.forEach(ip => {
+            if (!allIps.includes(ip)) allIps.push(ip);
+        });
+    } else {
+        const servers = window.app.state.servers || [];
+        selectedServerNames.forEach(srvName => {
+            const srv = servers.find(s => s.name === srvName);
+            if (srv && srv.allIps) {
+                srv.allIps.forEach(ip => {
+                    if (!allIps.includes(ip)) allIps.push(ip);
+                });
+            }
+        });
+    }
 
     if (allIps.length === 0) {
-        alert('Selected servers have no IPs.');
+        alert(usingManualIps ? 'No valid IPs found in the manual IPs field.' : 'Selected servers have no IPs.');
         return;
     }
 
@@ -9132,7 +9164,8 @@ window.generateDNSRecords = () => {
     outputArea.value = lines.join('\n');
     outputDiv.style.display = 'block';
     
-    let resultMessage = `✅ Generated <b>${lines.length}</b> record(s) using <b>${allIps.length}</b> IPs from <b>${selectedServerNames.length}</b> server(s). ${matched > 0 ? `<span style="color: var(--success);">${matched} matched in inventory</span>` : ''} ${unmatched > 0 ? `<span style="color: var(--warning);">${unmatched} not found in inventory (using domain as-is)</span>` : ''}`;
+    const ipSourceLabel = usingManualIps ? `manually entered IPs` : `<b>${selectedServerNames.length}</b> server(s)`;
+    let resultMessage = `✅ Generated <b>${lines.length}</b> record(s) using <b>${allIps.length}</b> IPs from ${ipSourceLabel}. ${matched > 0 ? `<span style="color: var(--success);">${matched} matched in inventory</span>` : ''} ${unmatched > 0 ? `<span style="color: var(--warning);">${unmatched} not found in inventory (using domain as-is)</span>` : ''}`;
     
     if (limitWarnings.length > 0) {
         limitWarnings.forEach(warning => {
