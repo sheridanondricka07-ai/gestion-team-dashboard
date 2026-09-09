@@ -2658,9 +2658,24 @@ window.switchToolsTab = (tab) => {
     window.app.updateDashboard();
 };
 
+window.toggleImacrosIdPerLine = () => {
+    const checked = document.getElementById('imacros-id-per-line').checked;
+    const ipsLabel = document.getElementById('imacros-ips-label');
+    const ipsTextarea = document.getElementById('imacros-ips');
+    const idNewsLabel = document.getElementById('imacros-id-news-label');
+    if (ipsLabel) ipsLabel.textContent = checked ? 'IPs / Domains (one pair per line, format: IP;domain;id)' : 'IPs / Domains (one pair per line, format: IP;domain)';
+    if (idNewsLabel) idNewsLabel.textContent = checked ? 'ID News (fallback if a line has none)' : 'ID News';
+    if (ipsTextarea) {
+        ipsTextarea.placeholder = checked
+            ? '51.38.72.123;zultranexo.world;25148&#10;51.38.72.126;grinnvolaz.com;25149&#10;51.38.72.127;scoutdive.live;25150'.replace(/&#10;/g, '\n')
+            : '51.38.72.123;zultranexo.world\n51.38.72.126;grinnvolaz.com\n51.38.72.127;scoutdive.live\n51.75.173.104;clervazin.com\n51.75.173.105;justrightmax.world\n51.195.146.50;fieldborne.space';
+    }
+};
+
 window.generateImacrosFile = () => {
     const ipsInput = document.getElementById('imacros-ips').value;
     const idNews = document.getElementById('imacros-id-news').value.trim();
+    const idPerLine = document.getElementById('imacros-id-per-line') && document.getElementById('imacros-id-per-line').checked;
     const limit = parseInt(document.getElementById('imacros-limit').value) || 0;
     const minMarge = parseInt(document.getElementById('imacros-marge-min').value) || 0;
     const maxMarge = parseInt(document.getElementById('imacros-marge-max').value) || 0;
@@ -2679,7 +2694,7 @@ window.generateImacrosFile = () => {
     for (const line of rawLines) {
         const trimmed = line.trim();
         if (!trimmed) continue;
-        
+
         let parts = [];
         if (trimmed.includes(';')) {
             parts = trimmed.split(';').map(p => p.trim());
@@ -2691,6 +2706,7 @@ window.generateImacrosFile = () => {
         let domain = '';
         let serverName = null;
         let customLimit = null;
+        let customId = null;
 
         if (parts.length === 1) {
             if (ipRegex.test(parts[0])) {
@@ -2704,19 +2720,35 @@ window.generateImacrosFile = () => {
                 ip = parts[1];
                 domain = parts[2] || '[DRDNS]';
                 if (parts.length >= 4) {
-                    const parsedLimit = parseInt(parts[3]);
-                    if (!isNaN(parsedLimit)) {
-                        customLimit = parsedLimit;
+                    if (idPerLine) {
+                        if (parts[3]) customId = parts[3];
+                        if (parts.length >= 5) {
+                            const parsedLimit = parseInt(parts[4]);
+                            if (!isNaN(parsedLimit)) customLimit = parsedLimit;
+                        }
+                    } else {
+                        const parsedLimit = parseInt(parts[3]);
+                        if (!isNaN(parsedLimit)) {
+                            customLimit = parsedLimit;
+                        }
                     }
                 }
             } else {
-                // Standard: IP;domain or IP;domain;limit
+                // Standard: IP;domain or IP;domain;limit (or IP;domain;id when idPerLine is on)
                 ip = parts[0];
                 domain = parts[1] || '[DRDNS]';
                 if (parts.length >= 3) {
-                    const parsedLimit = parseInt(parts[2]);
-                    if (!isNaN(parsedLimit)) {
-                        customLimit = parsedLimit;
+                    if (idPerLine) {
+                        if (parts[2]) customId = parts[2];
+                        if (parts.length >= 4) {
+                            const parsedLimit = parseInt(parts[3]);
+                            if (!isNaN(parsedLimit)) customLimit = parsedLimit;
+                        }
+                    } else {
+                        const parsedLimit = parseInt(parts[2]);
+                        if (!isNaN(parsedLimit)) {
+                            customLimit = parsedLimit;
+                        }
                     }
                 }
             }
@@ -2727,7 +2759,8 @@ window.generateImacrosFile = () => {
                 ip,
                 domain,
                 serverName,
-                customLimit
+                customLimit,
+                customId
             });
         }
     }
@@ -2826,8 +2859,10 @@ window.generateImacrosFile = () => {
              }
          }
 
+        const pairIdNews = (pair.customId !== null && pair.customId !== '') ? pair.customId : idNews;
+
         // domain,id_news,server_name,pmta_wait,ip,limit,random_number,(limit/2)+3,between_drops_wait
-        const row = `${pair.domain},${idNews},${serverName},${pmtaWaitVal},${pair.ip},${pairLimit},${randNum},${pairLimitHalfPlus3},${betweenDropsWait}`;
+        const row = `${pair.domain},${pairIdNews},${serverName},${pmtaWaitVal},${pair.ip},${pairLimit},${randNum},${pairLimitHalfPlus3},${betweenDropsWait}`;
         generatedLines.push(row);
     }
 
@@ -3154,13 +3189,17 @@ function renderTools(app, container) {
                         </h3>
                         
                         <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">IPs / Domains (one pair per line, format: IP;domain)</label>
+                            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);" id="imacros-ips-label">IPs / Domains (one pair per line, format: IP;domain)</label>
                             <textarea id="imacros-ips" placeholder="51.38.72.123;zultranexo.world&#10;51.38.72.126;grinnvolaz.com&#10;51.38.72.127;scoutdive.live&#10;51.75.173.104;clervazin.com&#10;51.75.173.105;justrightmax.world&#10;51.195.146.50;fieldborne.space" style="height: 150px; font-family: monospace; font-size: 0.85rem; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); resize: vertical;"></textarea>
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.78rem; color: var(--text-secondary); cursor: pointer; margin-top: 2px;">
+                                <input type="checkbox" id="imacros-id-per-line" onchange="window.toggleImacrosIdPerLine()" style="width: 15px; height: 15px; cursor: pointer;">
+                                Each line has its own ID News (add a 3rd column: <code style="background: var(--bg-primary); padding: 1px 5px; border-radius: 4px;">IP;domain;id</code>)
+                            </label>
                         </div>
 
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                             <div style="display: flex; flex-direction: column; gap: 6px;">
-                                <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">ID News</label>
+                                <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);" id="imacros-id-news-label">ID News</label>
                                 <input type="text" id="imacros-id-news" value="25148" style="padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.85rem;">
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 6px;">
