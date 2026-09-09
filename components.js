@@ -2663,11 +2663,11 @@ window.toggleImacrosIdPerLine = () => {
     const ipsLabel = document.getElementById('imacros-ips-label');
     const ipsTextarea = document.getElementById('imacros-ips');
     const idNewsLabel = document.getElementById('imacros-id-news-label');
-    if (ipsLabel) ipsLabel.textContent = checked ? 'IPs / Domains (one pair per line, format: IP;domain;id)' : 'IPs / Domains (one pair per line, format: IP;domain)';
+    if (ipsLabel) ipsLabel.textContent = checked ? 'IPs / Domains (one pair per line, format: IP;domain;send_size;id)' : 'IPs / Domains (one pair per line, format: IP;domain)';
     if (idNewsLabel) idNewsLabel.textContent = checked ? 'ID News (fallback if a line has none)' : 'ID News';
     if (ipsTextarea) {
         ipsTextarea.placeholder = checked
-            ? '51.38.72.123;zultranexo.world;25148&#10;51.38.72.126;grinnvolaz.com;25149&#10;51.38.72.127;scoutdive.live;25150'.replace(/&#10;/g, '\n')
+            ? '51.38.72.123;zultranexo.world;10000;25148\n51.38.72.126;grinnvolaz.com;10000;25149\n51.38.72.127;scoutdive.live;15000;25150'
             : '51.38.72.123;zultranexo.world\n51.38.72.126;grinnvolaz.com\n51.38.72.127;scoutdive.live\n51.75.173.104;clervazin.com\n51.75.173.105;justrightmax.world\n51.195.146.50;fieldborne.space';
     }
 };
@@ -2719,37 +2719,29 @@ window.generateImacrosFile = () => {
                 serverName = parts[0];
                 ip = parts[1];
                 domain = parts[2] || '[DRDNS]';
+                // parts[3] is always send_size/limit (as usual), parts[4] is the optional per-line id
                 if (parts.length >= 4) {
-                    if (idPerLine) {
-                        if (parts[3]) customId = parts[3];
-                        if (parts.length >= 5) {
-                            const parsedLimit = parseInt(parts[4]);
-                            if (!isNaN(parsedLimit)) customLimit = parsedLimit;
-                        }
-                    } else {
-                        const parsedLimit = parseInt(parts[3]);
-                        if (!isNaN(parsedLimit)) {
-                            customLimit = parsedLimit;
-                        }
+                    const parsedLimit = parseInt(parts[3]);
+                    if (!isNaN(parsedLimit)) {
+                        customLimit = parsedLimit;
                     }
                 }
+                if (idPerLine && parts.length >= 5 && parts[4]) {
+                    customId = parts[4];
+                }
             } else {
-                // Standard: IP;domain or IP;domain;limit (or IP;domain;id when idPerLine is on)
+                // Standard: IP;domain;send_size (limit stays in its usual 3rd spot),
+                // with an optional 4th column for per-line id when idPerLine is on.
                 ip = parts[0];
                 domain = parts[1] || '[DRDNS]';
                 if (parts.length >= 3) {
-                    if (idPerLine) {
-                        if (parts[2]) customId = parts[2];
-                        if (parts.length >= 4) {
-                            const parsedLimit = parseInt(parts[3]);
-                            if (!isNaN(parsedLimit)) customLimit = parsedLimit;
-                        }
-                    } else {
-                        const parsedLimit = parseInt(parts[2]);
-                        if (!isNaN(parsedLimit)) {
-                            customLimit = parsedLimit;
-                        }
+                    const parsedLimit = parseInt(parts[2]);
+                    if (!isNaN(parsedLimit)) {
+                        customLimit = parsedLimit;
                     }
+                }
+                if (idPerLine && parts.length >= 4 && parts[3]) {
+                    customId = parts[3];
                 }
             }
         }
@@ -3193,7 +3185,7 @@ function renderTools(app, container) {
                             <textarea id="imacros-ips" placeholder="51.38.72.123;zultranexo.world&#10;51.38.72.126;grinnvolaz.com&#10;51.38.72.127;scoutdive.live&#10;51.75.173.104;clervazin.com&#10;51.75.173.105;justrightmax.world&#10;51.195.146.50;fieldborne.space" style="height: 150px; font-family: monospace; font-size: 0.85rem; padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); resize: vertical;"></textarea>
                             <label style="display: flex; align-items: center; gap: 8px; font-size: 0.78rem; color: var(--text-secondary); cursor: pointer; margin-top: 2px;">
                                 <input type="checkbox" id="imacros-id-per-line" onchange="window.toggleImacrosIdPerLine()" style="width: 15px; height: 15px; cursor: pointer;">
-                                Each line has its own ID News (add a 3rd column: <code style="background: var(--bg-primary); padding: 1px 5px; border-radius: 4px;">IP;domain;id</code>)
+                                Each line has its own ID News (add a 4th column after send_size: <code style="background: var(--bg-primary); padding: 1px 5px; border-radius: 4px;">IP;domain;send_size;id</code>)
                             </label>
                         </div>
 
