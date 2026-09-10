@@ -2653,8 +2653,42 @@ window.switchEmailEnhancerView = (view) => {
     }
 };
 
+const TOOLS_NAV = [
+    { id: 'warmup', label: 'Warmup', icon: 'flame', tools: [
+        { id: 'hosted', label: 'hosted Tools', icon: 'layout-grid' },
+        { id: 'imacros', label: 'Generate imacros File', icon: 'file-cog' },
+    ]},
+    { id: 'content', label: 'Content & Email', icon: 'mail', tools: [
+        { id: 'generateText', label: 'Generate Text', icon: 'align-left' },
+        { id: 'extractHeaders', label: 'Extract Headers', icon: 'file-text' },
+        { id: 'footer', label: 'Extract Footer', icon: 'scissors' },
+        { id: 'cleanNews', label: 'Clean News', icon: 'sparkles' },
+        { id: 'emailEnhancer', label: 'Email Enhancer', icon: 'wand-2' },
+    ]},
+    { id: 'domains', label: 'Domains', icon: 'globe', tools: [
+        { id: 'domainAge', label: 'Domain Age Checker', icon: 'calendar' },
+        { id: 'domainFilter', label: 'Domain Filter', icon: 'filter' },
+        { id: 'domainCrossCheck', label: 'Domain Cross-Check', icon: 'scan-search' },
+    ]},
+    { id: 'encoders', label: 'Encoders', icon: 'binary', tools: [
+        { id: 'textEncoder', label: 'Text Encoder', icon: 'binary' },
+        { id: 'ipEncoder', label: 'IP Encoder', icon: 'network' },
+    ]},
+];
+
 window.switchToolsTab = (tab) => {
     window.app.state.toolsActiveTab = tab;
+    window.app.updateDashboard();
+};
+
+window.switchToolsCategory = (catId) => {
+    const g = TOOLS_NAV.find(x => x.id === catId);
+    if (!g || !g.tools.length) return;
+    const current = window.app.state.toolsActiveTab;
+    // keep the current tab if it already lives in this category, else jump to its first tool
+    if (!g.tools.some(t => t.id === current)) {
+        window.app.state.toolsActiveTab = g.tools[0].id;
+    }
     window.app.updateDashboard();
 };
 
@@ -3259,43 +3293,28 @@ function renderTools(app, container) {
     const role = app.state.currentUser.role;
     const activeTab = app.state.toolsActiveTab || 'hosted';
 
+    const activeGroup = TOOLS_NAV.find(g => g.tools.some(t => t.id === activeTab)) || TOOLS_NAV[0];
+
     container.innerHTML = `
-        <div style="padding: 16px 24px 0 24px; border-bottom: 1px solid var(--border-color); display: flex; gap: 24px; background: var(--bg-secondary); overflow-x: auto;">
-            <div onclick="window.switchToolsTab('hosted')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'hosted' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'hosted' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
-                <i data-lucide="layout-grid" style="width: 14px; height: 14px;"></i> hosted Tools
+        <div style="background: var(--bg-secondary); border-bottom: 1px solid var(--border-color);">
+            <div style="padding: 12px 24px 0 24px; display: flex; gap: 6px; flex-wrap: wrap;">
+                ${TOOLS_NAV.map(g => {
+                    const isActive = activeGroup.id === g.id;
+                    return `
+                    <div onclick="window.switchToolsCategory('${g.id}')" style="padding: 8px 14px; font-size: 0.8rem; font-weight: 700; cursor: pointer; border-radius: 8px 8px 0 0; display: flex; align-items: center; gap: 6px; transition: all 0.15s; background: ${isActive ? 'var(--bg-primary)' : 'transparent'}; color: ${isActive ? 'var(--text-primary)' : 'var(--text-secondary)'}; border: 1px solid ${isActive ? 'var(--border-color)' : 'transparent'}; border-bottom: none;">
+                        <i data-lucide="${g.icon}" style="width: 13px; height: 13px;"></i> ${g.label}
+                        <span style="font-size: 0.68rem; padding: 1px 5px; border-radius: 10px; background: ${isActive ? 'var(--bg-tertiary)' : 'rgba(255,255,255,0.05)'}; color: var(--text-secondary);">${g.tools.length}</span>
+                    </div>`;
+                }).join('')}
             </div>
-            <div onclick="window.switchToolsTab('imacros')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'imacros' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'imacros' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
-                <i data-lucide="file-cog" style="width: 14px; height: 14px;"></i> Generate imacros File
-            </div>
-            <div onclick="window.switchToolsTab('generateText')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'generateText' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'generateText' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
-                <i data-lucide="align-left" style="width: 14px; height: 14px;"></i> Generate Text
-            </div>
-            <div onclick="window.switchToolsTab('extractHeaders')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'extractHeaders' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'extractHeaders' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
-                <i data-lucide="file-text" style="width: 14px; height: 14px;"></i> Extract Headers
-            </div>
-            <div onclick="window.switchToolsTab('footer')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'footer' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'footer' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
-                <i data-lucide="scissors" style="width: 14px; height: 14px;"></i> Extract Footer
-            </div>
-            <div onclick="window.switchToolsTab('domainAge')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'domainAge' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'domainAge' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
-                <i data-lucide="calendar" style="width: 14px; height: 14px;"></i> Domain Age Checker
-            </div>
-            <div onclick="window.switchToolsTab('domainFilter')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'domainFilter' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'domainFilter' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
-                <i data-lucide="filter" style="width: 14px; height: 14px;"></i> Domain Filter
-            </div>
-            <div onclick="window.switchToolsTab('textEncoder')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'textEncoder' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'textEncoder' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
-                <i data-lucide="binary" style="width: 14px; height: 14px;"></i> Text Encoder
-            </div>
-            <div onclick="window.switchToolsTab('ipEncoder')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'ipEncoder' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'ipEncoder' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
-                <i data-lucide="network" style="width: 14px; height: 14px;"></i> IP Encoder
-            </div>
-            <div onclick="window.switchToolsTab('cleanNews')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'cleanNews' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'cleanNews' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
-                <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Clean News
-            </div>
-            <div onclick="window.switchToolsTab('emailEnhancer')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'emailEnhancer' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'emailEnhancer' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
-                <i data-lucide="wand-2" style="width: 14px; height: 14px;"></i> Email Enhancer
-            </div>
-            <div onclick="window.switchToolsTab('domainCrossCheck')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'domainCrossCheck' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'domainCrossCheck' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
-                <i data-lucide="scan-search" style="width: 14px; height: 14px;"></i> Domain Cross-Check
+            <div style="padding: 2px 24px 0 24px; display: flex; gap: 22px; flex-wrap: wrap; background: var(--bg-primary); border-top: 1px solid var(--border-color);">
+                ${activeGroup.tools.map(t => {
+                    const isActive = activeTab === t.id;
+                    return `
+                    <div onclick="window.switchToolsTab('${t.id}')" style="padding: 12px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${isActive ? 'var(--accent-primary)' : 'transparent'}; color: ${isActive ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+                        <i data-lucide="${t.icon}" style="width: 14px; height: 14px;"></i> ${t.label}
+                    </div>`;
+                }).join('')}
             </div>
         </div>
 
