@@ -399,7 +399,10 @@ export default async function handler(req, res) {
         }
     }
 
-    // 5. Automated Gmail IP Placement Status Sync (Daily at 10:30 AM Morocco Time / 09:30 UTC)
+    // 5. Automated Gmail IP Placement Status Sync
+    //    Triggered 3x/day by cron-job.org (?task=gmail-status) at 10:00/14:00/20:00 UTC
+    //    = 11:00 / 15:00 / 21:00 Morocco. Later runs keep an RDNS already set today and
+    //    only add new placements (spam never overrides rdns; unmatched IPs untouched).
     if (runGmailStatus) {
         console.log('Running Automated Gmail IP Placement Status Sync...');
         try {
@@ -507,17 +510,19 @@ export default async function handler(req, res) {
 
                 const foundIpsCount = Object.keys(resultsObj).length;
                 const formattedDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                // Runs 3x/day (11:00, 15:00, 21:00 Morocco). Show the actual run time.
+                const moroccoTime = new Date().toLocaleTimeString('en-GB', { timeZone: 'Africa/Casablanca', hour: '2-digit', minute: '2-digit' });
 
                 if (foundIpsCount === 0) {
                     // No matches at all: leave today's cell empty for every IP instead of
                     // writing 'down' - an empty cell means "no data", not "confirmed down".
 
                     // Send Telegram Warning
-                    const telegramMessage = `⚠️ <b>Daily Gmail IP Delivery Sync: IPs Not Found</b>\n` +
+                    const telegramMessage = `⚠️ <b>Gmail IP Delivery Sync: IPs Not Found</b>\n` +
                                             `📅 <b>Date:</b> ${formattedDate}\n` +
-                                            `⏰ <b>Time:</b> 10:30 AM (Morocco Time)\n\n` +
+                                            `⏰ <b>Time:</b> ${moroccoTime} (Morocco Time)\n\n` +
                                             `🔴 <b>No IPs Found:</b> No delivery data or IP headers were matched in your recent emails (last 12 hours).\n` +
-                                            `<i>Today's cells were left empty (no status written). Please verify test email delivery.</i>`;
+                                            `<i>Today's cells were left untouched (no status written). Please verify test email delivery.</i>`;
                     await sendTelegram(telegramMessage, 17);
 
                     results.gmailStatusSyncTriggered = true;
@@ -599,15 +604,15 @@ export default async function handler(req, res) {
                     }
 
                     // Send Telegram Success Report
-                    const telegramMessage = `📥 <b>Daily Gmail IP Delivery Sync</b>\n` +
+                    const telegramMessage = `📥 <b>Gmail IP Delivery Sync</b>\n` +
                                             `📅 <b>Date:</b> ${formattedDate}\n` +
-                                            `⏰ <b>Time:</b> 10:30 AM (Morocco Time)\n\n` +
+                                            `⏰ <b>Time:</b> ${moroccoTime} (Morocco Time)\n\n` +
                                             `📊 <b>STATUS SUMMARY:</b>\n` +
                                             `• <b>Total Checked:</b> <code>${targetIps.length}</code> IPs\n` +
                                             `• 🟢 <b>RDNS (Inbox):</b> <code>${rdnsCount}</code> IPs\n` +
                                             `• 🔴 <b>SPAM:</b> <code>${spamCount}</code> IPs\n` +
-                                            `• ⚪ <b>Not Found (left empty):</b> <code>${notFoundCount}</code> IPs\n\n` +
-                                            `⚙️ <i>IP statuses updated in the dashboard; unmatched IPs were left empty.</i>`;
+                                            `• ⚪ <b>Not Found (kept as-is):</b> <code>${notFoundCount}</code> IPs\n\n` +
+                                            `⚙️ <i>RDNS is kept once set today; later runs only add new placements (spam never overrides RDNS).</i>`;
                     await sendTelegram(telegramMessage, 17);
 
                     results.gmailStatusSyncTriggered = true;
