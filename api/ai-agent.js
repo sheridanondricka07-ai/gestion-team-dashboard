@@ -96,7 +96,11 @@ async function callGemini(apiKey, systemPrompt, history, message) {
     }
     contents.push({ role: 'user', parts: [{ text: message }] });
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    // "gemini-flash-latest" is a moving alias to the current stable Flash model,
+    // so it keeps working when Google retires a specific version (2.0-flash was
+    // removed Sep 2026). Override with GEMINI_MODEL env var if needed.
+    const model = process.env.GEMINI_MODEL || 'gemini-flash-latest';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     const resp = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -111,7 +115,10 @@ async function callGemini(apiKey, systemPrompt, history, message) {
         throw new Error(`Gemini HTTP ${resp.status}: ${err.error?.message || 'unknown'}`);
     }
     const data = await resp.json();
-    const text = stripThink(data.candidates?.[0]?.content?.parts?.[0]?.text || '');
+    // Newer Gemini models can return multiple parts (e.g. a thought part then the
+    // answer); concatenate every part that carries text.
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    const text = stripThink(parts.map(p => p && p.text ? p.text : '').join('').trim());
     if (!text) throw new Error('Gemini returned empty content');
     return text;
 }
