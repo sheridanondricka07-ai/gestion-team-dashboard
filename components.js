@@ -2658,6 +2658,162 @@ window.switchToolsTab = (tab) => {
     window.app.updateDashboard();
 };
 
+// ============================================================
+// Domain Cross-Check tool
+// Checks pasted domains against: warmup (last 24h), RDNS of prod
+// IPs, and the SPF (domainIncluded/subdomainIncluded) of extern
+// RPs currently in warmup. Reports exactly where each match is.
+// ============================================================
+window.runDomainCrossCheck = () => {
+    const inputEl = document.getElementById('dcc-input');
+    if (!inputEl) return;
+    window._dccInput = inputEl.value;
+
+    const cleanDomain = (d) => (d || '')
+        .toString().trim().toLowerCase()
+        .replace(/^https?:\/\//, '')
+        .replace(/^www\./, '')
+        .replace(/[\/\s].*$/, '')
+        .replace(/\.$/, '');
+
+    const domains = [...new Set(
+        inputEl.value.split(/[\n,;]+/).map(cleanDomain).filter(d => d.includes('.'))
+    )];
+
+    if (domains.length === 0) {
+        alert('Please paste at least one domain (one per line).');
+        return;
+    }
+
+    const app = window.app;
+    const state = app.state;
+    const now = Date.now();
+    const cutoff24h = now - 24 * 60 * 60 * 1000;
+
+    // domain-suffix aware match: a === b, or a is a subdomain of b, or b is a subdomain of a
+    const domMatches = (a, b) => {
+        if (!a || !b) return false;
+        return a === b || a.endsWith('.' + b) || b.endsWith('.' + a);
+    };
+
+    // ---- Index 1: warmup last 24h ----
+    const warmupIdx = {}; // clean domain -> [{server, ip, ts}]
+    Object.values(state.warmupData || {}).forEach(r => {
+        if (!r || !r.domain) return;
+        const ts = Number(r.timestamp) || 0;
+        if (ts < cutoff24h) return;
+        const d = cleanDomain(r.domain);
+        if (!d) return;
+        (warmupIdx[d] = warmupIdx[d] || []).push({ server: r.server || '?', ip: r.ip || '?', ts });
+    });
+
+    // ---- Index 2: RDNS of production IPs ----
+    const rdnsIdx = {}; // clean rdns host -> [{server, ip}]
+    (state.servers || []).forEach(srv => {
+        const ips = [...new Set([...(srv.allIps || []), srv.mainIp, srv.ip].filter(Boolean))];
+        ips.forEach(ip => {
+            const host = cleanDomain(getRdns(ip, state));
+            if (!host || !host.includes('.')) return;
+            (rdnsIdx[host] = rdnsIdx[host] || []).push({ server: srv.name || '?', ip });
+        });
+    });
+    // also fold in any stray vmtaResults not tied to a server row
+    Object.entries(state.vmtaResults || {}).forEach(([safeIp, data]) => {
+        const host = cleanDomain(data && data.ptr);
+        if (!host || !host.includes('.')) return;
+        const ip = safeIp.replace(/_/g, '.');
+        const arr = (rdnsIdx[host] = rdnsIdx[host] || []);
+        if (!arr.some(x => x.ip === ip)) arr.push({ server: '(vmta map)', ip });
+    });
+
+    // ---- Index 3: SPF (domainIncluded/subdomainIncluded) of extern RPs in warmup ----
+    // "in warmup" = the RP domain shows up anywhere in warmupData, or has a server assigned
+    const warmupRpDomains = new Set();
+    Object.values(state.warmupData || {}).forEach(r => {
+        if (r && r.domain) warmupRpDomains.add(cleanDomain(r.domain));
+    });
+    const externSpfIdx = {}; // included domain -> [{rpDomain, srv, field}]
+    (state.rpInventory || []).forEach(item => {
+        const rpDom = cleanDomain(item.rpDomain);
+        if (!rpDom) return;
+        let rpType = (item.rpType || '').toLowerCase().trim();
+        if (!rpType) {
+            const di = cleanDomain(item.domainIncluded);
+            rpType = (di && di === rpDom) ? 'intern' : (di ? 'extern' : '');
+        }
+        if (rpType !== 'extern') return;
+        const inWarmup = warmupRpDomains.has(rpDom) || !!(item.srv && item.srv !== '' && item.srv !== 'SENT');
+        if (!inWarmup) return;
+        [['domainIncluded', item.domainIncluded], ['subdomainIncluded', item.subdomainIncluded]].forEach(([field, val]) => {
+            const d = cleanDomain(val);
+            if (!d || !d.includes('.') || d === rpDom) return;
+            (externSpfIdx[d] = externSpfIdx[d] || []).push({ rpDomain: rpDom, srv: item.srv || '(unassigned)', field });
+        });
+    });
+
+    const fmtTs = (ts) => {
+        const diffH = Math.round((now - ts) / 3600000);
+        return diffH <= 1 ? 'just now' : `${diffH}h ago`;
+    };
+
+    const results = domains.map(domain => {
+        const hits = [];
+
+        Object.keys(warmupIdx).forEach(k => {
+            if (domMatches(domain, k)) {
+                warmupIdx[k].forEach(h => hits.push({
+                    source: 'warmup',
+                    label: `${h.server}`,
+                    detail: `IP ${h.ip} · ${fmtTs(h.ts)}${k !== domain ? ` · as ${k}` : ''}`
+                }));
+            }
+        });
+
+        Object.keys(rdnsIdx).forEach(k => {
+            if (domMatches(domain, k)) {
+                rdnsIdx[k].forEach(h => hits.push({
+                    source: 'rdns',
+                    label: `${h.server}`,
+                    detail: `IP ${h.ip} → RDNS ${k}`
+                }));
+            }
+        });
+
+        Object.keys(externSpfIdx).forEach(k => {
+            if (domMatches(domain, k)) {
+                externSpfIdx[k].forEach(h => hits.push({
+                    source: 'spf',
+                    label: `RP ${h.rpDomain}`,
+                    detail: `${h.field} = ${k} · srv ${h.srv}`
+                }));
+            }
+        });
+
+        return { domain, hits };
+    });
+
+    window._dccResults = results;
+    window._dccSummary = {
+        free: results.filter(r => r.hits.length === 0).length,
+        used: results.filter(r => r.hits.length > 0).length,
+        warmup: results.filter(r => r.hits.some(h => h.source === 'warmup')).length,
+        rdns: results.filter(r => r.hits.some(h => h.source === 'rdns')).length,
+        spf: results.filter(r => r.hits.some(h => h.source === 'spf')).length
+    };
+    window.app.updateDashboard();
+};
+
+window.copyDomainCrossCheck = (type) => {
+    const results = window._dccResults || [];
+    if (results.length === 0) { alert('Run a check first.'); return; }
+    const list = (type === 'free'
+        ? results.filter(r => r.hits.length === 0)
+        : results.filter(r => r.hits.length > 0)
+    ).map(r => r.domain);
+    if (list.length === 0) { alert(`No ${type.toUpperCase()} domains.`); return; }
+    navigator.clipboard.writeText(list.join('\n'));
+};
+
 window.toggleImacrosIdPerLine = () => {
     const checked = document.getElementById('imacros-id-per-line').checked;
     const ipsLabel = document.getElementById('imacros-ips-label');
@@ -3138,8 +3294,11 @@ function renderTools(app, container) {
             <div onclick="window.switchToolsTab('emailEnhancer')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'emailEnhancer' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'emailEnhancer' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
                 <i data-lucide="wand-2" style="width: 14px; height: 14px;"></i> Email Enhancer
             </div>
+            <div onclick="window.switchToolsTab('domainCrossCheck')" style="padding: 14px 4px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid ${activeTab === 'domainCrossCheck' ? 'var(--accent-primary)' : 'transparent'}; color: ${activeTab === 'domainCrossCheck' ? 'var(--text-primary)' : 'var(--text-secondary)'}; transition: all 0.2s; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+                <i data-lucide="scan-search" style="width: 14px; height: 14px;"></i> Domain Cross-Check
+            </div>
         </div>
-        
+
         <div id="tools-tab-content">
             ${activeTab === 'hosted' ? `
                 <div style="padding: 24px;">
@@ -3690,6 +3849,111 @@ function renderTools(app, container) {
                         <!-- HTML Code Panel -->
                         <div id="email-enhancer-view-code" style="display: none; flex-direction: column; gap: 10px; flex: 1; min-height: 700px;">
                             <textarea id="email-enhancer-output" readonly placeholder="Enhanced email HTML code will appear here..." style="flex: 1; min-height: 700px; font-family: monospace; font-size: 0.8rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); resize: vertical; line-height: 1.5;"></textarea>
+                        </div>
+                    </div>
+                </div>
+            ` : activeTab === 'domainCrossCheck' ? `
+                <div style="display: flex; gap: 24px; padding: 24px; flex-wrap: wrap;">
+                    <div class="card" style="flex: 1 1 340px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <h3 style="font-size: 1.1rem; margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                            <i data-lucide="scan-search" style="color: var(--accent-primary); width: 20px; height: 20px;"></i>
+                            Domain Cross-Check
+                        </h3>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin: 0;">
+                            Paste candidate domains (one per line). Checks each one against:
+                            <br>• <b>Warmup</b> — domains sent in the last 24h
+                            <br>• <b>RDNS</b> — reverse DNS of production IPs
+                            <br>• <b>Extern RP SPF</b> — domainIncluded / subdomainIncluded of extern RPs currently in warmup
+                            <br>Tells you exactly where each match was found.
+                        </p>
+
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <textarea id="dcc-input" oninput="window._dccInput = this.value;" placeholder="mydomain.com&#10;another-domain.net&#10;candidate-rp.org" style="height: 260px; font-family: monospace; font-size: 0.85rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); resize: vertical;">${window._dccInput || ''}</textarea>
+                        </div>
+
+                        <button onclick="window.runDomainCrossCheck()" style="padding: 12px; background: var(--accent-primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                            <i data-lucide="search" style="width: 16px; height: 16px;"></i> Check Domains
+                        </button>
+                        <div style="font-size: 0.72rem; color: var(--text-secondary); line-height: 1.4;">
+                            Uses data already loaded in the app (warmup cache, RDNS map, RP inventory). Run a Warmup Progress refresh first if you want the freshest 24h window.
+                        </div>
+                    </div>
+
+                    <div class="card" style="flex: 2 1 520px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                            <h3 style="font-size: 1.1rem; margin: 0; display: flex; align-items: center; gap: 8px;">
+                                <i data-lucide="list-checks" style="color: var(--success); width: 20px; height: 20px;"></i>
+                                Results ${window._dccResults ? `(${window._dccResults.length})` : ''}
+                            </h3>
+                            <div style="display: flex; gap: 8px;">
+                                <button onclick="window.copyDomainCrossCheck('free')" style="padding: 6px 10px; font-size: 0.75rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 4px; border-radius: 6px; cursor: pointer;">
+                                    <i data-lucide="copy" style="width: 12px; height: 12px;"></i> Copy FREE
+                                </button>
+                                <button onclick="window.copyDomainCrossCheck('used')" style="padding: 6px 10px; font-size: 0.75rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 4px; border-radius: 6px; cursor: pointer;">
+                                    <i data-lucide="copy" style="width: 12px; height: 12px;"></i> Copy USED
+                                </button>
+                            </div>
+                        </div>
+
+                        ${window._dccSummary ? `
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap; font-size: 0.78rem;">
+                                <span style="padding: 4px 10px; border-radius: 6px; background: rgba(34,197,94,0.12); color: #22c55e; font-weight: 600;">Free: ${window._dccSummary.free}</span>
+                                <span style="padding: 4px 10px; border-radius: 6px; background: rgba(239,68,68,0.12); color: #ef4444; font-weight: 600;">Used: ${window._dccSummary.used}</span>
+                                <span style="padding: 4px 10px; border-radius: 6px; background: rgba(59,130,246,0.12); color: #60a5fa; font-weight: 600;">Warmup 24h: ${window._dccSummary.warmup}</span>
+                                <span style="padding: 4px 10px; border-radius: 6px; background: rgba(168,85,247,0.12); color: #a855f7; font-weight: 600;">RDNS: ${window._dccSummary.rdns}</span>
+                                <span style="padding: 4px 10px; border-radius: 6px; background: rgba(234,88,12,0.12); color: #f97316; font-weight: 600;">Extern RP SPF: ${window._dccSummary.spf}</span>
+                            </div>
+                        ` : ''}
+
+                        <div style="overflow-x: auto; flex: 1; min-height: 350px;">
+                            <table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.78rem;">
+                                <thead>
+                                    <tr style="text-align: left; background: var(--bg-tertiary);">
+                                        <th style="padding: 10px 8px; border-bottom: 2px solid var(--border-color);">Domain</th>
+                                        <th style="padding: 10px 8px; border-bottom: 2px solid var(--border-color);">Status</th>
+                                        <th style="padding: 10px 8px; border-bottom: 2px solid var(--border-color);">Found In</th>
+                                        <th style="padding: 10px 8px; border-bottom: 2px solid var(--border-color);">Where exactly</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${(window._dccResults || []).map((r, idx) => {
+                                        const rowBg = idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent';
+                                        if (r.hits.length === 0) {
+                                            return `
+                                                <tr style="background: ${rowBg}; border-bottom: 1px solid var(--border-color);">
+                                                    <td style="padding: 9px 8px; font-weight: 600; color: var(--text-primary);">${r.domain}</td>
+                                                    <td style="padding: 9px 8px;"><span style="display:inline-block;padding:2px 8px;border-radius:4px;background:rgba(34,197,94,0.12);color:#22c55e;font-weight:700;font-size:0.72rem;">FREE</span></td>
+                                                    <td style="padding: 9px 8px; color: var(--text-secondary);">—</td>
+                                                    <td style="padding: 9px 8px; color: var(--text-secondary); font-style: italic;">Not used anywhere</td>
+                                                </tr>
+                                            `;
+                                        }
+                                        const badgeFor = (src) => {
+                                            if (src === 'warmup') return '<span style="display:inline-block;padding:2px 7px;border-radius:4px;background:rgba(59,130,246,0.14);color:#60a5fa;font-weight:700;font-size:0.68rem;margin:1px;">WARMUP 24h</span>';
+                                            if (src === 'rdns') return '<span style="display:inline-block;padding:2px 7px;border-radius:4px;background:rgba(168,85,247,0.14);color:#a855f7;font-weight:700;font-size:0.68rem;margin:1px;">RDNS</span>';
+                                            return '<span style="display:inline-block;padding:2px 7px;border-radius:4px;background:rgba(234,88,12,0.14);color:#f97316;font-weight:700;font-size:0.68rem;margin:1px;">EXTERN RP SPF</span>';
+                                        };
+                                        const sources = [...new Set(r.hits.map(h => h.source))];
+                                        const detailHtml = r.hits.map(h => `<div style="padding:2px 0;color:var(--text-secondary);"><span style="color:var(--text-primary);font-weight:600;">${h.label}</span> ${h.detail}</div>`).join('');
+                                        return `
+                                            <tr style="background: ${rowBg}; border-bottom: 1px solid var(--border-color);">
+                                                <td style="padding: 9px 8px; font-weight: 600; color: var(--text-primary); vertical-align: top;">${r.domain}</td>
+                                                <td style="padding: 9px 8px; vertical-align: top;"><span style="display:inline-block;padding:2px 8px;border-radius:4px;background:rgba(239,68,68,0.12);color:#ef4444;font-weight:700;font-size:0.72rem;">USED</span></td>
+                                                <td style="padding: 9px 8px; vertical-align: top;">${sources.map(badgeFor).join(' ')}</td>
+                                                <td style="padding: 9px 8px; vertical-align: top;">${detailHtml}</td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                    ${!(window._dccResults && window._dccResults.length > 0) ? `
+                                        <tr>
+                                            <td colspan="4" style="text-align: center; padding: 80px; color: var(--text-secondary);">
+                                                <i data-lucide="scan-search" style="width: 32px; height: 32px; opacity: 0.2; margin-bottom: 10px; display: inline-block;"></i>
+                                                <div style="font-size: 0.8rem;">Paste domains on the left and click Check.</div>
+                                            </td>
+                                        </tr>
+                                    ` : ''}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
