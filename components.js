@@ -8400,6 +8400,12 @@ GUIDELINES:
 7. If the user asks about RP domains, subdomains, domain inclusion, SPF types (Include, Arecord, MxRecord, Mx), or which domains are included/configured for specific RPs, search the RP INVENTORY section above. Present results in a clear table format.
 8. If the user asks about IP delivery statuses (RDNS, RP TEST, SPAM, DOWN, BOUNCE, PAUSED, Change DOM), reference the IP DELIVERY STATUS BREAKDOWN and the server infrastructure data.
 9. You have FULL access to ALL data in the dashboard. Never say you cannot provide information about domains, subdomains, RPs, IPs, servers, or any other data. Search through all provided context sections to find the answer.
+9b. ADDING NEW RPs: When the user asks you to ADD / CREATE / register new RP(s) into the system (e.g. "add these RPs", "zid had RPs", pastes a list of new RP domains to add), you CAN do it. Reply with ONE short sentence, then a single machine-readable block in EXACTLY this format (no code fences around it):
+<<ADD_RPS>>
+rpdomain1.com | domainIncluded_or_AUTO | subdomainIncluded_or_AUTO | Include_or_Arecord_or_AUTO | server_or_AUTO
+rpdomain2.com | AUTO | AUTO | AUTO | AUTO
+<<END_ADD_RPS>>
+Rules for the block: one RP per line, exactly 5 pipe-separated fields. Put the literal word AUTO for any field you are not 100% sure of — the system will auto-detect it from the RP's live SPF record on confirmation. Only fill domainIncluded / subdomainIncluded / type / server when the user explicitly gave them, or when that exact RP already appears in the RP INVENTORY context with those values. NEVER invent a server name or an included domain. Do not add RPs that already exist in the RP INVENTORY (mention they already exist instead). The user will see a preview table with Confirm / Cancel buttons — you do not need to ask for confirmation yourself, just emit the block.
 10. If the user asks to generate DNS records (e.g., for specific RPs, available/stock/unassigned RPs, or filtered RPs, using specified servers or all servers):
     a. Identify the target RPs ONLY from the "RP (RETURN PATH) INVENTORY" section. Do NOT use PTR domains, VMTA domains, or server domains as the target RPs.
     b. "Available", "stock", "unassigned", or "not affected to any server" RPs are those with "Server: Unassigned" (or empty server / blank server name).
@@ -8466,19 +8472,140 @@ GUIDELINES:
                 app.aiChatHistory.push({ role: 'model', text: `⚠️ <b>Error:</b> ${result.error}` });
             } else {
                 if (result.provider) window._aiLastProvider = result.provider;
-                app.aiChatHistory.push({ role: 'model', text: result.response });
+                const parsed = window._aiExtractAddRps(result.response || '');
+                if (parsed && parsed.rows.length > 0) {
+                    const token = 'rpact_' + Date.now();
+                    window._aiPendingRps = window._aiPendingRps || {};
+                    window._aiPendingRps[token] = parsed.rows;
+                    app.aiChatHistory.push({ role: 'model', text: parsed.cleanText + window._aiRenderAddRpsCard(token, parsed.rows) });
+                } else {
+                    app.aiChatHistory.push({ role: 'model', text: result.response });
+                }
             }
         } catch (e) {
             app.aiChatHistory.push({ role: 'model', text: `⚠️ <b>Connection Error:</b> Failed to reach AI Agent endpoint. (${e.message})` });
         } finally {
             if (typing) typing.style.display = 'none';
             app.updateDashboard();
-            
+
             setTimeout(() => {
                 const freshContainer = document.getElementById('ai-chat-messages');
                 if (freshContainer) freshContainer.scrollTop = freshContainer.scrollHeight;
             }, 100);
         }
+    };
+
+    // --- AI-proposed "add RPs" action: parse the block, show a confirm card, execute on confirm ---
+    window._aiExtractAddRps = (responseText) => {
+        const m = responseText.match(/<<ADD_RPS>>([\s\S]*?)<<END_ADD_RPS>>/i);
+        if (!m) return null;
+        const rows = m[1].split('\n').map(line => line.trim()).filter(Boolean).map(line => {
+            const parts = line.split('|').map(p => p.trim());
+            const isAuto = (v) => !v || /^auto$/i.test(v) || v === '-' || /^n\/?a$/i.test(v);
+            const rpDomain = (parts[0] || '').toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+            if (!rpDomain || !rpDomain.includes('.')) return null;
+            return {
+                rpDomain,
+                domainIncluded: isAuto(parts[1]) ? '' : parts[1],
+                subdomainIncluded: isAuto(parts[2]) ? '' : parts[2],
+                spfType: isAuto(parts[3]) ? '' : (/arec/i.test(parts[3]) ? 'Arecod' : 'Include'),
+                srv: isAuto(parts[4]) ? '' : parts[4]
+            };
+        }).filter(Boolean);
+        // strip the block (and an optional fenced wrapper) from the visible text
+        const cleanText = responseText
+            .replace(/```[a-z]*\s*<<ADD_RPS>>[\s\S]*?<<END_ADD_RPS>>\s*```/i, '')
+            .replace(/<<ADD_RPS>>[\s\S]*?<<END_ADD_RPS>>/i, '')
+            .trim() || 'I\'ve prepared the following RP(s) to add:';
+        return { rows, cleanText };
+    };
+
+    window._aiRenderAddRpsCard = (token, rows) => {
+        const rowsHtml = rows.map(r => `
+            <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 6px 8px; font-weight: 600;">${r.rpDomain}</td>
+                <td style="padding: 6px 8px; color: var(--text-secondary);">${r.domainIncluded || '<i>auto</i>'}</td>
+                <td style="padding: 6px 8px; color: var(--text-secondary);">${r.srv || '<i>auto</i>'}</td>
+                <td style="padding: 6px 8px; color: var(--text-secondary);">${r.spfType || '<i>auto</i>'}</td>
+            </tr>`).join('');
+        return `
+            <div id="aicard-${token}" style="margin-top: 10px; border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; background: var(--bg-primary);">
+                <div style="padding: 8px 12px; background: var(--bg-tertiary); font-size: 0.75rem; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                    <i data-lucide="git-branch-plus" style="width: 13px;"></i> Proposed RPs to add (${rows.length})
+                </div>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.75rem;">
+                        <thead><tr style="background: rgba(255,255,255,0.02); text-align: left;">
+                            <th style="padding: 6px 8px;">RP Domain</th><th style="padding: 6px 8px;">Domain Included</th><th style="padding: 6px 8px;">Server</th><th style="padding: 6px 8px;">Type</th>
+                        </tr></thead>
+                        <tbody>${rowsHtml}</tbody>
+                    </table>
+                </div>
+                <div id="aicard-status-${token}" style="padding: 8px 12px; font-size: 0.75rem; color: var(--text-secondary);">Fields marked <i>auto</i> are detected from each RP's live SPF on confirm.</div>
+                <div style="padding: 10px 12px; display: flex; gap: 8px; border-top: 1px solid var(--border-color);">
+                    <button onclick="window.aiConfirmAddRps('${token}')" style="padding: 7px 16px; border-radius: 6px; border: none; background: var(--success, #22c55e); color: #fff; font-weight: 700; font-size: 0.78rem; cursor: pointer;">Confirm & Add</button>
+                    <button onclick="window.aiCancelAddRps('${token}')" style="padding: 7px 16px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-tertiary); color: var(--text-secondary); font-weight: 600; font-size: 0.78rem; cursor: pointer;">Cancel</button>
+                </div>
+            </div>`;
+    };
+
+    window.aiCancelAddRps = (token) => {
+        if (window._aiPendingRps) delete window._aiPendingRps[token];
+        const card = document.getElementById('aicard-' + token);
+        if (card) card.querySelector('div:last-child').innerHTML = '<span style="font-size:0.75rem;color:var(--text-secondary);">Cancelled — nothing was added.</span>';
+    };
+
+    window.aiConfirmAddRps = async (token) => {
+        const rows = (window._aiPendingRps || {})[token];
+        if (!rows) return;
+        const statusEl = document.getElementById('aicard-status-' + token);
+        const card = document.getElementById('aicard-' + token);
+        const btnRow = card ? card.querySelector('div:last-child') : null;
+        if (btnRow) btnRow.innerHTML = '<span style="font-size:0.78rem;color:var(--text-secondary);">Working…</span>';
+
+        const items = [];
+        for (let i = 0; i < rows.length; i++) {
+            const r = rows[i];
+            if (statusEl) statusEl.textContent = `Resolving ${r.rpDomain} (${i + 1}/${rows.length})…`;
+            let domainIncluded = r.domainIncluded;
+            let subdomainIncluded = r.subdomainIncluded;
+            let spfType = r.spfType;
+            let srv = r.srv;
+            let rpType = '';
+
+            const needsDetect = !domainIncluded || !srv || !spfType;
+            if (needsDetect) {
+                try {
+                    const resp = await fetch('/api/extract-spf-info?domain=' + encodeURIComponent(r.rpDomain));
+                    const d = await resp.json();
+                    if (d && d.found) {
+                        domainIncluded = domainIncluded || d.domainIncluded || '';
+                        subdomainIncluded = subdomainIncluded || d.subdomainIncluded || '';
+                        spfType = spfType || (d.spfType === 'Arecod' || d.spfType === 'Arecord' ? 'Arecod' : 'Include');
+                        srv = srv || d.server || '';
+                        rpType = d.rpType || '';
+                    }
+                } catch (e) { /* fall back below */ }
+            }
+            // fallbacks + business rule: RP == domainIncluded => intern
+            if (!domainIncluded) domainIncluded = r.rpDomain;
+            if (!spfType) spfType = 'Include';
+            if (!rpType) rpType = (domainIncluded.trim().toLowerCase() === r.rpDomain.trim().toLowerCase()) ? 'intern' : 'extern';
+
+            items.push({ rpDomain: r.rpDomain, domainIncluded, subdomainIncluded, srv, spfType, rpType, alreadySent: false });
+        }
+
+        if (statusEl) statusEl.textContent = 'Adding to inventory…';
+        try {
+            await app.bulkImportRPInventory(items);
+        } catch (e) {
+            if (btnRow) btnRow.innerHTML = `<span style="font-size:0.78rem;color:var(--error);">Failed: ${e.message}</span>`;
+            return;
+        }
+        if (window._aiPendingRps) delete window._aiPendingRps[token];
+        const summary = items.map(it => `${it.rpDomain} → ${it.srv || 'unassigned'} (${it.rpType}, ${it.spfType})`).join('<br>');
+        if (statusEl) statusEl.innerHTML = `<b style="color:var(--success,#22c55e);">Done.</b> Processed ${items.length} RP(s):<br>${summary}`;
+        if (btnRow) btnRow.innerHTML = '<span style="font-size:0.75rem;color:var(--text-secondary);">Check the RPs page — any duplicates were skipped (see the popup notice).</span>';
     };
 
     if (!document.getElementById('ai-agent-styles')) {
