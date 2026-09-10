@@ -33,6 +33,16 @@ function stripThink(text) {
     return (text || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 }
 
+// Reject after `ms` so one slow/hung provider can't burn the whole
+// serverless budget — the caller then falls through to the next provider.
+function withTimeout(promise, ms, label) {
+    let t;
+    const timeout = new Promise((_, reject) => {
+        t = setTimeout(() => reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s`)), ms);
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(t));
+}
+
 // Build OpenAI-style messages array (Groq / OpenRouter / Pollinations all use this shape)
 function buildOpenAiMessages(systemPrompt, history, message) {
     const messages = [{ role: 'system', content: systemPrompt }];
@@ -96,10 +106,10 @@ async function callGemini(apiKey, systemPrompt, history, message) {
     }
     contents.push({ role: 'user', parts: [{ text: message }] });
 
-    // "gemini-flash-latest" is a moving alias to the current stable Flash model,
-    // so it keeps working when Google retires a specific version (2.0-flash was
-    // removed Sep 2026). Override with GEMINI_MODEL env var if needed.
-    const model = process.env.GEMINI_MODEL || 'gemini-flash-latest';
+    // gemini-2.5-flash: fast, non-thinking by default, 1M context, on the free
+    // tier (gemini-2.0-flash was removed by Google Sep 2026). Override with the
+    // GEMINI_MODEL env var if this one is ever retired too.
+    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     const resp = await fetch(url, {
         method: 'POST',
@@ -107,7 +117,9 @@ async function callGemini(apiKey, systemPrompt, history, message) {
         body: JSON.stringify({
             contents,
             systemInstruction: { parts: [{ text: systemPrompt }] },
-            generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
+            // thinkingBudget: 0 keeps 2.5-flash fast (thinking is on by default and
+            // roughly doubles latency, which risks the serverless timeout).
+            generationConfig: { temperature: 0.2, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } }
         })
     });
     if (!resp.ok) {
@@ -831,9 +843,20 @@ GUIDELINES:
         let usedProvider = '';
         const failures = [];
 
+        // Stay safely under the function's maxDuration (60s). Give each provider a
+        // slice of the remaining budget so a hung request can't trigger a Vercel
+        // FUNCTION_INVOCATION_TIMEOUT — we abandon it and try the next one instead.
+        const DEADLINE = Date.now() + 50000;
+        const PER_PROVIDER_MAX = 32000;
+
         for (const p of providers) {
+            const remaining = DEADLINE - Date.now();
+            if (remaining < 6000) {
+                failures.push(`${p.name}: skipped (out of time budget)`);
+                continue;
+            }
             try {
-                const out = await p.run();
+                const out = await withTimeout(p.run(), Math.min(remaining, PER_PROVIDER_MAX), p.name);
                 if (out && out.trim()) {
                     responseText = out;
                     usedProvider = p.name;
