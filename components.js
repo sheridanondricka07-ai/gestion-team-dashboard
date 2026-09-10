@@ -7535,8 +7535,8 @@ window.renderAiAgent = (app, container) => {
                 </div>
             ` : app.aiChatHistory.map(msg => `
                 <div style="display: flex; justify-content: ${msg.role === 'user' ? 'flex-end' : 'flex-start'};">
-                    <div style="max-width: 80%; padding: 12px 16px; border-radius: 12px; font-size: 0.85rem; line-height: 1.5; ${msg.role === 'user' 
-                        ? 'background: linear-gradient(135deg, var(--accent-primary) 0%, #2563eb 100%); color: #fff; border-bottom-right-radius: 2px; box-shadow: 0 4px 12px rgba(59,130,246,0.2);' 
+                    <div style="max-width: 80%; padding: 12px 16px; border-radius: 12px; font-size: 0.85rem; line-height: 1.5; ${msg.role === 'user'
+                        ? 'background: linear-gradient(135deg, var(--accent-primary) 0%, #2563eb 100%); color: #fff; border-bottom-right-radius: 2px; box-shadow: 0 4px 12px rgba(59,130,246,0.2); white-space: pre-wrap; word-break: break-word;'
                         : 'background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-color); border-bottom-left-radius: 2px;'
                     }">
                         ${msg.text}
@@ -8406,6 +8406,7 @@ rpdomain1.com | domainIncluded_or_AUTO | subdomainIncluded_or_AUTO | Include_or_
 rpdomain2.com | AUTO | AUTO | AUTO | AUTO
 <<END_ADD_RPS>>
 Rules for the block: one RP per line, exactly 5 pipe-separated fields. Put the literal word AUTO for any field you are not 100% sure of — the system will auto-detect it from the RP's live SPF record on confirmation. Only fill domainIncluded / subdomainIncluded / type / server when the user explicitly gave them, or when that exact RP already appears in the RP INVENTORY context with those values. NEVER invent a server name or an included domain. Do not add RPs that already exist in the RP INVENTORY (mention they already exist instead). The user will see a preview table with Confirm / Cancel buttons — you do not need to ask for confirmation yourself, just emit the block.
+The user often pastes RP details in a loose layout (space-, tab-, comma- or newline-separated, and newlines may be lost so several RPs can run together on one line). Typical column order per RP is: RP domain, domain included, subdomain included, optional server (looks like s_wmn3_XXXX), then type (Include / Arecord / Arecod). Split that stream into one <<ADD_RPS>> row per RP domain, mapping the columns you can identify and using AUTO for the rest. A token is a server only if it matches s_wmn3_ followed by digits; "Arecod"/"Arecord" => Arecord, otherwise Include.
 10. If the user asks to generate DNS records (e.g., for specific RPs, available/stock/unassigned RPs, or filtered RPs, using specified servers or all servers):
     a. Identify the target RPs ONLY from the "RP (RETURN PATH) INVENTORY" section. Do NOT use PTR domains, VMTA domains, or server domains as the target RPs.
     b. "Available", "stock", "unassigned", or "not affected to any server" RPs are those with "Server: Unassigned" (or empty server / blank server name).
