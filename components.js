@@ -7571,11 +7571,42 @@ window.renderAiAgent = (app, container) => {
                         Real-time AI analyst trained on your server inventory, Spamhaus status, and drops performance.
                     </p>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2); padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; color: #22c55e; font-weight: 600;">
-                    <span style="display: inline-block; width: 8px; height: 8px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 8px #22c55e; animation: pulse 2s infinite;"></span>
-                    AI Engine Online
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    ${window._aiLastProvider ? `<span style="font-size: 0.72rem; color: var(--text-secondary);">via <b style="color: var(--text-primary);">${window._aiLastProvider}</b></span>` : ''}
+                    <div onclick="window.toggleAiKeyPanel()" title="AI engine key settings" style="display: flex; align-items: center; gap: 8px; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2); padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; color: #22c55e; font-weight: 600; cursor: pointer;">
+                        <span style="display: inline-block; width: 8px; height: 8px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 8px #22c55e; animation: pulse 2s infinite;"></span>
+                        AI Engine Online
+                        <i data-lucide="settings" style="width: 12px; height: 12px;"></i>
+                    </div>
                 </div>
             </div>
+
+            ${app.state.currentUser && app.state.currentUser.role === 'admin' ? `
+            <div id="ai-key-panel" style="display: ${window._aiKeyPanelOpen ? 'flex' : 'none'}; flex-direction: column; gap: 10px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; flex-shrink: 0;">
+                <div style="font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                    <i data-lucide="key" style="width: 14px; color: #a855f7;"></i> Free AI Engine Key
+                </div>
+                <p style="margin: 0; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5;">
+                    The agent tries providers in order: <b>Gemini → Groq → OpenRouter → Pollinations</b> (keyless last resort). Every one is free. Paste <b>one</b> free key below and it works.
+                    <br>• <b>Gemini</b> (best for big data, 1M context): <a href="https://aistudio.google.com/apikey" target="_blank" style="color: var(--accent-primary);">aistudio.google.com/apikey</a>
+                    <br>• <b>Groq</b> (very fast, no card): <a href="https://console.groq.com/keys" target="_blank" style="color: var(--accent-primary);">console.groq.com/keys</a>
+                    <br><i>More secure option: set it as a Vercel env var (GEMINI_API_KEY / GROQ_API_KEY / OPENROUTER_API_KEY) instead — the Firebase DB is publicly readable.</i>
+                </p>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                    <select id="ai-key-provider" style="padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.8rem;">
+                        <option value="geminiApiKey">Gemini key</option>
+                        <option value="groqApiKey">Groq key</option>
+                        <option value="openrouterApiKey">OpenRouter key</option>
+                    </select>
+                    <input type="password" id="ai-key-value" placeholder="Paste API key…" style="flex: 1; min-width: 220px; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); font-size: 0.8rem;">
+                    <button onclick="window.saveAiAgentKey()" style="padding: 8px 16px; border-radius: 6px; border: none; background: var(--accent-primary); color: #fff; font-weight: 600; font-size: 0.8rem; cursor: pointer;">Save</button>
+                    <button onclick="window.clearAiAgentKeys()" style="padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-tertiary); color: var(--text-secondary); font-weight: 600; font-size: 0.8rem; cursor: pointer;">Clear all</button>
+                </div>
+                <div style="font-size: 0.72rem; color: var(--text-secondary);">
+                    Saved keys: ${['geminiApiKey','groqApiKey','openrouterApiKey'].filter(k => (app.state.aiConfig || {})[k]).map(k => `<span style="color:#22c55e;font-weight:600;">${k.replace('ApiKey','')}</span>`).join(', ') || '<i>none (using keyless Pollinations — small prompts only)</i>'}
+                </div>
+            </div>
+            ` : ''}
 
             <!-- Two Column Chat Layout -->
             <div style="display: flex; gap: 20px; flex: 1; min-height: 0;">
@@ -7694,6 +7725,42 @@ window.renderAiAgent = (app, container) => {
     window.clearAiChat = () => {
         app.aiChatHistory = [];
         app.updateDashboard();
+    };
+
+    window.toggleAiKeyPanel = () => {
+        window._aiKeyPanelOpen = !window._aiKeyPanelOpen;
+        const panel = document.getElementById('ai-key-panel');
+        if (panel) panel.style.display = window._aiKeyPanelOpen ? 'flex' : 'none';
+    };
+
+    window.saveAiAgentKey = async () => {
+        const provSel = document.getElementById('ai-key-provider');
+        const valInput = document.getElementById('ai-key-value');
+        if (!provSel || !valInput) return;
+        const field = provSel.value;
+        const val = valInput.value.trim();
+        if (!val) { alert('Paste a key first.'); return; }
+        app.state.aiConfig = app.state.aiConfig || {};
+        app.state.aiConfig[field] = val;
+        try {
+            await app.saveNode('aiConfig');
+            valInput.value = '';
+            alert(`${field.replace('ApiKey','')} key saved. The AI agent will use it on the next message.`);
+            app.updateDashboard();
+        } catch (e) {
+            alert('Failed to save key: ' + e.message);
+        }
+    };
+
+    window.clearAiAgentKeys = async () => {
+        if (!confirm('Remove all saved AI keys? The agent will fall back to the keyless free provider.')) return;
+        app.state.aiConfig = {};
+        try {
+            await app.saveNode('aiConfig');
+            app.updateDashboard();
+        } catch (e) {
+            alert('Failed to clear keys: ' + e.message);
+        }
     };
 
     window.handleAiInputKeydown = (e) => {
@@ -7993,7 +8060,8 @@ window.renderAiAgent = (app, container) => {
             let totalRPSpfFail = 0;
             const rpSpfTypeCounts = {};
 
-            const formattedRPInventory = rpInventory.map(item => {
+            const RP_LIST_CAP = 400;
+            const formattedRPInventoryLines = rpInventory.map(item => {
                 if (!item) return null;
                 totalRPs++;
                 const rpType = (item.rpType || 'intern').toLowerCase();
@@ -8006,7 +8074,9 @@ window.renderAiAgent = (app, container) => {
                 const spfType = item.spfType || 'Include';
                 rpSpfTypeCounts[spfType] = (rpSpfTypeCounts[spfType] || 0) + 1;
                 return `- RP Domain: ${item.rpDomain || 'N/A'}, Domain Included: ${item.domainIncluded || 'N/A'}, Subdomain Included: ${item.subdomainIncluded || 'N/A'}, Type: ${spfType}, Server: ${item.srv || 'Unassigned'}, RP Type: ${item.rpType || 'intern'}, Sent: ${item.alreadySent ? 'Yes' : 'No'}, SPF Status: ${item.spfStatus || 'N/A'}`;
-            }).filter(Boolean).join('\n');
+            }).filter(Boolean);
+            const formattedRPInventory = formattedRPInventoryLines.slice(0, RP_LIST_CAP).join('\n')
+                + (formattedRPInventoryLines.length > RP_LIST_CAP ? `\n... (+${formattedRPInventoryLines.length - RP_LIST_CAP} more RPs not listed here — use the pre-computed RP totals above for counts)` : '');
 
             const rpSpfTypeBreakdown = Object.entries(rpSpfTypeCounts)
                 .sort((a, b) => b[1] - a[1])
@@ -8211,9 +8281,16 @@ window.renderAiAgent = (app, container) => {
                 return `- Domain/IP: ${g.domain}${typeLabel}, Server: ${g.server}, IP: ${g.ip || 'N/A'}, Status: ${statusLabel}, Warmup Start Date: ${startDate}, Warmup Duration: ${durationDays} days, Warmup Drops Count: ${dropsCount}, Total Sent: ${totalOutAllTime.toLocaleString()}, Last Drop Size: ${lastOut.toLocaleString()} emails, Operator: ${user}, Recommendation: ${rec}`;
             };
 
-            const activeWarmupSummary = activeWarmupGroups.map(g => formatWarmupGroup(g, 'Active')).join('\n');
-            const inactiveWarmupSummary = inactiveWarmupGroups.map(g => formatWarmupGroup(g, 'Inactive')).join('\n');
-            const archivedWarmupSummary = archivedWarmupGroups.map(g => formatWarmupGroup(g, 'Archived (Sent)')).join('\n');
+            const WARMUP_LIST_CAP = 250;
+            const capList = (arr, label) => {
+                const shown = arr.slice(0, WARMUP_LIST_CAP).join('\n');
+                return arr.length > WARMUP_LIST_CAP
+                    ? shown + `\n... (+${arr.length - WARMUP_LIST_CAP} more ${label} groups not listed — see the pre-computed totals above)`
+                    : shown;
+            };
+            const activeWarmupSummary = capList(activeWarmupGroups.map(g => formatWarmupGroup(g, 'Active')), 'active');
+            const inactiveWarmupSummary = capList(inactiveWarmupGroups.map(g => formatWarmupGroup(g, 'Inactive')), 'inactive');
+            const archivedWarmupSummary = capList(archivedWarmupGroups.map(g => formatWarmupGroup(g, 'Archived (Sent)')), 'archived');
 
             const milestoneAveragesStr = milestones.map(m => {
                 const avg = warmupAverages[m];
@@ -8384,10 +8461,11 @@ GUIDELINES:
             });
 
             const result = await response.json();
-            
+
             if (result.error) {
                 app.aiChatHistory.push({ role: 'model', text: `⚠️ <b>Error:</b> ${result.error}` });
             } else {
+                if (result.provider) window._aiLastProvider = result.provider;
                 app.aiChatHistory.push({ role: 'model', text: result.response });
             }
         } catch (e) {

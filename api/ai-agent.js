@@ -22,6 +22,119 @@ async function getFirebaseData(path) {
     }
 }
 
+// ============================================================
+// AI PROVIDER CHAIN — every provider is free.
+// Order: Groq -> Gemini -> OpenRouter -> Pollinations (keyless).
+// Each returns plain text or throws; the handler falls through
+// to the next provider on any failure.
+// ============================================================
+
+function stripThink(text) {
+    return (text || '').replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+}
+
+// Build OpenAI-style messages array (Groq / OpenRouter / Pollinations all use this shape)
+function buildOpenAiMessages(systemPrompt, history, message) {
+    const messages = [{ role: 'system', content: systemPrompt }];
+    if (Array.isArray(history)) {
+        history.slice(-10).forEach(h => {
+            messages.push({ role: h.role === 'user' ? 'user' : 'assistant', content: h.text });
+        });
+    }
+    messages.push({ role: 'user', content: message });
+    return messages;
+}
+
+async function callGroq(apiKey, systemPrompt, history, message) {
+    const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify({
+            model: 'llama-3.3-70b-versatile',
+            messages: buildOpenAiMessages(systemPrompt, history, message),
+            temperature: 0.2,
+            max_tokens: 8000
+        })
+    });
+    if (!resp.ok) {
+        const err = await resp.text().catch(() => '');
+        throw new Error(`Groq HTTP ${resp.status}: ${err.slice(0, 200)}`);
+    }
+    const data = await resp.json();
+    const text = stripThink(data.choices?.[0]?.message?.content || '');
+    if (!text) throw new Error('Groq returned empty content');
+    return text;
+}
+
+async function callOpenRouter(apiKey, systemPrompt, history, message) {
+    const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify({
+            model: 'meta-llama/llama-3.3-70b-instruct:free',
+            messages: buildOpenAiMessages(systemPrompt, history, message),
+            temperature: 0.2,
+            max_tokens: 8000
+        })
+    });
+    if (!resp.ok) {
+        const err = await resp.text().catch(() => '');
+        throw new Error(`OpenRouter HTTP ${resp.status}: ${err.slice(0, 200)}`);
+    }
+    const data = await resp.json();
+    const text = stripThink(data.choices?.[0]?.message?.content || '');
+    if (!text) throw new Error('OpenRouter returned empty content');
+    return text;
+}
+
+async function callGemini(apiKey, systemPrompt, history, message) {
+    const contents = [];
+    if (Array.isArray(history)) {
+        history.slice(-10).forEach(h => {
+            contents.push({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.text }] });
+        });
+    }
+    contents.push({ role: 'user', parts: [{ text: message }] });
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            contents,
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
+        })
+    });
+    if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(`Gemini HTTP ${resp.status}: ${err.error?.message || 'unknown'}`);
+    }
+    const data = await resp.json();
+    const text = stripThink(data.candidates?.[0]?.content?.parts?.[0]?.text || '');
+    if (!text) throw new Error('Gemini returned empty content');
+    return text;
+}
+
+async function callPollinations(systemPrompt, history, message) {
+    const resp = await fetch('https://text.pollinations.ai/openai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            model: 'openai',
+            messages: buildOpenAiMessages(systemPrompt, history, message)
+        })
+    });
+    if (!resp.ok) {
+        const err = await resp.text().catch(() => '');
+        throw new Error(`Pollinations HTTP ${resp.status}: ${err.slice(0, 160)}`);
+    }
+    const data = await resp.json();
+    const text = stripThink(data.choices?.[0]?.message?.content || '');
+    if (!text) throw new Error('Pollinations returned empty content');
+    return text;
+}
+
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).send('Method Not Allowed');
@@ -34,9 +147,13 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: 'Message is required' });
         }
 
-        // 1. Fetch AI config for the API Key
+        // 1. Fetch AI config (optional API keys). Every provider is free;
+        //    keys just unlock a more reliable / larger-context backend.
+        //    Env vars are preferred (not exposed in the public Firebase DB).
         const aiConfig = await getFirebaseData('state/aiConfig') || {};
-        const apiKey = aiConfig.geminiApiKey;
+        const groqKey = process.env.GROQ_API_KEY || aiConfig.groqApiKey || '';
+        const geminiKey = process.env.GEMINI_API_KEY || aiConfig.geminiApiKey || '';
+        const openrouterKey = process.env.OPENROUTER_API_KEY || aiConfig.openrouterApiKey || '';
 
         let systemPrompt = clientSystemPrompt;
         if (!systemPrompt) {
@@ -692,155 +809,47 @@ GUIDELINES:
 12. If the user asks about revenue by domain name extension, TLD, domain extension performance, or which extensions are most/least profitable, look at the REVENUE BY SENDING DOMAIN EXTENSION / TLD section above. If they ask about revenue per specific sending domain, look at the REVENUE BY SENDING DOMAIN section. Each domain is tagged as [Domain (RP)] if it matched a known RP domain, or [RDNS] if the drop had no returnPath. Also use the summary stats for RP vs RDNS revenue comparison. Present ranked results with revenue, drops count, EPC, and CPM in a table format.`;
         }
 
+        // ---- Provider fallback chain (all free) ----
+        // Gemini first: its free tier has by far the largest context / tokens-per-minute
+        // budget, which suits this large pre-computed dashboard prompt. Groq / OpenRouter
+        // are lighter free tiers used as fallback; Pollinations is the keyless last resort.
+        const providers = [];
+        if (geminiKey)     providers.push({ name: 'Gemini 2.0 Flash',            run: () => callGemini(geminiKey, systemPrompt, history, message) });
+        if (groqKey)       providers.push({ name: 'Groq · llama-3.3-70b',        run: () => callGroq(groqKey, systemPrompt, history, message) });
+        if (openrouterKey) providers.push({ name: 'OpenRouter · llama-3.3-70b',  run: () => callOpenRouter(openrouterKey, systemPrompt, history, message) });
+        // keyless last-ditch (small prompts only, often rate-limited — but free with zero setup)
+        providers.push({ name: 'Pollinations (free, no key)', run: () => callPollinations(systemPrompt, history, message) });
+
         let responseText = '';
+        let usedProvider = '';
+        const failures = [];
 
-        if (apiKey) {
-            // --- USE GEMINI API ---
-            const contents = [];
-            
-            // Add chat history if present
-            if (Array.isArray(history)) {
-                history.slice(-10).forEach(h => {
-                    contents.push({
-                        role: h.role === 'user' ? 'user' : 'model',
-                        parts: [{ text: h.text }]
-                    });
-                });
-            }
-
-            // Add latest user prompt
-            contents.push({
-                role: 'user',
-                parts: [{ text: message }]
-            });
-
-            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-            
-            let apiResponse;
-            let retries = 4;
-            let delay = 1500;
-            let errData = {};
-
-            for (let i = 0; i < retries; i++) {
-                try {
-                    apiResponse = await fetch(geminiUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            contents: contents,
-                            systemInstruction: {
-                                parts: [{ text: systemPrompt }]
-                            },
-                            generationConfig: {
-                                temperature: 0.2,
-                                maxOutputTokens: 8192,
-                                thinkingConfig: {
-                                    thinkingBudget: 0
-                                }
-                            }
-                        })
-                    });
-
-                    if (apiResponse.ok) {
-                        break; // Success! Exit retry loop
-                    }
-
-                    errData = await apiResponse.json().catch(() => ({}));
-                    console.warn(`Gemini API attempt ${i + 1} failed:`, errData);
-                    
-                    // Stop retrying if it's a permanent error (like invalid API key)
-                    if (apiResponse.status === 400 && errData.error?.message?.toLowerCase().includes('key')) {
-                        break;
-                    }
-                } catch (e) {
-                    console.error(`Gemini API attempt ${i + 1} threw error:`, e);
-                    errData = { error: { message: e.message } };
-                }
-
-                if (i < retries - 1) {
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                    delay *= 1.5; // Exponential backoff
-                }
-            }
-
-            if (!apiResponse || !apiResponse.ok) {
-                return res.status(200).json({
-                    response: `⚠️ <b>Error communicating with Gemini API.</b><br>Please verify that your API key is correct and valid. Developer message: <i>${errData.error?.message || 'Unknown error'}</i>`
-                });
-            }
-
-            const data = await apiResponse.json();
-            responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "I was unable to generate a response. Please try again.";
-        } else {
-            // --- USE FREE POLLINATIONS.AI API (DeepSeek R1 — powerful reasoning model) ---
-            const messages = [
-                { role: 'system', content: systemPrompt }
-            ];
-
-            if (Array.isArray(history)) {
-                history.slice(-10).forEach(h => {
-                    messages.push({
-                        role: h.role === 'user' ? 'user' : 'assistant',
-                        content: h.text
-                    });
-                });
-            }
-
-            messages.push({
-                role: 'user',
-                content: message
-            });
-
+        for (const p of providers) {
             try {
-                const pollinationsUrl = 'https://text.pollinations.ai/openai';
-                const apiResponse = await fetch(pollinationsUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        model: 'deepseek-r1',
-                        messages: messages
-                    })
-                });
-
-                if (!apiResponse.ok) {
-                    throw new Error(`HTTP error! status: ${apiResponse.status}`);
+                const out = await p.run();
+                if (out && out.trim()) {
+                    responseText = out;
+                    usedProvider = p.name;
+                    break;
                 }
-
-                const data = await apiResponse.json();
-                let text = data.choices?.[0]?.message?.content || "I was unable to generate a response. Please try again.";
-                
-                // DeepSeek R1 sometimes includes <think>...</think> reasoning blocks — strip them for clean output
-                text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-                
-                responseText = text;
-            } catch (err) {
-                console.warn('Pollinations POST failed, falling back to GET...', err);
-                
-                // Construct compact prompt for GET request to avoid URL limit issues
-                let combinedPrompt = `System Instructions:\n${systemPrompt.slice(0, 2000)}\n\n`;
-                if (Array.isArray(history)) {
-                    history.slice(-4).forEach(h => {
-                        combinedPrompt += `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.text}\n`;
-                    });
-                }
-                combinedPrompt += `User: ${message}`;
-
-                const getUrl = `https://text.pollinations.ai/${encodeURIComponent(combinedPrompt.slice(0, 4000))}?model=deepseek-r1`;
-                const getResponse = await fetch(getUrl);
-                if (!getResponse.ok) {
-                    return res.status(200).json({
-                        response: `⚠️ <b>Error:</b> The free AI service is currently overloaded. Please add a free Gemini API Key in settings to get direct dedicated access.`
-                    });
-                }
-                let fallbackText = await getResponse.text();
-                fallbackText = fallbackText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-                responseText = fallbackText;
+                failures.push(`${p.name}: empty response`);
+            } catch (e) {
+                console.warn(`AI provider "${p.name}" failed:`, e.message);
+                failures.push(`${p.name}: ${e.message}`);
             }
         }
 
-        return res.status(200).json({ response: responseText });
+        if (!responseText) {
+            return res.status(200).json({
+                response: `⚠️ <b>All free AI providers are currently unavailable.</b><br>`
+                    + `For a reliable free backend, get a <b>Groq</b> API key (free, no card) at `
+                    + `<a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a> and set it as the Vercel environment variable `
+                    + `<code>GROQ_API_KEY</code> (recommended) or save it to <code>state/aiConfig/groqApiKey</code> in Firebase.`
+                    + `<br><br><i>Attempts: ${failures.join(' | ')}</i>`
+            });
+        }
+
+        return res.status(200).json({ response: responseText, provider: usedProvider });
 
     } catch (error) {
         console.error('Critical AI Agent Error:', error);
