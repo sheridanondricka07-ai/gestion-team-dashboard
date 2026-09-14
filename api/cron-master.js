@@ -88,7 +88,8 @@ export default async function handler(req, res) {
         spamhausTriggered: false,
         vmtaTriggered: false,
         spfTriggered: false,
-        ptrSpfTriggered: false
+        ptrSpfTriggered: false,
+        gmailStatusSyncTriggered: false
     };
 
     // Prevent duplicate executions by storing and checking task timestamps in Firebase
@@ -618,9 +619,30 @@ export default async function handler(req, res) {
                     results.gmailStatusSyncTriggered = true;
                     results.gmailStatusStats = { totalChecked: targetIps.length, rdnsCount, spamCount, notFoundCount };
                 }
+            } else {
+                console.warn('Gmail IP Status Sync skipped: missing state/gmail credentials or no servers.');
+                await sendTelegram(
+                    `⚠️ <b>Gmail IP Delivery Sync SKIPPED</b>\n` +
+                    `⏰ <b>Time:</b> ${new Date().toLocaleTimeString('en-GB', { timeZone: 'Africa/Casablanca', hour: '2-digit', minute: '2-digit' })} (Morocco Time)\n\n` +
+                    `Missing Gmail credentials (state/gmail) or no servers configured — nothing was checked this run.`,
+                    17
+                );
             }
         } catch (e) {
+            // Don't let a failure here (IMAP auth rejected, Google security block,
+            // network timeout...) pass silently as a "200 OK" cron run with nobody
+            // noticing that no IP got a status today. Surface it.
             console.error('Automated Gmail IP Status Sync Error:', e);
+            results.gmailStatusError = e.message;
+            try {
+                await sendTelegram(
+                    `❌ <b>Gmail IP Delivery Sync FAILED</b>\n` +
+                    `⏰ <b>Time:</b> ${new Date().toLocaleTimeString('en-GB', { timeZone: 'Africa/Casablanca', hour: '2-digit', minute: '2-digit' })} (Morocco Time)\n\n` +
+                    `⚠️ <b>Error:</b> <code>${(e.message || 'unknown error').slice(0, 300)}</code>\n\n` +
+                    `<i>No IP statuses were updated this run. If this repeats, check the Gmail app password / IMAP access for ${'state/gmail'}.</i>`,
+                    17
+                );
+            } catch (e2) { /* best-effort alert, never throw from here */ }
         }
     }
 
