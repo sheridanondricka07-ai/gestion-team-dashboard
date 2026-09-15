@@ -176,6 +176,9 @@ function renderTopBar(app) {
         </div>
         <div style="display: flex; align-items: center; gap: var(--spacing-md);">
             ${app.state.currentUser.role === 'admin' && app.state.currentView === 'management' ? `
+                <button onclick="window.detectServerWarmers()" ${app.state.warmerCheckRunning ? 'disabled' : ''} style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: #8B5CF6; border: none; color: white;" title="Check last 48h/3 days of Warmup activity to see who is actually warming each server">
+                    ${app.state.warmerCheckRunning ? '<i data-lucide="loader" class="spin" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Checking...' : '<i data-lucide="user-search" style="width:12px; vertical-align:middle; margin-right:4px;"></i> Verify Warmers'}
+                </button>
                 <button onclick="showAddServerModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary);">+ Server</button>
                 <button onclick="showAddRPModal()" style="padding: 6px 12px; font-size: 0.8rem; width: auto;">+ RP</button>
             ` : ''}
@@ -4918,6 +4921,149 @@ function renderOverview(app, container) {
     `;
     if (window.lucide) window.lucide.createIcons();
 }
+
+// ============================================================
+// Verify Warmers: checks the last 48h / 3 days of real Warmup
+// activity (warmupData.user) against each server's assigned
+// mailer, so the Management columns reflect who is actually
+// warming a server right now, not a stale/manual assignment.
+// ============================================================
+window.detectServerWarmers = async () => {
+    const app = window.app;
+    app.state.warmerCheckRunning = true;
+    app.updateDashboard();
+
+    try {
+        let warmupRecords = {};
+        try {
+            const snap = await window.db.ref('warmupData').once('value'); // full fetch, not the 2000-cap cache
+            warmupRecords = snap.val() || {};
+        } catch (e) {
+            warmupRecords = app.state.warmupData || {};
+        }
+
+        const mailers = (app.state.mailers || []).filter(m => m && m.name);
+        const servers = app.state.servers || [];
+
+        // Heuristic: "First Last" -> "f.last" (matches the login codes actually
+        // used in warmup records, e.g. "Hiba Ghazzali" -> "h.ghazzali"). Single-word
+        // names (shared/generic accounts) produce no code and are never auto-detected.
+        // Admin accounts are excluded on purpose: Management only has a column per
+        // mailer-role member, so "detecting" a server into an admin id would just
+        // make it vanish from every column instead of fixing anything.
+        const codeToMailer = {};
+        mailers.filter(m => m.role === 'mailer').forEach(m => {
+            const parts = m.name.trim().split(/\s+/);
+            if (parts.length < 2) return;
+            const code = (parts[0][0] + '.' + parts[parts.length - 1]).toLowerCase();
+            codeToMailer[code] = m;
+        });
+
+        const now = Date.now();
+        const cutoff48h = now - 48 * 60 * 60 * 1000;
+        const cutoff3d = now - 3 * 24 * 60 * 60 * 1000;
+        const counts48 = {}, counts3d = {};
+
+        Object.values(warmupRecords).forEach(r => {
+            if (!r || !r.server) return;
+            const ts = Number(r.timestamp) || 0;
+            if (ts < cutoff3d) return;
+            const mailer = codeToMailer[(r.user || '').trim().toLowerCase()];
+            if (!mailer) return; // unmapped user (admin account, ex-team-member, test data...)
+            (counts3d[r.server] = counts3d[r.server] || {})[mailer.id] = (counts3d[r.server][mailer.id] || 0) + 1;
+            if (ts >= cutoff48h) {
+                (counts48[r.server] = counts48[r.server] || {})[mailer.id] = (counts48[r.server][mailer.id] || 0) + 1;
+            }
+        });
+
+        const results = [];
+        servers.forEach(s => {
+            if (!s) return;
+            const c3 = counts3d[s.name];
+            if (!c3) return; // no mailer-attributable activity in the last 3 days at all
+            const detectedId = Object.keys(c3).sort((a, b) => c3[b] - c3[a])[0];
+            if (s.mailerId === detectedId) return; // already correctly assigned
+            const detectedMailer = mailers.find(m => m.id === detectedId);
+            const currentMailer = mailers.find(m => m.id === s.mailerId);
+            results.push({
+                serverId: s.id,
+                serverName: s.name,
+                currentMailerName: currentMailer ? currentMailer.name : 'Unassigned',
+                detectedMailerId: detectedId,
+                detectedMailerName: detectedMailer ? detectedMailer.name : '?',
+                drops3d: c3[detectedId],
+                drops48h: (counts48[s.name] || {})[detectedId] || 0
+            });
+        });
+
+        results.sort((a, b) => b.drops3d - a.drops3d);
+        window._warmerCheckResults = results;
+        window.showWarmerCheckModal();
+    } catch (e) {
+        alert('Verify Warmers failed: ' + e.message);
+    } finally {
+        app.state.warmerCheckRunning = false;
+        app.updateDashboard();
+    }
+};
+
+window.showWarmerCheckModal = () => {
+    const results = window._warmerCheckResults || [];
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'warmer-check-modal-overlay';
+
+    const rowsHtml = results.map(r => `
+        <tr style="border-bottom: 1px solid var(--border-color);" id="warmer-row-${r.serverId}">
+            <td style="padding: 8px; font-weight: 600;">${r.serverName}</td>
+            <td style="padding: 8px; color: var(--text-secondary);">${r.currentMailerName}</td>
+            <td style="padding: 8px; color: #a78bfa; font-weight: 600;">${r.detectedMailerName}</td>
+            <td style="padding: 8px; text-align: center;">${r.drops3d} <span style="color: var(--text-secondary); font-size: 0.7rem;">(${r.drops48h} in 48h)</span></td>
+            <td style="padding: 8px; text-align: right;">
+                <button onclick="window.reassignServerMailer('${r.serverId}', '${r.detectedMailerId}')" style="padding: 5px 12px; font-size: 0.72rem; width: auto; background: #8B5CF6; border: none; color: white; border-radius: 6px; cursor: pointer; font-weight: 600;">Reassign</button>
+            </td>
+        </tr>`).join('');
+
+    overlay.innerHTML = `
+        <div class="modal" style="width: 780px; max-width: 92vw;">
+            <h2 style="margin-bottom: 4px; display: flex; align-items: center; gap: 8px;"><i data-lucide="user-search" style="width: 20px; color: #a78bfa;"></i> Verify Warmers</h2>
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 16px;">
+                Based on who actually submitted Warmup drops for each server in the last 3 days (real <code>warmupData.user</code> activity), compared to the server's assigned mailer in Management. Only <b>mismatches</b> are listed — servers already correctly assigned aren't shown.
+                <br><i>Servers run under a generic/admin account (e.g. a shared "Reda" login) won't get a detected match here — this only flags cases where a specific team member is provably the real operator.</i>
+            </p>
+            <div style="max-height: 50vh; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+                    <thead><tr style="background: var(--bg-tertiary); text-align: left; position: sticky; top: 0;">
+                        <th style="padding: 8px;">Server</th><th style="padding: 8px;">Currently Assigned</th><th style="padding: 8px;">Actually Warming</th><th style="padding: 8px; text-align: center;">Drops (3d)</th><th></th>
+                    </tr></thead>
+                    <tbody id="warmer-check-tbody">${rowsHtml || `<tr><td colspan="5" style="padding: 30px; text-align: center; color: var(--text-secondary);">No mismatches found — every server with recent activity is correctly assigned.</td></tr>`}</tbody>
+                </table>
+            </div>
+            <div style="display: flex; gap: 12px; margin-top: 16px;">
+                <button onclick="this.closest('.modal-overlay').remove()" style="flex: 1; background: var(--bg-tertiary); color: var(--text-primary);">Close</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    if (window.lucide) window.lucide.createIcons();
+};
+
+window.reassignServerMailer = async (serverId, mailerId) => {
+    const app = window.app;
+    const srv = (app.state.servers || []).find(s => s.id === serverId);
+    if (!srv) return;
+    srv.mailerId = mailerId;
+    try {
+        await app.saveNode('servers');
+    } catch (e) {
+        alert('Failed to reassign: ' + e.message);
+        return;
+    }
+    const row = document.getElementById('warmer-row-' + serverId);
+    if (row) row.remove();
+    window._warmerCheckResults = (window._warmerCheckResults || []).filter(r => r.serverId !== serverId);
+    app.updateDashboard();
+};
 
 function renderManagement(app, container) {
     const { rps, servers, mailers, currentUser } = app.state;
