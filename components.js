@@ -1889,6 +1889,7 @@ window.cleanNewsContent = () => {
     const redactMsgId = document.getElementById('clean-news-opt-redact-msgid')?.checked ?? true;
     const removeTrackers = document.getElementById('clean-news-opt-remove-trackers')?.checked ?? true;
     const mirrorCc = document.getElementById('clean-news-opt-mirror-cc')?.checked ?? false;
+    const redactToCc = document.getElementById('clean-news-opt-redact-tocc')?.checked ?? true;
     const clearSubject = document.getElementById('clean-news-opt-clear-subject')?.checked ?? false;
 
     let headerText = raw;
@@ -1985,6 +1986,12 @@ window.cleanNewsContent = () => {
             const idx = txt.indexOf(toBlock) + toBlock.length;
             txt = txt.substring(0, idx) + '\r\n' + ccBlock + txt.substring(idx);
         }
+    }
+
+    if (redactToCc) {
+        // Blank out the real recipient entirely: To/Cc become a literal placeholder
+        // instead of the actual address, e.g. "To: [*to]" / "Cc: [*to]".
+        txt = txt.replace(/^(To|Cc):[^\r\n]*(?:\r?\n[ \t][^\r\n]*)*/igm, (m, hdr) => `${hdr}: [*to]`);
     }
 
     const fullClean = txt + (bodyText ? (sep + bodyText) : '');
@@ -3748,6 +3755,10 @@ function renderTools(app, container) {
                             <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
                                 <input type="checkbox" id="clean-news-opt-mirror-cc" style="accent-color: var(--accent-primary);">
                                 Mirror CC (Copy To -> Cc)
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
+                                <input type="checkbox" id="clean-news-opt-redact-tocc" checked style="accent-color: var(--accent-primary);">
+                                Redact To/Cc [*to]
                             </label>
                             <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-primary);">
                                 <input type="checkbox" id="clean-news-opt-clear-subject" style="accent-color: var(--accent-primary);">
