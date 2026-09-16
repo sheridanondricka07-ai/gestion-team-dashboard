@@ -2680,6 +2680,7 @@ const TOOLS_NAV = [
         { id: 'domainAge', label: 'Domain Age Checker', icon: 'calendar' },
         { id: 'domainFilter', label: 'Domain Filter', icon: 'filter' },
         { id: 'domainCrossCheck', label: 'Domain Cross-Check', icon: 'scan-search' },
+        { id: 'dmarcChecker', label: 'DMARC Checker', icon: 'shield-check' },
     ]},
     { id: 'encoders', label: 'Encoders', icon: 'binary', tools: [
         { id: 'textEncoder', label: 'Text Encoder', icon: 'binary' },
@@ -3270,6 +3271,93 @@ window.copyDomainAgeResults = () => {
     navigator.clipboard.writeText(text).then(() => {
         alert("Results copied to clipboard!");
     });
+};
+
+// ============================================================
+// DMARC Checker: bulk-checks _dmarc.<domain> TXT records.
+// Chunks large pastes (500+) into batches run with limited
+// concurrency, so it stays fast without hammering the endpoint.
+// ============================================================
+window.checkDmarcDomains = async () => {
+    const input = document.getElementById('dmarc-input').value;
+    const domains = [...new Set(input.split(/[\n,;\s]+/).map(d => d.trim().toLowerCase()).filter(d => d.includes('.')))];
+
+    if (domains.length === 0) {
+        alert('Please enter at least one valid domain name.');
+        return;
+    }
+
+    window._dmarcResults = [];
+    window._dmarcChecking = true;
+    window._dmarcProgress = { current: 0, total: domains.length };
+    window.app.updateDashboard();
+
+    const chunkSize = 30;
+    const maxConcurrent = 5;
+    const chunks = [];
+    for (let i = 0; i < domains.length; i += chunkSize) chunks.push(domains.slice(i, i + chunkSize));
+
+    const allResults = [];
+    let completed = 0;
+    let nextChunkIdx = 0;
+
+    const worker = async () => {
+        while (nextChunkIdx < chunks.length) {
+            const chunk = chunks[nextChunkIdx++];
+            try {
+                const resp = await fetch('/api/check-dmarc', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ domains: chunk })
+                });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (data.results) allResults.push(...data.results);
+                } else {
+                    chunk.forEach(d => allResults.push({ domain: d, hasDmarc: false, policy: null, record: null, error: `API error: ${resp.statusText}` }));
+                }
+            } catch (err) {
+                chunk.forEach(d => allResults.push({ domain: d, hasDmarc: false, policy: null, record: null, error: err.message }));
+            }
+            completed++;
+            window._dmarcProgress.current = Math.min(completed * chunkSize, domains.length);
+            window._dmarcResults = [...allResults];
+            window.app.updateDashboard();
+        }
+    };
+
+    await Promise.all(Array.from({ length: Math.min(maxConcurrent, chunks.length) }, worker));
+
+    window._dmarcChecking = false;
+    window.app.updateDashboard();
+};
+
+window.copyDmarcResults = (type) => {
+    const results = window._dmarcResults || [];
+    if (results.length === 0) {
+        alert('Run a check first.');
+        return;
+    }
+    const list = (type === 'no-dmarc'
+        ? results.filter(r => !r.hasDmarc)
+        : results.filter(r => r.hasDmarc && r.policy === 'none')
+    ).map(r => r.domain);
+
+    if (list.length === 0) {
+        alert(type === 'no-dmarc' ? 'No domains without DMARC.' : 'No domains with DMARC p=none.');
+        return;
+    }
+    navigator.clipboard.writeText(list.join('\n'));
+};
+
+window.copyAllDmarcResults = () => {
+    const results = window._dmarcResults || [];
+    if (results.length === 0) {
+        alert('Run a check first.');
+        return;
+    }
+    const csv = results.map(r => `${r.domain}\t${r.hasDmarc ? 'HAS_DMARC' : 'NO_DMARC'}\t${r.policy || ''}\t${(r.record || r.error || '').replace(/\t/g, ' ')}`).join('\n');
+    navigator.clipboard.writeText(csv);
 };
 
 window.exportDomainAgeResultsToExcel = () => {
@@ -3983,6 +4071,119 @@ function renderTools(app, container) {
                                             <td colspan="4" style="text-align: center; padding: 80px; color: var(--text-secondary);">
                                                 <i data-lucide="scan-search" style="width: 32px; height: 32px; opacity: 0.2; margin-bottom: 10px; display: inline-block;"></i>
                                                 <div style="font-size: 0.8rem;">Paste domains on the left and click Check.</div>
+                                            </td>
+                                        </tr>
+                                    ` : ''}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            ` : activeTab === 'dmarcChecker' ? `
+                <div style="display: flex; gap: 24px; padding: 24px; flex-wrap: wrap;">
+                    <div class="card" style="flex: 1 1 340px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <h3 style="font-size: 1.1rem; margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                            <i data-lucide="shield-check" style="color: var(--accent-primary); width: 20px; height: 20px;"></i>
+                            DMARC Checker
+                        </h3>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin: 0;">
+                            Paste domains (one per line). Handles large bulk lists (500+) — checked in parallel batches. Looks up each domain's <code>_dmarc.&lt;domain&gt;</code> TXT record.
+                        </p>
+
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <textarea id="dmarc-input" placeholder="mydomain.com&#10;another-domain.net&#10;example.org" style="height: 260px; font-family: monospace; font-size: 0.85rem; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); resize: vertical;"></textarea>
+                        </div>
+
+                        ${window._dmarcChecking ? `
+                            <div style="background: rgba(139, 92, 246, 0.05); border: 1px solid rgba(139, 92, 246, 0.15); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+                                <div style="display: flex; justify-content: space-between; font-size: 0.78rem; font-weight: 500;">
+                                    <span style="display: flex; align-items: center; gap: 6px;">
+                                        <i data-lucide="refresh-cw" class="spin" style="width:12px; height:12px; color: var(--accent-primary);"></i> Checking DMARC...
+                                    </span>
+                                    <span>${window._dmarcProgress?.current || 0}/${window._dmarcProgress?.total || 0}</span>
+                                </div>
+                                <div style="height: 6px; width: 100%; background: var(--bg-tertiary); border-radius: 3px; overflow: hidden;">
+                                    <div style="height: 100%; background: var(--gradient-primary); width: ${Math.round(((window._dmarcProgress?.current || 0) / (window._dmarcProgress?.total || 1)) * 100)}%; transition: width 0.2s;"></div>
+                                </div>
+                            </div>
+                        ` : `
+                            <button onclick="window.checkDmarcDomains()" style="padding: 12px; background: var(--accent-primary); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                <i data-lucide="shield-check" style="width: 16px; height: 16px;"></i> Check DMARC
+                            </button>
+                        `}
+
+                        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 4px;">
+                            <button onclick="window.copyDmarcResults('no-dmarc')" style="padding: 10px; font-size: 0.8rem; width: auto; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25); color: #ef4444; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                                <i data-lucide="copy" style="width: 12px; height: 12px;"></i> Copy NO DMARC domains
+                            </button>
+                            <button onclick="window.copyDmarcResults('dmarc-none')" style="padding: 10px; font-size: 0.8rem; width: auto; background: rgba(249,115,22,0.1); border: 1px solid rgba(249,115,22,0.25); color: #f97316; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                                <i data-lucide="copy" style="width: 12px; height: 12px;"></i> Copy DMARC p=none domains
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card" style="flex: 2 1 520px; padding: 24px; display: flex; flex-direction: column; gap: 16px; background: var(--bg-secondary);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+                            <h3 style="font-size: 1.1rem; margin: 0; display: flex; align-items: center; gap: 8px;">
+                                <i data-lucide="list-checks" style="color: var(--success); width: 20px; height: 20px;"></i>
+                                Results (${(window._dmarcResults || []).length})
+                            </h3>
+                            <button onclick="window.copyAllDmarcResults()" style="padding: 6px 10px; font-size: 0.75rem; width: auto; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; gap: 4px; border-radius: 6px; cursor: pointer;">
+                                <i data-lucide="copy" style="width: 12px; height: 12px;"></i> Copy All (CSV)
+                            </button>
+                        </div>
+
+                        ${window._dmarcResults && window._dmarcResults.length > 0 ? (() => {
+                            const results = window._dmarcResults;
+                            const noDmarc = results.filter(r => !r.hasDmarc).length;
+                            const pNone = results.filter(r => r.hasDmarc && r.policy === 'none').length;
+                            const pQuarantine = results.filter(r => r.hasDmarc && r.policy === 'quarantine').length;
+                            const pReject = results.filter(r => r.hasDmarc && r.policy === 'reject').length;
+                            return `
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap; font-size: 0.78rem;">
+                                <span style="padding: 4px 10px; border-radius: 6px; background: rgba(239,68,68,0.12); color: #ef4444; font-weight: 600;">No DMARC: ${noDmarc}</span>
+                                <span style="padding: 4px 10px; border-radius: 6px; background: rgba(249,115,22,0.12); color: #f97316; font-weight: 600;">p=none: ${pNone}</span>
+                                <span style="padding: 4px 10px; border-radius: 6px; background: rgba(234,179,8,0.12); color: #eab308; font-weight: 600;">p=quarantine: ${pQuarantine}</span>
+                                <span style="padding: 4px 10px; border-radius: 6px; background: rgba(34,197,94,0.12); color: #22c55e; font-weight: 600;">p=reject: ${pReject}</span>
+                            </div>`;
+                        })() : ''}
+
+                        <div style="overflow-x: auto; flex: 1; min-height: 350px;">
+                            <table style="width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.78rem;">
+                                <thead>
+                                    <tr style="text-align: left; background: var(--bg-tertiary);">
+                                        <th style="padding: 10px 8px; border-bottom: 2px solid var(--border-color);">Domain</th>
+                                        <th style="padding: 10px 8px; border-bottom: 2px solid var(--border-color);">DMARC</th>
+                                        <th style="padding: 10px 8px; border-bottom: 2px solid var(--border-color);">Policy</th>
+                                        <th style="padding: 10px 8px; border-bottom: 2px solid var(--border-color);">Raw Record</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${(window._dmarcResults || []).map((r, idx) => {
+                                        const rowBg = idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent';
+                                        if (!r.hasDmarc) {
+                                            return `
+                                                <tr style="background: ${rowBg}; border-bottom: 1px solid var(--border-color);">
+                                                    <td style="padding: 9px 8px; font-weight: 600; color: var(--text-primary);">${r.domain}</td>
+                                                    <td style="padding: 9px 8px;"><span style="display:inline-block;padding:2px 8px;border-radius:4px;background:rgba(239,68,68,0.12);color:#ef4444;font-weight:700;font-size:0.72rem;">NO DMARC</span></td>
+                                                    <td style="padding: 9px 8px; color: var(--text-secondary);">—</td>
+                                                    <td style="padding: 9px 8px; color: var(--text-secondary); font-style: italic;">${r.error ? 'Error: ' + r.error : 'No _dmarc TXT record found'}</td>
+                                                </tr>`;
+                                        }
+                                        const policyColor = r.policy === 'reject' ? '#22c55e' : (r.policy === 'quarantine' ? '#eab308' : '#f97316');
+                                        return `
+                                            <tr style="background: ${rowBg}; border-bottom: 1px solid var(--border-color);">
+                                                <td style="padding: 9px 8px; font-weight: 600; color: var(--text-primary);">${r.domain}</td>
+                                                <td style="padding: 9px 8px;"><span style="display:inline-block;padding:2px 8px;border-radius:4px;background:rgba(34,197,94,0.12);color:#22c55e;font-weight:700;font-size:0.72rem;">HAS DMARC</span></td>
+                                                <td style="padding: 9px 8px;"><span style="font-weight: 700; color: ${policyColor};">p=${r.policy || '?'}</span></td>
+                                                <td style="padding: 9px 8px; color: var(--text-secondary); font-family: monospace; font-size: 0.72rem; max-width: 320px; overflow-wrap: break-word;">${r.record}</td>
+                                            </tr>`;
+                                    }).join('')}
+                                    ${!(window._dmarcResults && window._dmarcResults.length > 0) ? `
+                                        <tr>
+                                            <td colspan="4" style="text-align: center; padding: 80px; color: var(--text-secondary);">
+                                                <i data-lucide="shield-check" style="width: 32px; height: 32px; opacity: 0.2; margin-bottom: 10px; display: inline-block;"></i>
+                                                <div style="font-size: 0.8rem;">Paste domains on the left and click Check DMARC.</div>
                                             </td>
                                         </tr>
                                     ` : ''}
