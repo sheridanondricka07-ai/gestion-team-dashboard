@@ -8659,6 +8659,27 @@ window.renderAiAgent = (app, container) => {
                 return `- Reach ${m} emails/Drop: ${avg !== null ? `${avg.toLocaleString()} total sent` : 'No data yet'}`;
             }).join('\n');
 
+            // Per-operator sent totals: each raw warmup record's outVal is the size of
+            // THAT single drop (not a running cumulative), so summing outVal per user
+            // within a time window gives an exact "total sent in that window" per person —
+            // pre-computed here so the AI never has to (and never has to say it can't).
+            const nowForUserTotals = Date.now();
+            const last24hCutoff = nowForUserTotals - 24 * 60 * 60 * 1000;
+            const last7dCutoff = nowForUserTotals - 7 * 24 * 60 * 60 * 1000;
+            const userTotals24h = {}, userTotals7d = {}, userTotalsAllTime = {};
+            rawWarmupRecords.forEach(r => {
+                const u = (r.user || '').trim() || 'Unknown';
+                const out = Number(r.outVal) || 0;
+                const ts = Number(r.timestamp) || 0;
+                userTotalsAllTime[u] = (userTotalsAllTime[u] || 0) + out;
+                if (ts >= last7dCutoff) userTotals7d[u] = (userTotals7d[u] || 0) + out;
+                if (ts >= last24hCutoff) userTotals24h[u] = (userTotals24h[u] || 0) + out;
+            });
+            const allOperators = Object.keys(userTotalsAllTime).sort((a, b) => (userTotals24h[b] || 0) - (userTotals24h[a] || 0));
+            const operatorSentBreakdown = allOperators.map(u =>
+                `- ${u}: ${(userTotals24h[u] || 0).toLocaleString()} sent (last 24h), ${(userTotals7d[u] || 0).toLocaleString()} sent (last 7d), ${(userTotalsAllTime[u] || 0).toLocaleString()} sent (all-time)`
+            ).join('\n');
+
             const systemPrompt = `You are "Gestion Team AI Agent", an intelligent assistant integrated into the Team Emailing Infrastructure Dashboard.
 Your job is to analyze real-time infrastructure, server blacklists (Spamhaus), VMTA/PTR status, drop revenue performance, RP (Return Path) inventory, IP delivery statuses, and domain/IP warmup progress to answer questions, extract data, and generate insights.
 
@@ -8688,6 +8709,11 @@ DOMAIN WARMUP INTELLIGENCE (LEARNED STRATEGY / SCHEMA):
 ------------------
 Learned from ${learnedDomains} domains. Cumulative sent targets needed to scale drops safely:
 ${milestoneAveragesStr || 'No learned milestone data yet.'}
+
+TOTAL EMAILS SENT PER OPERATOR/MAILER (PRE-COMPUTED FROM EVERY WARMUP DROP — USE THESE EXACT NUMBERS):
+------------------
+Each warmup record's own send size is summed per operator (not the cumulative "Total Sent" from the ACTIVE/INACTIVE/ARCHIVED groups below, which is per-domain since that domain's warmup started). Use THIS section whenever the user asks for "total sent last 24h/7d/today" for a mailer/operator — do not say this can't be computed.
+${operatorSentBreakdown || 'No warmup drop records with an operator found.'}
 
 ACTIVE DOMAIN WARMUP GROUPS:
 ------------------
@@ -8788,6 +8814,7 @@ The user often pastes RP details in a loose layout (space-, tab-, comma- or newl
     j. CRITICAL: Each line in the code block must start exactly with the domainIncluded. Do NOT prepend or prefix any server IPs, server names, or any other metadata to the record lines. Do not use brackets, quotes, or placeholders.
     k. Include limits/warnings in your response if applicable: if record type is Arecord and the number of IPs > 49, warn the user. If record type is Include and the number of IPs > 99, warn the user.
 11. If the user asks about domain warmup progress, start date, duration of warmup, drops count, total sent, last drop size, or warmup strategy/recommendations, refer directly to the ACTIVE DOMAIN WARMUP GROUPS, INACTIVE DOMAIN WARMUP GROUPS, ARCHIVED DOMAIN WARMUP GROUPS, and DOMAIN WARMUP INTELLIGENCE sections above. Respond with details about start date, duration in days, and recommendations computed from historical data.
+11b. If the user asks how much a specific mailer/operator/user sent (last 24h, last 7d, all-time, or generically "total sent"), use the TOTAL EMAILS SENT PER OPERATOR/MAILER section above — it is already computed per person, per time window, from every individual drop. Never say this cannot be calculated; that section exists precisely for this question.
 12. If the user asks about revenue by domain name extension, TLD, domain extension performance, or which extensions are most/least profitable, look at the REVENUE BY SENDING DOMAIN EXTENSION / TLD section above. If they ask about revenue per specific sending domain, look at the REVENUE BY SENDING DOMAIN section. Each domain is tagged as [Domain (RP)] if it matched a known RP domain, or [RDNS] if the drop had no returnPath. Also use the summary stats for RP vs RDNS revenue comparison. Present ranked results with revenue, drops count, EPC, and CPM in a table format.`;
 
             return systemPrompt;
