@@ -8842,6 +8842,20 @@ The user often pastes RP details in a loose layout (space-, tab-, comma- or newl
         const typing = document.getElementById('ai-chat-typing');
         if (typing) typing.style.display = 'flex';
 
+        // warmupData is deliberately excluded from the main Firebase listener (see
+        // mergeCloudData in app.js) and is normally only populated by visiting the
+        // Warmup Progress page. If the user comes straight to AI Agent it's still
+        // empty, and every warmup/operator-sent question would silently see no data.
+        if (!app.state.warmupData || Object.keys(app.state.warmupData).length === 0) {
+            try {
+                const warmupSnap = await window.db.ref('warmupData').orderByKey().limitToLast(2000).once('value');
+                app.state.warmupData = warmupSnap.val() || {};
+                window._lastWarmupFetchTime = Date.now();
+            } catch (e) {
+                // proceed with whatever we have; compileAiSystemPrompt tolerates empty warmupData
+            }
+        }
+
         // Compile prompt client side to bypass Firebase fetches on the server
         const systemPrompt = window.compileAiSystemPrompt(app);
 
