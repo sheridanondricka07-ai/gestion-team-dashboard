@@ -275,17 +275,83 @@ function extractRootDomain(domain) {
 }
 
 // ==========================================
+// ==========================================
+// DMARC BULK CHECK CODE (POST, mode: 'dmarc')
+// Folded into this file rather than its own endpoint — Vercel Hobby
+// caps a deployment at 12 serverless functions.
+// ==========================================
+
+async function safeResolveTxtDmarc(domain, timeoutMs = 4000) {
+    try {
+        const lookup = dns.resolveTxt(domain);
+        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('DNS Timeout')), timeoutMs));
+        return await Promise.race([lookup, timeout]);
+    } catch (e) {
+        return null;
+    }
+}
+
+function findDmarcRecord(records) {
+    if (!records) return null;
+    const flat = records
+        .map(chunks => chunks.join(''))
+        .filter(r => r.trim().toLowerCase().startsWith('v=dmarc1'));
+    return flat.length > 0 ? flat[0] : null;
+}
+
+function extractDmarcTag(record, tag) {
+    for (const part of record.split(';')) {
+        const eq = part.indexOf('=');
+        if (eq === -1) continue;
+        const key = part.slice(0, eq).trim().toLowerCase();
+        if (key === tag) return part.slice(eq + 1).trim().toLowerCase();
+    }
+    return null;
+}
+
+async function checkDmarcDomain(rawDomain) {
+    const domain = (rawDomain || '').trim().toLowerCase()
+        .replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[\/\s].*$/, '');
+    if (!domain || !domain.includes('.')) {
+        return { domain: rawDomain, hasDmarc: false, policy: null, record: null, error: 'Invalid domain' };
+    }
+    try {
+        const records = await safeResolveTxtDmarc(`_dmarc.${domain}`);
+        const record = findDmarcRecord(records);
+        if (!record) {
+            return { domain, hasDmarc: false, policy: null, record: null };
+        }
+        return {
+            domain,
+            hasDmarc: true,
+            policy: extractDmarcTag(record, 'p'),
+            subdomainPolicy: extractDmarcTag(record, 'sp'),
+            pct: extractDmarcTag(record, 'pct'),
+            record
+        };
+    } catch (e) {
+        return { domain, hasDmarc: false, policy: null, record: null, error: e.message };
+    }
+}
+
+// ==========================================
 // MAIN HANDLER
 // ==========================================
 
 export default async function handler(req, res) {
     if (req.method === 'POST') {
-        // Bulk domain check
-        const { domains } = req.body;
+        const { domains, mode } = req.body;
         if (!domains || !Array.isArray(domains)) {
             return res.status(400).json({ error: 'Invalid domains list provided' });
         }
 
+        if (mode === 'dmarc') {
+            const batch = domains.slice(0, 60); // client chunks larger bulk pastes
+            const results = await Promise.all(batch.map(d => checkDmarcDomain(d)));
+            return res.status(200).json({ results });
+        }
+
+        // Default: bulk WHOIS domain age check
         const results = [];
         for (const domain of domains) {
             if (!domain.trim()) continue;

@@ -27,9 +27,6 @@
     },
     "api/sync-telegram-warmup.js": {
       "maxDuration": 60
-    },
-    "api/check-dmarc.js": {
-      "maxDuration": 60
     }
   },
   "rewrites": [

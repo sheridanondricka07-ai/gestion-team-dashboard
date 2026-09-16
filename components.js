@@ -3305,10 +3305,10 @@ window.checkDmarcDomains = async () => {
         while (nextChunkIdx < chunks.length) {
             const chunk = chunks[nextChunkIdx++];
             try {
-                const resp = await fetch('/api/check-dmarc', {
+                const resp = await fetch('/api/extract-spf-info', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ domains: chunk })
+                    body: JSON.stringify({ domains: chunk, mode: 'dmarc' })
                 });
                 if (resp.ok) {
                     const data = await resp.json();
