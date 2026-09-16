@@ -3338,13 +3338,16 @@ window.copyDmarcResults = (type) => {
         alert('Run a check first.');
         return;
     }
+    // "p=none" bucket is strict: policy=none AND no rua/ruf mailto reporting address —
+    // i.e. truly unmonitored (e.g. "v=DMARC1; p=none;"), not just unenforced with
+    // someone still watching reports (e.g. "v=DMARC1; p=none; rua=mailto:...").
     const list = (type === 'no-dmarc'
         ? results.filter(r => !r.hasDmarc)
-        : results.filter(r => r.hasDmarc && r.policy === 'none')
+        : results.filter(r => r.hasDmarc && r.policy === 'none' && !/mailto:/i.test(r.record || ''))
     ).map(r => r.domain);
 
     if (list.length === 0) {
-        alert(type === 'no-dmarc' ? 'No domains without DMARC.' : 'No domains with DMARC p=none.');
+        alert(type === 'no-dmarc' ? 'No domains without DMARC.' : 'No domains with a bare DMARC p=none (no mailto reporting).');
         return;
     }
     navigator.clipboard.writeText(list.join('\n'));
@@ -4116,8 +4119,8 @@ function renderTools(app, container) {
                             <button onclick="window.copyDmarcResults('no-dmarc')" style="padding: 10px; font-size: 0.8rem; width: auto; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25); color: #ef4444; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 8px; cursor: pointer; font-weight: 600;">
                                 <i data-lucide="copy" style="width: 12px; height: 12px;"></i> Copy NO DMARC domains
                             </button>
-                            <button onclick="window.copyDmarcResults('dmarc-none')" style="padding: 10px; font-size: 0.8rem; width: auto; background: rgba(249,115,22,0.1); border: 1px solid rgba(249,115,22,0.25); color: #f97316; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 8px; cursor: pointer; font-weight: 600;">
-                                <i data-lucide="copy" style="width: 12px; height: 12px;"></i> Copy DMARC p=none domains
+                            <button onclick="window.copyDmarcResults('dmarc-none')" title="Only bare p=none records with no rua/ruf mailto reporting address" style="padding: 10px; font-size: 0.8rem; width: auto; background: rgba(249,115,22,0.1); border: 1px solid rgba(249,115,22,0.25); color: #f97316; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                                <i data-lucide="copy" style="width: 12px; height: 12px;"></i> Copy p=none (no mailto) domains
                             </button>
                         </div>
                     </div>
