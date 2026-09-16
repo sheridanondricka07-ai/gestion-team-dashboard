@@ -1990,8 +1990,9 @@ window.cleanNewsContent = () => {
 
     if (redactToCc) {
         // Blank out the real recipient entirely: To/Cc become a literal placeholder
-        // instead of the actual address, e.g. "To: [*to]" / "Cc: [*to]".
-        txt = txt.replace(/^(To|Cc):[^\r\n]*(?:\r?\n[ \t][^\r\n]*)*/igm, (m, hdr) => `${hdr}: [*to]`);
+        // instead of the actual address — always exactly "To: [*to]" / "Cc: [*to]",
+        // regardless of how the header name was cased in the source.
+        txt = txt.replace(/^(To|Cc):[^\r\n]*(?:\r?\n[ \t][^\r\n]*)*/igm, (m, hdr) => `${hdr.toLowerCase() === 'to' ? 'To' : 'Cc'}: [*to]`);
     }
 
     const fullClean = txt + (bodyText ? (sep + bodyText) : '');
