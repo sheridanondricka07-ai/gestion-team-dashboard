@@ -2754,12 +2754,15 @@ window.runDomainCrossCheck = () => {
     });
 
     // Servers marked "TO CANCEL" are being decommissioned — their RDNS/SPF assignment
-    // shouldn't block reusing a domain elsewhere.
+    // shouldn't block reusing a domain elsewhere. Track which IPs currently belong to
+    // an active (non-cancelled) server, so anything else — cancelled, or simply no
+    // longer attached to any server at all (removed from prod, but vmtaResults never
+    // gets cleaned up) — is never treated as "in use".
     const canceledServerNames = new Set((state.servers || []).filter(s => s && s.markedForCancel === true).map(s => s.name));
-    const canceledIps = new Set();
+    const activeServerIps = new Set();
     (state.servers || []).forEach(srv => {
-        if (srv && srv.markedForCancel === true) {
-            [...(srv.allIps || []), srv.mainIp, srv.ip].filter(Boolean).forEach(ip => canceledIps.add(ip));
+        if (srv && srv.markedForCancel !== true) {
+            [...(srv.allIps || []), srv.mainIp, srv.ip].filter(Boolean).forEach(ip => activeServerIps.add(ip));
         }
     });
 
@@ -2774,10 +2777,12 @@ window.runDomainCrossCheck = () => {
             (rdnsIdx[host] = rdnsIdx[host] || []).push({ server: srv.name || '?', ip });
         });
     });
-    // also fold in any stray vmtaResults not tied to a server row (skip cancelled IPs)
+    // Fold in vmtaResults entries too, but ONLY for IPs still attached to a current
+    // active server — an IP no longer listed on any server (removed from prod) or only
+    // on a cancelled one must not count as "in use", even if a stale PTR record lingers.
     Object.entries(state.vmtaResults || {}).forEach(([safeIp, data]) => {
         const ip = safeIp.replace(/_/g, '.');
-        if (canceledIps.has(ip)) return;
+        if (!activeServerIps.has(ip)) return;
         const host = cleanDomain(data && data.ptr);
         if (!host || !host.includes('.')) return;
         const arr = (rdnsIdx[host] = rdnsIdx[host] || []);
