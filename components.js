@@ -2753,9 +2753,20 @@ window.runDomainCrossCheck = () => {
         (warmupIdx[d] = warmupIdx[d] || []).push({ server: r.server || '?', ip: r.ip || '?', ts });
     });
 
+    // Servers marked "TO CANCEL" are being decommissioned — their RDNS/SPF assignment
+    // shouldn't block reusing a domain elsewhere.
+    const canceledServerNames = new Set((state.servers || []).filter(s => s && s.markedForCancel === true).map(s => s.name));
+    const canceledIps = new Set();
+    (state.servers || []).forEach(srv => {
+        if (srv && srv.markedForCancel === true) {
+            [...(srv.allIps || []), srv.mainIp, srv.ip].filter(Boolean).forEach(ip => canceledIps.add(ip));
+        }
+    });
+
     // ---- Index 2: RDNS of production IPs ----
     const rdnsIdx = {}; // clean rdns host -> [{server, ip}]
     (state.servers || []).forEach(srv => {
+        if (srv && srv.markedForCancel === true) return; // skip servers being cancelled
         const ips = [...new Set([...(srv.allIps || []), srv.mainIp, srv.ip].filter(Boolean))];
         ips.forEach(ip => {
             const host = cleanDomain(getRdns(ip, state));
@@ -2763,11 +2774,12 @@ window.runDomainCrossCheck = () => {
             (rdnsIdx[host] = rdnsIdx[host] || []).push({ server: srv.name || '?', ip });
         });
     });
-    // also fold in any stray vmtaResults not tied to a server row
+    // also fold in any stray vmtaResults not tied to a server row (skip cancelled IPs)
     Object.entries(state.vmtaResults || {}).forEach(([safeIp, data]) => {
+        const ip = safeIp.replace(/_/g, '.');
+        if (canceledIps.has(ip)) return;
         const host = cleanDomain(data && data.ptr);
         if (!host || !host.includes('.')) return;
-        const ip = safeIp.replace(/_/g, '.');
         const arr = (rdnsIdx[host] = rdnsIdx[host] || []);
         if (!arr.some(x => x.ip === ip)) arr.push({ server: '(vmta map)', ip });
     });
@@ -2788,6 +2800,7 @@ window.runDomainCrossCheck = () => {
             rpType = (di && di === rpDom) ? 'intern' : (di ? 'extern' : '');
         }
         if (rpType !== 'extern') return;
+        if (item.srv && canceledServerNames.has(item.srv)) return; // server being decommissioned
         const inWarmup = warmupRpDomains.has(rpDom) || !!(item.srv && item.srv !== '' && item.srv !== 'SENT');
         if (!inWarmup) return;
         [['domainIncluded', item.domainIncluded], ['subdomainIncluded', item.subdomainIncluded]].forEach(([field, val]) => {
@@ -3989,7 +4002,7 @@ function renderTools(app, container) {
                             <br>• <b>Warmup</b> — domains sent in the last 24h
                             <br>• <b>RDNS</b> — reverse DNS of production IPs
                             <br>• <b>Extern RP SPF</b> — domainIncluded / subdomainIncluded of extern RPs currently in warmup
-                            <br>Tells you exactly where each match was found.
+                            <br>Tells you exactly where each match was found. Servers marked "TO CANCEL" are excluded from RDNS/SPF matching (they're being decommissioned).
                         </p>
 
                         <div style="display: flex; flex-direction: column; gap: 6px;">
